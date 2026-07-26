@@ -3,44 +3,26 @@ package com.gymtracker.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.feature.logging.LoggingRoute
 import dagger.hilt.android.AndroidEntryPoint
 
-/** The single activity. Navigation and real screens arrive with M1. */
+/** The single activity. A navigation graph arrives when there is more than one destination. */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             GymTrackerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    BlankScreen()
+                    LoggingRoute()
                 }
             }
         }
-    }
-}
-
-/** Placeholder content so the skeleton is installable and launchable. */
-@Composable
-fun BlankScreen(modifier: Modifier = Modifier) {
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding))
-    }
-}
-
-@Preview
-@Composable
-private fun BlankScreenPreview() {
-    GymTrackerTheme {
-        BlankScreen()
     }
 }
