@@ -14,11 +14,16 @@ import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.session.SessionDao
+import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
+import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -42,7 +47,7 @@ object DataModule {
     ): GymTrackerDatabase =
         Room
             .databaseBuilder(context, GymTrackerDatabase::class.java, GymTrackerDatabase.NAME)
-            .addMigrations(GymTrackerDatabase.MIGRATION_1_2)
+            .addMigrations(GymTrackerDatabase.MIGRATION_1_2, GymTrackerDatabase.MIGRATION_2_3)
             .build()
 
     @Provides
@@ -50,6 +55,13 @@ object DataModule {
 
     @Provides
     fun exerciseDao(database: GymTrackerDatabase): ExerciseDao = database.exerciseDao()
+
+    @Provides
+    fun sessionExerciseDao(database: GymTrackerDatabase): SessionExerciseDao = database.sessionExerciseDao()
+
+    @Provides
+    fun addExerciseToSession(sessionExercises: SessionExerciseRepository): AddExerciseToSession =
+        AddExerciseToSession(sessionExercises) { SessionExerciseId(UUID.randomUUID().toString()) }
 
     /** Lenient about unknown keys so a catalog gaining a field does not break older installs. */
     @Provides
@@ -99,4 +111,7 @@ abstract class DataBindings {
 
     @Binds
     abstract fun exerciseCatalog(impl: RoomExerciseCatalog): ExerciseCatalog
+
+    @Binds
+    abstract fun sessionExercises(impl: RoomSessionExerciseRepository): SessionExerciseRepository
 }

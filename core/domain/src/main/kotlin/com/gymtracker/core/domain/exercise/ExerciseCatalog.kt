@@ -1,6 +1,7 @@
 package com.gymtracker.core.domain.exercise
 
 import com.gymtracker.core.domain.model.Exercise
+import com.gymtracker.core.domain.model.UserId
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -11,9 +12,13 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ExerciseCatalog {
     /**
-     * Exercises whose name matches [query], alphabetically.
+     * Exercises whose name matches [query], most recently used first and the rest alphabetically.
      *
      * @param query a substring match on the name. Blank returns the whole catalog.
+     * @param forMember whose usage history decides the ranking.
      */
-    fun search(query: String): Flow<List<Exercise>>
+    fun search(
+        query: String,
+        forMember: UserId,
+    ): Flow<List<Exercise>>
 }

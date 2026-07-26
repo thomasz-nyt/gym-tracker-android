@@ -10,13 +10,20 @@ build:
 
 complexity:
   LongParameterList:
-    # Composables legitimately take many parameters; state hoisting is the point.
-    ignoreAnnotated: ['Composable']
+    # Composables legitimately take many parameters; state hoisting is the point. A
+    # @HiltViewModel constructor is written by the DI graph, never by hand, so the usual
+    # "too many arguments to call comfortably" argument does not apply either. Cohesion is
+    # still worth watching: ActiveSessionViewModel currently drives two screens and should
+    # split when the search screen grows.
+    ignoreAnnotated: ['Composable', 'HiltViewModel']
     # Test data builders take one defaulted parameter per field on purpose, so a test can
     # name only the field it cares about. The rule is about production APIs.
     excludes: ['**/test/**', '**/androidTest/**']
   TooManyFunctions:
     ignoreAnnotatedFunctions: ['Composable']
+    # A Hilt @Module is a list of @Provides bindings. Its length tracks how many things the
+    # graph holds, not how much responsibility one class has taken on.
+    ignoreAnnotated: ['Module']
 
 naming:
   FunctionNaming:

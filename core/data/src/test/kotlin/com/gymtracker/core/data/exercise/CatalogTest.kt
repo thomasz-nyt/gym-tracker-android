@@ -8,6 +8,7 @@ import app.cash.turbine.test
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.domain.model.BodyPart
 import com.gymtracker.core.domain.model.Equipment
+import com.gymtracker.core.domain.model.UserId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -30,6 +31,7 @@ class CatalogTest {
     private lateinit var dao: ExerciseDao
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val member = UserId("alice")
 
     private val bundled =
         """
@@ -89,7 +91,7 @@ class CatalogTest {
         runTest {
             seeder().seedIfEmpty(now = 1L)
 
-            val bench = RoomExerciseCatalog(dao, json).search("Bench").first().single()
+            val bench = RoomExerciseCatalog(dao, json).search("Bench", member).first().single()
 
             assertEquals("Bench Press", bench.name)
             assertEquals(listOf(BodyPart.CHEST), bench.primaryMuscles)
@@ -104,7 +106,7 @@ class CatalogTest {
         runTest {
             seeder().seedIfEmpty(now = 1L)
 
-            val names = RoomExerciseCatalog(dao, json).search("").first().map { it.name }
+            val names = RoomExerciseCatalog(dao, json).search("", member).first().map { it.name }
 
             assertEquals(listOf("ab roller", "Bench Press", "Cable Fly"), names)
         }
@@ -115,15 +117,15 @@ class CatalogTest {
             seeder().seedIfEmpty(now = 1L)
             val catalog = RoomExerciseCatalog(dao, json)
 
-            assertEquals(listOf("Bench Press"), catalog.search("press").first().map { it.name })
-            assertEquals(listOf("ab roller"), catalog.search("ROLL").first().map { it.name })
-            assertEquals(listOf("Cable Fly"), catalog.search("  Cable  ".trim()).first().map { it.name })
+            assertEquals(listOf("Bench Press"), catalog.search("press", member).first().map { it.name })
+            assertEquals(listOf("ab roller"), catalog.search("ROLL", member).first().map { it.name })
+            assertEquals(listOf("Cable Fly"), catalog.search("  Cable  ".trim(), member).first().map { it.name })
         }
 
     @Test
     fun `search emits again when the catalog changes`() =
         runTest {
-            RoomExerciseCatalog(dao, json).search("").test {
+            RoomExerciseCatalog(dao, json).search("", member).test {
                 assertEquals(emptyList(), awaitItem())
 
                 seeder().seedIfEmpty(now = 1L)
@@ -137,7 +139,7 @@ class CatalogTest {
         runTest {
             seeder().seedIfEmpty(now = 1L)
 
-            assertTrue(RoomExerciseCatalog(dao, json).search("zzzz").first().isEmpty())
+            assertTrue(RoomExerciseCatalog(dao, json).search("zzzz", member).first().isEmpty())
         }
 }
 
