@@ -16,6 +16,8 @@ import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.session.SessionDao
 import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
 import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
+import com.gymtracker.core.data.set.RoomSetRepository
+import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -24,6 +26,9 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
+import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.SetRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -47,8 +52,11 @@ object DataModule {
     ): GymTrackerDatabase =
         Room
             .databaseBuilder(context, GymTrackerDatabase::class.java, GymTrackerDatabase.NAME)
-            .addMigrations(GymTrackerDatabase.MIGRATION_1_2, GymTrackerDatabase.MIGRATION_2_3)
-            .build()
+            .addMigrations(
+                GymTrackerDatabase.MIGRATION_1_2,
+                GymTrackerDatabase.MIGRATION_2_3,
+                GymTrackerDatabase.MIGRATION_3_4,
+            ).build()
 
     @Provides
     fun sessionDao(database: GymTrackerDatabase): SessionDao = database.sessionDao()
@@ -58,6 +66,18 @@ object DataModule {
 
     @Provides
     fun sessionExerciseDao(database: GymTrackerDatabase): SessionExerciseDao = database.sessionExerciseDao()
+
+    @Provides
+    fun setDao(database: GymTrackerDatabase): SetDao = database.setDao()
+
+    @Provides
+    fun logSet(
+        sets: SetRepository,
+        clock: Clock,
+    ): LogSet = LogSet(sets, clock) { UUID.randomUUID().toString() }
+
+    @Provides
+    fun prefillFromLastSet(sets: SetRepository): PrefillFromLastSet = PrefillFromLastSet(sets)
 
     @Provides
     fun addExerciseToSession(sessionExercises: SessionExerciseRepository): AddExerciseToSession =
@@ -114,4 +134,7 @@ abstract class DataBindings {
 
     @Binds
     abstract fun sessionExercises(impl: RoomSessionExerciseRepository): SessionExerciseRepository
+
+    @Binds
+    abstract fun sets(impl: RoomSetRepository): SetRepository
 }

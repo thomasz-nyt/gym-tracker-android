@@ -10,6 +10,8 @@ import com.gymtracker.core.data.session.SessionDao
 import com.gymtracker.core.data.session.SessionEntity
 import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.sessionexercise.SessionExerciseEntity
+import com.gymtracker.core.data.set.SetDao
+import com.gymtracker.core.data.set.SetEntity
 
 /**
  * The local database, which is the source of truth for the UI (constitution §2).
@@ -18,8 +20,8 @@ import com.gymtracker.core.data.sessionexercise.SessionExerciseEntity
  * that need them.
  */
 @Database(
-    entities = [SessionEntity::class, ExerciseEntity::class, SessionExerciseEntity::class],
-    version = 3,
+    entities = [SessionEntity::class, ExerciseEntity::class, SessionExerciseEntity::class, SetEntity::class],
+    version = 4,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -29,6 +31,8 @@ abstract class GymTrackerDatabase : RoomDatabase() {
 
     abstract fun sessionExerciseDao(): SessionExerciseDao
 
+    abstract fun setDao(): SetDao
+
     companion object {
         const val NAME = "gym-tracker.db"
 
@@ -37,6 +41,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V1_SESSIONS = 1
         private const val V2_CATALOG = 2
         private const val V3_SESSION_EXERCISES = 3
+        private const val V4_SETS = 4
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -94,6 +99,35 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE INDEX IF NOT EXISTS `index_session_exercises_exercise_id` " +
                             "ON `session_exercises` (`exercise_id`)",
+                    )
+                }
+            }
+
+        /** Adds `sets` (US-03). Additive; existing tables untouched. */
+        val MIGRATION_3_4 =
+            object : Migration(V3_SESSION_EXERCISES, V4_SETS) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `sets` (
+                            `id` TEXT NOT NULL,
+                            `session_exercise_id` TEXT NOT NULL,
+                            `set_index` INTEGER NOT NULL,
+                            `weight_kg` REAL,
+                            `reps` INTEGER NOT NULL,
+                            `rpe` REAL,
+                            `performed_at` INTEGER NOT NULL,
+                            `updated_at` INTEGER NOT NULL,
+                            `sync_state` TEXT NOT NULL,
+                            PRIMARY KEY(`id`),
+                            FOREIGN KEY(`session_exercise_id`) REFERENCES `session_exercises`(`id`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_sets_session_exercise_id_performed_at` " +
+                            "ON `sets` (`session_exercise_id`, `performed_at`)",
                     )
                 }
             }
