@@ -30,6 +30,15 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     sourceCompatibility = JAVA_VERSION
                     targetCompatibility = JAVA_VERSION
                 }
+                lint {
+                    // Android Lint is the only check that reads the merged manifest against
+                    // the compiled classes, so it is the one that catches a manifest naming a
+                    // class that does not exist — which ktlint, detekt and a green
+                    // assembleDebug all happily ignore.
+                    abortOnError = true
+                    checkDependencies = true
+                    warningsAsErrors = false
+                }
             }
 
             // APK file name. CI passes -PbuildNumber and -PbuildSha so that every artifact
