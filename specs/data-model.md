@@ -6,6 +6,12 @@
 charts, PRs, AI context — derives from the `sets` table. There is deliberately no
 "activity type" concept anywhere in the schema (constitution §1).
 
+One structure sits between a session and its sets: `session_exercises`, so that an
+exercise added to a session can exist before its first set is logged, and so the
+same exercise can appear twice in one session (both US-02 criteria). See
+`adr/0004-session-exercises-table.md`. This is not a workout template — there are
+still no activity types, and every chart and PR derives from `sets`.
+
 All wearable-derived fields are **nullable**, always. Nothing in the model assumes
 a watch exists.
 
@@ -15,6 +21,7 @@ a watch exists.
 @JvmInline value class UserId(val value: String)
 @JvmInline value class ExerciseId(val value: String)
 @JvmInline value class SessionId(val value: String)
+@JvmInline value class SessionExerciseId(val value: String)
 
 enum class BodyPart { CHEST, BACK, SHOULDERS, BICEPS, TRICEPS, FOREARMS,
                       QUADS, HAMSTRINGS, GLUTES, CALVES, CORE, FULL_BODY }
@@ -53,11 +60,18 @@ data class SessionMetrics(
     val source: String?,          // "health_connect" | "healthkit"
 )
 
-data class ExerciseSet(
-    val id: String,
+/** An exercise as it appears in one session. The same exercise may appear twice. */
+data class SessionExercise(
+    val id: SessionExerciseId,
     val sessionId: SessionId,
     val exerciseId: ExerciseId,
-    val setIndex: Int,            // 1-based within (session, exercise)
+    val position: Int,            // 1-based order within the session
+)
+
+data class ExerciseSet(
+    val id: String,
+    val sessionExerciseId: SessionExerciseId,
+    val setIndex: Int,            // 1-based within the session_exercise
     val weightKg: Double?,        // canonical unit is ALWAYS kg
     val reps: Int,
     val rpe: Double?,             // 5.0..10.0 in 0.5 steps
@@ -93,15 +107,22 @@ sessions(id PK, user_id, gym_name, started_at, ended_at,
          avg_hr, max_hr, active_kcal, metrics_source,
          updated_at, sync_state)
 
-sets(id PK, session_id FK→sessions ON DELETE CASCADE, exercise_id FK→exercises,
+session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
+                  exercise_id FK→exercises, position,
+                  updated_at, sync_state)
+
+sets(id PK, session_exercise_id FK→session_exercises ON DELETE CASCADE,
      set_index, weight_kg, reps, rpe, performed_at,
      updated_at, sync_state)
 
 sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
 ```
 
-Indexes: `sets(exercise_id, performed_at DESC)` — this backs both the prefill in
-US-03 and every chart in M4. `sessions(user_id, started_at DESC)` for history.
+Indexes: `session_exercises(exercise_id)` and
+`sets(session_exercise_id, performed_at DESC)` — together these back the prefill
+in US-03 and every chart in M4, which join through `session_exercises` rather than
+reading a denormalised `exercise_id` off the set (ADR-0004).
+`sessions(user_id, started_at DESC)` for history.
 
 `sync_state`: `SYNCED | PENDING | ERROR`.
 
@@ -159,10 +180,17 @@ create table sessions (
   updated_at timestamptz not null default now()
 );
 
-create table sets (
+create table session_exercises (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references sessions on delete cascade,
   exercise_id uuid not null references exercises on delete restrict,
+  position int not null check (position >= 1),
+  updated_at timestamptz not null default now()
+);
+
+create table sets (
+  id uuid primary key default gen_random_uuid(),
+  session_exercise_id uuid not null references session_exercises on delete cascade,
   set_index int not null check (set_index >= 1),
   weight_kg numeric(6,2) check (weight_kg >= 0),
   reps int not null check (reps >= 1),
@@ -189,6 +217,7 @@ alter table households       enable row level security;
 alter table profiles         enable row level security;
 alter table exercises        enable row level security;
 alter table sessions         enable row level security;
+alter table session_exercises enable row level security;
 alter table sets             enable row level security;
 alter table coach_responses  enable row level security;
 
@@ -210,14 +239,30 @@ create policy sessions_select on sessions for select using (
 create policy sessions_write on sessions for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
--- Sets follow their session.
+-- Session-exercises follow their session; sets follow their session-exercise.
+-- The select policies lean on sessions' own RLS filtering the subquery.
+create policy session_exercises_select on session_exercises for select using (
+  exists (select 1 from sessions s where s.id = session_exercises.session_id)
+);
+create policy session_exercises_write on session_exercises for all using (
+  exists (select 1 from sessions s
+          where s.id = session_exercises.session_id and s.user_id = auth.uid())
+) with check (
+  exists (select 1 from sessions s
+          where s.id = session_exercises.session_id and s.user_id = auth.uid())
+);
+
 create policy sets_select on sets for select using (
-  exists (select 1 from sessions s where s.id = sets.session_id)
+  exists (select 1 from session_exercises se where se.id = sets.session_exercise_id)
 );
 create policy sets_write on sets for all using (
-  exists (select 1 from sessions s where s.id = sets.session_id and s.user_id = auth.uid())
+  exists (select 1 from session_exercises se
+          join sessions s on s.id = se.session_id
+          where se.id = sets.session_exercise_id and s.user_id = auth.uid())
 ) with check (
-  exists (select 1 from sessions s where s.id = sets.session_id and s.user_id = auth.uid())
+  exists (select 1 from session_exercises se
+          join sessions s on s.id = se.session_id
+          where se.id = sets.session_exercise_id and s.user_id = auth.uid())
 );
 
 -- Exercises: the global catalog is readable by all; household media is scoped.

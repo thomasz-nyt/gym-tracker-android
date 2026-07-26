@@ -9,6 +9,11 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 
 [*.{kt,kts}]
+# Must match detekt's MaxLineLength (120). ktlint defaults to 140, and the gap is
+# not harmless: ktlintFormat would collapse a wrapped expression onto one 130-char
+# line that detekt then rejects, so the two tools fight over the same file.
+max_line_length = 120
+
 # Composables are PascalCase by Compose convention, which ktlint's function-naming
 # rule otherwise rejects. This is the API convention of the UI toolkit, not a style
 # opinion we get to have.

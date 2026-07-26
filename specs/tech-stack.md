@@ -15,6 +15,7 @@ hard part and are native on both sides anyway).
 | Architecture | MVVM + UDF, `StateFlow` state holders | One immutable `UiState` per screen |
 | DI | Hilt | |
 | Local DB | Room (source of truth) | Offline-first is a constitutional requirement |
+| Device-local prefs | DataStore (Preferences) | Unsynced, this-device-only state. ADR-0005 |
 | Async | Coroutines + Flow | |
 | Background sync | WorkManager | Constrained on network availability |
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions) | |
@@ -33,6 +34,7 @@ hard part and are native on both sides anyway).
 | Layer | Tools |
 |---|---|
 | Domain (JVM, fast) | JUnit 5, kotlin.test, Turbine (Flow), MockK, kotlinx-coroutines-test |
+| Data / Room (JVM) | JUnit 4 + Robolectric — Robolectric's runner is JUnit 4, so this layer does not use JUnit 5 |
 | Data / Room | Room in-memory DB, instrumented on JVM via Robolectric where possible |
 | ViewModels | Turbine + fake repositories (never MockK for repos — hand-written fakes) |
 | Compose UI | `createComposeRule`, semantics-based assertions, no screenshot-diff at first |
