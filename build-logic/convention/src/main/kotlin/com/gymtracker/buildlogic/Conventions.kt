@@ -25,6 +25,9 @@ const val COMPILE_SDK = 37
 /** JVM bytecode level for every module, and the toolchain CI provisions. */
 const val JAVA_TARGET = 17
 
+/** Marketing version, also used to name the APK. */
+const val VERSION_NAME = "0.1.0"
+
 val JAVA_VERSION: JavaVersion = JavaVersion.VERSION_17
 
 val JAVA_LANGUAGE_VERSION: JavaLanguageVersion = JavaLanguageVersion.of(JAVA_TARGET)
