@@ -1,0 +1,21 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+# Composables are PascalCase by Compose convention, which ktlint's function-naming
+# rule otherwise rejects. This is the API convention of the UI toolkit, not a style
+# opinion we get to have.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+[*.{xml,yml,yaml,toml,json}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
