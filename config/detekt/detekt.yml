@@ -12,6 +12,9 @@ complexity:
   LongParameterList:
     # Composables legitimately take many parameters; state hoisting is the point.
     ignoreAnnotated: ['Composable']
+    # Test data builders take one defaulted parameter per field on purpose, so a test can
+    # name only the field it cares about. The rule is about production APIs.
+    excludes: ['**/test/**', '**/androidTest/**']
   TooManyFunctions:
     ignoreAnnotatedFunctions: ['Composable']
 

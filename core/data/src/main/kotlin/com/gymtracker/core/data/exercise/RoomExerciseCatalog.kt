@@ -1,0 +1,23 @@
+package com.gymtracker.core.data.exercise
+
+import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.model.Exercise
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
+import javax.inject.Inject
+
+/** [ExerciseCatalog] over Room. */
+class RoomExerciseCatalog
+    @Inject
+    constructor(
+        private val dao: ExerciseDao,
+        private val json: Json,
+    ) : ExerciseCatalog {
+        override fun search(query: String): Flow<List<Exercise>> =
+            dao.search(query.trim()).map { rows ->
+                rows.map { row -> row.toDomain(::decode) }
+            }
+
+        private fun decode(raw: String): List<String> = json.decodeFromString(raw)
+    }
