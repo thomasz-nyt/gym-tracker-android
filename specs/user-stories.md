@@ -17,6 +17,10 @@ As a member, I start a gym session so my sets are grouped.
 - Given an active session exists, when I reopen the app, I return to it rather
   than starting a new one.
 - Only one active session per member at a time.
+- If, on app open, the active session's last activity (its last set's
+  `performed_at`, else `started_at`) is more than 4 hours old, I am prompted to
+  finish it (`ended_at` = the last set's timestamp) or discard it if it has no
+  sets. The app never invents an end time silently.
 
 ### US-02 — Add an exercise
 - Given an active session, when I search the catalog and select an exercise, it is
@@ -40,8 +44,11 @@ As a member, I start a gym session so my sets are grouped.
 - Editing a past session's set is possible from history and recalculates PRs.
 
 ### US-05 — Rest timer
-- After logging a set, a rest timer starts automatically at my configured default.
+- After logging a set, a rest timer starts automatically at my configured
+  default (90 seconds until changed in settings).
 - The timer keeps running when the app is backgrounded and notifies at zero.
+- If notification permission is denied, the timer still runs and displays
+  in-app. The permission is requested once and never re-prompted.
 - I can dismiss or skip it. It never blocks logging the next set.
 
 ### US-06 — End a session and see history
@@ -49,6 +56,8 @@ As a member, I start a gym session so my sets are grouped.
 - History lists sessions newest-first with date, duration, exercise count, and
   total volume.
 - A session with no sets is discarded rather than saved.
+- A session finished via the stale-session prompt (US-01) gets `ended_at` = its
+  last set's `performed_at`.
 
 ---
 
