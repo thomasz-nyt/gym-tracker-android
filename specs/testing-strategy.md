@@ -78,10 +78,18 @@ reported in CI but only `:core:domain` gates the build.
 
 ```
 ./gradlew ktlintCheck detekt :core:domain:test testDebugUnitTest
+./gradlew :app:lintDebug
 ./gradlew verifyDomainHasNoAndroidDeps
 gitleaks detect --no-git
 supabase db test           # pgTAP
 ```
+
+Android Lint is in that list because of a real M0 escape: the manifest named
+`.MainActivity`, which resolves against the module `namespace` rather than the
+package the Kotlin files are in, so the app compiled, packaged, installed and
+then died at launch with `ClassNotFoundException`. ktlint, detekt, the unit
+tests and `assembleDebug` were all green. Lint is the only check that reads the
+merged manifest against the compiled classes.
 
 Instrumented tests run on PRs to `main` only (they are slow); unit tests run on
 every push.

@@ -1,0 +1,119 @@
+name: CI
+
+# `push` is restricted to main and `pull_request` carries every branch. Running
+# both on '**' meant each push to a PR branch ran the whole suite twice, in two
+# separate runs that no concurrency group could collapse (the push run is keyed on
+# refs/heads/<branch>, the PR run on refs/pull/<n>/merge). A branch with no PR open
+# now gets no CI, which is the intended trade: work is reviewed through PRs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Keep the daemon out of the way on a 2-core runner.
+  GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+jobs:
+  # `specs/testing-strategy.md` § CI gates. Steps are kept separate so a red build
+  # names which gate failed rather than "the build".
+  build:
+    name: Build, lint and unit test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build logic (its own tests, ktlint and detekt)
+        run: ./gradlew -p build-logic check
+
+      - name: ktlint and detekt
+        run: ./gradlew ktlintCheck detekt
+
+      # Android Lint is the only gate that checks the merged manifest against the
+      # compiled classes. Without it, a manifest referencing a class that does not
+      # exist builds, packages and installs cleanly, then dies at launch.
+      - name: Android Lint
+        run: ./gradlew :app:lintDebug
+
+      - name: Unit tests
+        run: ./gradlew :core:domain:test testDebugUnitTest
+
+      - name: Domain layer has no Android dependency
+        run: ./gradlew verifyDomainHasNoAndroidDeps
+
+      # On a pull_request event github.sha is the merge commit, which is not a commit
+      # that exists on the branch. Name the APK after the head commit instead, so the
+      # file on your phone maps to something you can `git show`.
+      - name: Identify this build
+        id: build
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "sha_short=${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble debug APK
+        run: >-
+          ./gradlew assembleDebug
+          -PbuildNumber=${{ github.run_number }}
+          -PbuildSha=${{ steps.build.outputs.sha_short }}
+
+      # Produces gym-tracker-<version>-<run>-<sha>-debug.apk, so downloads from
+      # different runs never collide in a browser's download folder.
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk-debug-${{ github.run_number }}-${{ steps.build.outputs.sha_short }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+            build-logic/**/build/reports/
+          retention-days: 7
+
+  # Constitution §4: no secret ever ships in the app binary.
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks version
+
+      - name: gitleaks detect
+        run: ./gitleaks detect --no-git --redact --verbose

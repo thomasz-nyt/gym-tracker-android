@@ -1,0 +1,30 @@
+# Deltas from detekt's default config (buildUponDefaultConfig = true).
+# Every suppression needs a reason — see CLAUDE.md "Definition of done".
+
+build:
+  maxIssues: 0
+
+# Note: detekt's `formatting` ruleset (the detekt-formatting artifact) is deliberately
+# not on the classpath. ktlint runs as its own Gradle plugin and is the authority on
+# formatting; running both would produce duplicate findings for every style issue.
+
+complexity:
+  LongParameterList:
+    # Composables legitimately take many parameters; state hoisting is the point.
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    ignoreAnnotatedFunctions: ['Composable']
+
+naming:
+  FunctionNaming:
+    # @Composable functions are PascalCase by convention.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Z0-9]*'
+
+style:
+  MagicNumber:
+    ignoreAnnotated: ['Composable', 'Preview']
+  UnusedPrivateMember:
+    # @Preview composables are entry points for the IDE, never called from code.
+    ignoreAnnotated: ['Preview']
