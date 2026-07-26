@@ -55,8 +55,31 @@ jobs:
       - name: Domain layer has no Android dependency
         run: ./gradlew verifyDomainHasNoAndroidDeps
 
+      # On a pull_request event github.sha is the merge commit, which is not a commit
+      # that exists on the branch. Name the APK after the head commit instead, so the
+      # file on your phone maps to something you can `git show`.
+      - name: Identify this build
+        id: build
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "sha_short=${sha:0:7}" >> "$GITHUB_OUTPUT"
+
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug
+        run: >-
+          ./gradlew assembleDebug
+          -PbuildNumber=${{ github.run_number }}
+          -PbuildSha=${{ steps.build.outputs.sha_short }}
+
+      # Produces gym-tracker-<version>-<run>-<sha>-debug.apk, so downloads from
+      # different runs never collide in a browser's download folder.
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk-debug-${{ github.run_number }}-${{ steps.build.outputs.sha_short }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload reports
         if: failure()
