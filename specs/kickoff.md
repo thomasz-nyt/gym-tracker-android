@@ -41,13 +41,21 @@ minutes in the project.
 > Gradle skeleton and the CI check that :core:domain has no Android dependency —
 > write that check's failing test first.
 
-**Prompt 3 (first real story):**
-> Implement US-01 and US-03 from specs/user-stories.md. Write the tests first and
-> show me the failing run before implementing. Domain and Room only — no UI yet.
+**Prompt 3 onwards (M1 — one story per session, one story per branch):**
+> Read CLAUDE.md and everything in specs/. Current milestone: M1. Implement
+> US-XX on branch `us-xx-<slug>`. Follow the loop in CLAUDE.md: restate the
+> story and its acceptance criteria, write the failing tests first and show me
+> the failing run, implement the minimum, run the full check, refactor, commit
+> with story-ID-tagged Conventional Commits, and tick the roadmap checkbox in
+> the same commit. If any spec is ambiguous, stop and ask before writing code.
 
-**Prompt 4 (the loop, for real):**
-> Build the active-session UI for US-01 through US-03, then write the instrumented
-> two-tap assertion from specs/testing-strategy.md §2.
+Run the six M1 stories in dependency order **US-01 → US-02 → US-03 → US-05 →
+US-06 → US-04** (US-04 edits sets "from history", which US-06 builds). Shared
+foundations land in the first story that needs them: the Room schema in US-01,
+the catalog seed in US-02, `UnitConverter` in US-03. Review each PR before
+starting the next session. US-03 carries the two instrumented harnesses
+(two-tap assertion, app-kill persistence) — give it the strongest model; the
+other stories are well-specified TDD work.
 
 ## 3. Habits that make this work
 
@@ -66,6 +74,15 @@ minutes in the project.
 The exercise catalog comes from `free-exercise-db` (public domain, ~800 exercises
 with JSON metadata). Bundle the JSON in the app rather than fetching it, so the
 catalog works on first launch with no network.
+
+Bundle the **full catalog, unfiltered** (maintainer decision, 2026-07-26). A
+build-time script in `tools/catalog/` converts the source JSON to the app
+schema: deterministic UUIDv5 ids (see `data-model.md`) and an explicit mapping
+table from the source muscle/equipment taxonomy onto the domain enums (e.g.
+lats/traps/lower back/middle back → BACK, abdominals → CORE, quadriceps →
+QUADS, neck → SHOULDERS, abductors/adductors → GLUTES; e-z curl bar → BARBELL,
+body only → BODYWEIGHT, medicine ball/exercise ball/foam roll → OTHER). A
+table-driven test asserts every source value maps to something.
 
 For GIFs, mirror only the ones you actually use into Supabase Storage. Do not
 hotlink a free API endpoint — those carry rate limits and no uptime guarantee, and

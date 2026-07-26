@@ -72,6 +72,14 @@ member's `unitPreference`. There must be a single `UnitConverter` in
 `:core:domain` with a rounding-behaviour test table. Unit bugs in a lifting app are
 uniquely infuriating; do not scatter conversions.
 
+### Identity before M2
+
+M1 has no auth. On first launch the app generates one **local member UUID**
+(stored in DataStore) and stamps it on every session and set as `user_id`. One
+device = one member until M2. At M2 sign-in, the local UUID's rows are
+re-assigned to the authenticated Supabase user id in a single UPDATE before the
+first sync.
+
 ## Room (local, source of truth for the UI)
 
 Tables mirror the domain entities plus sync bookkeeping:
@@ -96,6 +104,15 @@ Indexes: `sets(exercise_id, performed_at DESC)` — this backs both the prefill 
 US-03 and every chart in M4. `sessions(user_id, started_at DESC)` for history.
 
 `sync_state`: `SYNCED | PENDING | ERROR`.
+
+### Catalog IDs are deterministic
+
+The bundled catalog (free-exercise-db) is converted at build time by a script in
+`tools/catalog/`; each exercise id is a **UUIDv5** derived from a fixed
+namespace plus the source slug (e.g. `Lat_Pulldown`). Every device therefore
+seeds identical ids, and the same script seeds the Supabase global catalog at
+M2, so `sets.exercise_id` needs no remapping at first sync. Household-created
+exercises (M3) still use `gen_random_uuid()`.
 
 ## Postgres (Supabase)
 
