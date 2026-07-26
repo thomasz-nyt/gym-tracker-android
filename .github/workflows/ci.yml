@@ -1,13 +1,17 @@
 name: CI
 
+# `push` is restricted to main and `pull_request` carries every branch. Running
+# both on '**' meant each push to a PR branch ran the whole suite twice, in two
+# separate runs that no concurrency group could collapse (the push run is keyed on
+# refs/heads/<branch>, the PR run on refs/pull/<n>/merge). A branch with no PR open
+# now gets no CI, which is the intended trade: work is reviewed through PRs.
 on:
   push:
-    branches: ['**']
-  pull_request:
     branches: [main]
+  pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
