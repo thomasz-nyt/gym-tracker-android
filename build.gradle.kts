@@ -25,3 +25,14 @@ allprojects {
         }
     }
 }
+
+/**
+ * The CI gate named in `specs/testing-strategy.md`. Aggregates the per-module
+ * `verifyNoAndroidDeps` check so the command in the spec keeps working even if
+ * more pure-Kotlin modules appear. See `specs/adr/0003-enforcing-a-pure-domain-layer.md`.
+ */
+tasks.register("verifyDomainHasNoAndroidDeps") {
+    group = "verification"
+    description = "Asserts that :core:domain has no Android plugin, dependency or import."
+    dependsOn(":core:domain:verifyNoAndroidDeps")
+}

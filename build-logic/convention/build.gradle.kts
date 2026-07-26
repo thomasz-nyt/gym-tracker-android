@@ -59,5 +59,9 @@ gradlePlugin {
             id = "gymtracker.jvm.library"
             implementationClass = "JvmLibraryConventionPlugin"
         }
+        register("pureKotlin") {
+            id = "gymtracker.pure.kotlin"
+            implementationClass = "PureKotlinConventionPlugin"
+        }
     }
 }

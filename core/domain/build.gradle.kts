@@ -1,5 +1,5 @@
 plugins {
-    id("gymtracker.jvm.library")
+    id("gymtracker.pure.kotlin")
 }
 
 dependencies {
