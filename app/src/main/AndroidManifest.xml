@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      Class names are fully qualified on purpose. A leading-dot name resolves against the
+      module's `namespace` (com.gymtracker), not against the package the Kotlin files are
+      actually in (com.gymtracker.app), and the mismatch only shows up as a
+      ClassNotFoundException at launch.
+    -->
     <application
-        android:name=".GymTrackerApplication"
+        android:name="com.gymtracker.app.GymTrackerApplication"
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.GymTracker">
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.gymtracker.app.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.GymTracker">
             <intent-filter>

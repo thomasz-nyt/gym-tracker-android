@@ -49,6 +49,12 @@ jobs:
       - name: ktlint and detekt
         run: ./gradlew ktlintCheck detekt
 
+      # Android Lint is the only gate that checks the merged manifest against the
+      # compiled classes. Without it, a manifest referencing a class that does not
+      # exist builds, packages and installs cleanly, then dies at launch.
+      - name: Android Lint
+        run: ./gradlew :app:lintDebug
+
       - name: Unit tests
         run: ./gradlew :core:domain:test testDebugUnitTest
 
