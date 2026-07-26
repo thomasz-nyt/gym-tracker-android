@@ -18,7 +18,7 @@ Goal: an empty app that builds, lints, and tests in CI.
 - [x] ktlint + detekt configured
 - [x] JUnit 5 + Turbine + MockK wired; one trivial passing test in `:core:domain`
 - [x] CI check that `:core:domain` has no Android dependency
-- [ ] GitHub Actions: build, lint, unit test, gitleaks secret scan
+- [x] GitHub Actions: build, lint, unit test, gitleaks secret scan
 - [x] `specs/adr/0000-template.md` and ADR-0001 recording the native-Android decision
 
 **Exit:** green CI on a PR. No feature code.
