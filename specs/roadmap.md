@@ -12,14 +12,14 @@ Current milestone: **M0**
 
 Goal: an empty app that builds, lints, and tests in CI.
 
-- [ ] Gradle multi-module skeleton per `tech-stack.md`
-- [ ] Version catalog, convention plugins
-- [ ] Hilt wired, one blank Compose screen
-- [ ] ktlint + detekt configured
-- [ ] JUnit 5 + Turbine + MockK wired; one trivial passing test in `:core:domain`
+- [x] Gradle multi-module skeleton per `tech-stack.md`
+- [x] Version catalog, convention plugins
+- [x] Hilt wired, one blank Compose screen
+- [x] ktlint + detekt configured
+- [x] JUnit 5 + Turbine + MockK wired; one trivial passing test in `:core:domain`
 - [ ] CI check that `:core:domain` has no Android dependency
 - [ ] GitHub Actions: build, lint, unit test, gitleaks secret scan
-- [ ] `specs/adr/0000-template.md` and ADR-0001 recording the native-Android decision
+- [x] `specs/adr/0000-template.md` and ADR-0001 recording the native-Android decision
 
 **Exit:** green CI on a PR. No feature code.
 
