@@ -39,7 +39,11 @@ As a member, I start a gym session so my sets are grouped.
 - When no prior set exists, the fields are empty and focused.
 - Confirming a set requires **no more than 2 taps** when the prefilled values are
   correct. Asserted by an instrumented test that counts interactions.
-- Weight accepts one decimal place; reps are whole numbers ≥ 1.
+- Weight accepts one decimal place, in the member's own unit; the other unit is shown
+  alongside (ADR-0006, ADR-0008). Reps are whole numbers ≥ 1.
+- A **sets** count may be entered — "3 sets of 12" — which records that many identical
+  sets, each as its own row (ADR-0009). It defaults to 1, so the two-tap path is
+  unaffected.
 - The set is persisted locally before any UI transition. Killing the app
   immediately after does not lose it.
 

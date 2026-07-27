@@ -1,6 +1,7 @@
 package com.gymtracker
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -128,7 +129,8 @@ class TwoTapSetLoggingTest {
             compose.waitForIdle()
 
             // Tap 1 — open set entry. It arrives prefilled from last week.
-            compose.onNodeWithText("Add set").performClick()
+            // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
+            compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
             compose.waitForIdle()
 
             // Tap 2 — confirm. Nothing is typed: the prefilled values were already right.
@@ -148,8 +150,9 @@ class TwoTapSetLoggingTest {
             // US-03: "persisted locally before any UI transition. Killing the app immediately
             // after does not lose it." LogSet is awaited before the sheet closes, so once the
             // dialog is gone the row is already committed — there is no window to lose it in.
-            compose.waitForIdle()
-            compose.onNodeWithText("Add set").performClick()
+            awaitReadyToLogASet()
+            // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
+            compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Save set").performClick()
             compose.waitForIdle()
@@ -163,7 +166,19 @@ class TwoTapSetLoggingTest {
         }
     }
 
+    /**
+     * The activity launches when the compose rule applies, which is before `@Before` seeds the
+     * database. The screen therefore starts on "no workout" and catches up when Room emits, so
+     * the test waits for the state it is actually about rather than assuming it is already there.
+     */
+    private fun awaitReadyToLogASet() {
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Add set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private companion object {
+        const val READY_TIMEOUT_MILLIS = 10_000L
         const val EXERCISE = "Bench Dips"
         val LAST_WEEK = SessionId("last-week")
         val TODAY_SESSION = SessionId("today")

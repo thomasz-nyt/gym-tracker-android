@@ -28,6 +28,7 @@ import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.SetRepository
 import dagger.Binds
@@ -77,6 +78,9 @@ object DataModule {
         sets: SetRepository,
         clock: Clock,
     ): LogSet = LogSet(sets, clock) { UUID.randomUUID().toString() }
+
+    @Provides
+    fun logSets(logSet: LogSet): LogSets = LogSets(logSet)
 
     @Provides
     fun prefillFromLastSet(sets: SetRepository): PrefillFromLastSet = PrefillFromLastSet(sets)

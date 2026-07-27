@@ -3,8 +3,9 @@ package com.gymtracker.feature.logging
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.SessionExerciseId
-import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.SetInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,8 @@ data class SetEntry(
     val exerciseName: String,
     val weight: String,
     val reps: String,
+    /** How many identical sets to record — "3 sets of 12" (ADR-0009). Defaults to "1". */
+    val sets: String,
     /** True when the fields came from a previous set rather than being empty (US-03). */
     val prefilled: Boolean,
 )
@@ -28,7 +31,7 @@ data class SetEntry(
  * with its own form state and validation, so it is the natural piece to lift out.
  */
 class SetEntryController(
-    private val logSet: LogSet,
+    private val logSets: LogSets,
     private val prefillFromLastSet: PrefillFromLastSet,
     private val unitPreference: UnitPreference,
     private val currentMember: CurrentMember,
@@ -57,6 +60,9 @@ class SetEntryController(
                     // Already in the member's unit; PrefillFromLastSet converted it.
                     weight = prefill?.weight?.let(::trimNumber).orEmpty(),
                     reps = prefill?.reps?.toString().orEmpty(),
+                    // Not prefilled from history: how many sets you did last time is not a
+                    // claim about today, and defaulting to 1 keeps the two-tap path intact.
+                    sets = "1",
                     prefilled = prefill != null,
                 )
         }
@@ -66,10 +72,15 @@ class SetEntryController(
     fun change(
         weight: String? = null,
         reps: String? = null,
+        sets: String? = null,
     ) {
         state.value =
             state.value?.let { current ->
-                current.copy(weight = weight ?: current.weight, reps = reps ?: current.reps)
+                current.copy(
+                    weight = weight ?: current.weight,
+                    reps = reps ?: current.reps,
+                    sets = sets ?: current.sets,
+                )
             }
     }
 
@@ -78,19 +89,22 @@ class SetEntryController(
     }
 
     /**
-     * Records the set. The sheet closes only after [LogSet] returns, so the UI never moves on
-     * from a set that is not yet on disk (US-03).
+     * Records the set, or several identical ones (ADR-0009). The sheet closes only after the
+     * write returns, so the UI never moves on from a set that is not yet on disk (US-03).
      */
     fun confirm() {
         val confirmed = state.value?.validated() ?: return
 
         scope.launch {
-            logSet(
-                confirmed.entry.sessionExerciseId,
-                confirmed.weight,
-                unitPreference.current(),
-                confirmed.reps,
-                rpe = null,
+            logSets(
+                sessionExerciseId = confirmed.entry.sessionExerciseId,
+                input =
+                    SetInput(
+                        weight = confirmed.weight,
+                        unit = unitPreference.current(),
+                        reps = confirmed.reps,
+                    ),
+                sets = confirmed.sets,
             )
             state.value = null
         }
@@ -100,6 +114,7 @@ class SetEntryController(
         val entry: SetEntry,
         val weight: Double?,
         val reps: Int,
+        val sets: Int,
     )
 
     /**
@@ -109,14 +124,16 @@ class SetEntryController(
      */
     private fun SetEntry.validated(): ConfirmedSet? {
         val parsedReps = reps.toIntOrNull()
+        val parsedSets = sets.toIntOrNull()
         val typed = weight.trim()
         val parsedWeight = typed.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
         val weightUnusable = typed.isNotEmpty() && parsedWeight == null
+        val unusable = parsedReps == null || parsedReps < 1 || parsedSets == null || parsedSets < 1
 
-        return if (parsedReps == null || weightUnusable) {
+        return if (unusable || weightUnusable) {
             null
         } else {
-            ConfirmedSet(this, parsedWeight, parsedReps)
+            ConfirmedSet(this, parsedWeight, parsedReps, parsedSets)
         }
     }
 

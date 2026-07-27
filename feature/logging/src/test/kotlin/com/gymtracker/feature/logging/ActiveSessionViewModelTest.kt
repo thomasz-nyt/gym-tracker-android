@@ -19,6 +19,7 @@ import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.WeightUnit
@@ -81,7 +82,7 @@ class ActiveSessionViewModelTest {
             catalog = catalog,
             currentMember = FakeCurrentMember(member),
             sets = sets,
-            logSet = LogSet(sets, clock) { "set-${nextSet++}" },
+            logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
             prefillFromLastSet = PrefillFromLastSet(sets),
             unitPreference = units,
             startSession = StartSession(repository, clock) { SessionId("new") },
@@ -295,6 +296,42 @@ class ActiveSessionViewModelTest {
             val logged = sets.all.single()
             assertEquals(61.23, logged.weightKg)
             assertEquals(5, logged.reps)
+        }
+
+    @Test
+    fun `three sets of twelve writes three rows`() =
+        runTest {
+            // ADR-0009: an input shorthand, not a stored concept.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "12", sets = "3")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertEquals(3, sets.all.size)
+            assertEquals(listOf(1, 2, 3), sets.all.map { it.setIndex })
+            assertEquals(listOf(12, 12, 12), sets.all.map { it.reps })
+        }
+
+    @Test
+    fun `set entry defaults to one set so the two-tap path is unchanged`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+
+                assertEquals("1", expectMostRecentItem().setEntry?.sets)
+            }
         }
 
     @Test

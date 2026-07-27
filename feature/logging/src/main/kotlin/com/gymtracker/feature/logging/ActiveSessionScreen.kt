@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,7 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
+import com.gymtracker.core.domain.set.SetGroup
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -78,6 +80,7 @@ fun LoggingRoute(
         onAddSet = viewModel.setEntry::open,
         onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
         onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
+        onSetCountChanged = { viewModel.setEntry.change(sets = it) },
         onConfirmSet = viewModel.setEntry::confirm,
         onSetEntryDismissed = viewModel.setEntry::dismiss,
         onAddExercise = viewModel::onAddExerciseClicked,
@@ -96,6 +99,7 @@ internal fun LoggingScreen(
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onSetWeightChanged: (String) -> Unit = {},
     onSetRepsChanged: (String) -> Unit = {},
+    onSetCountChanged: (String) -> Unit = {},
     onConfirmSet: () -> Unit = {},
     onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
@@ -149,6 +153,7 @@ internal fun LoggingScreen(
                 unit = state.unit,
                 onWeightChanged = onSetWeightChanged,
                 onRepsChanged = onSetRepsChanged,
+                onSetsChanged = onSetCountChanged,
                 onConfirm = onConfirmSet,
                 onDismiss = onSetEntryDismissed,
             )
@@ -337,13 +342,20 @@ private fun LoggedSets(
     }
 
     Column {
-        sets.forEach { set ->
-            val weight = WeightFormatter.format(set.weightKg, unit)
+        // Identical consecutive sets read as "3 × 12" rather than three near-identical
+        // lines (ADR-0009). The rows underneath stay separate.
+        SetGroup.of(sets).forEach { group ->
+            val weight = WeightFormatter.format(group.weightKg, unit)
             Text(
                 text =
                     buildString {
-                        append("${set.setIndex}.  ${weight.primary} × ${set.reps}")
-                        weight.secondary?.let { append("   ·  $it") }
+                        if (group.count > 1) {
+                            append("${group.count} × ${group.reps}")
+                        } else {
+                            append("${group.firstSetIndex}.  ${group.reps} reps")
+                        }
+                        append("   ${weight.primary}")
+                        weight.secondary?.let { append("  ·  $it") }
                     },
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -361,41 +373,35 @@ private fun SetEntryDialog(
     unit: WeightUnit,
     onWeightChanged: (String) -> Unit,
     onRepsChanged: (String) -> Unit,
+    onSetsChanged: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val enteredKilograms =
-        entry.weight
-            .trim()
-            .toDoubleOrNull()
-            ?.let { UnitConverter.toKilograms(it, unit) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(entry.exerciseName) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
-                OutlinedTextField(
-                    value = entry.weight,
-                    onValueChange = onWeightChanged,
-                    label = { Text("Weight (${unit.name.lowercase()})") },
-                    placeholder = { Text("Bodyweight") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                // The other unit, live, so nobody converts in their head mid-set (ADR-0008).
-                enteredKilograms?.let { kilograms ->
-                    WeightFormatter.format(kilograms, unit).secondary?.let { other ->
-                        Text(other, style = MaterialTheme.typography.bodySmall)
-                    }
+                WeightField(entry.weight, unit, onWeightChanged)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(GAP)) {
+                    OutlinedTextField(
+                        value = entry.sets,
+                        onValueChange = onSetsChanged,
+                        label = { Text("Sets") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = entry.reps,
+                        onValueChange = onRepsChanged,
+                        label = { Text("Reps") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-                OutlinedTextField(
-                    value = entry.reps,
-                    onValueChange = onRepsChanged,
-                    label = { Text("Reps") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
                 if (!entry.prefilled) {
                     Text(
                         "First time logging this one.",
@@ -407,7 +413,9 @@ private fun SetEntryDialog(
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
-                enabled = entry.reps.toIntOrNull()?.let { it >= 1 } == true,
+                enabled =
+                    entry.reps.toIntOrNull()?.let { it >= 1 } == true &&
+                        entry.sets.toIntOrNull()?.let { it >= 1 } == true,
                 modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
             ) {
                 Text("Save set")
@@ -417,6 +425,33 @@ private fun SetEntryDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+/**
+ * The weight field, with the other unit updating live beneath it (ADR-0008), so nobody has to
+ * convert in their head between sets.
+ */
+@Composable
+private fun WeightField(
+    value: String,
+    unit: WeightUnit,
+    onChanged: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChanged,
+            label = { Text("Weight (${unit.name.lowercase()})") },
+            placeholder = { Text("Bodyweight") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        )
+        value
+            .trim()
+            .toDoubleOrNull()
+            ?.let { typed -> WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary }
+            ?.let { other -> Text(other, style = MaterialTheme.typography.bodySmall) }
+    }
 }
 
 /**

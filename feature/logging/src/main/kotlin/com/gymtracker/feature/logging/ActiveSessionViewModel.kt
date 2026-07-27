@@ -17,7 +17,7 @@ import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
-import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.WeightUnit
@@ -69,7 +69,7 @@ class ActiveSessionViewModel
         private val sessions: SessionRepository,
         private val sessionExercises: SessionExerciseRepository,
         private val sets: SetRepository,
-        private val logSet: LogSet,
+        private val logSets: LogSets,
         private val prefillFromLastSet: PrefillFromLastSet,
         private val unitPreference: UnitPreference,
         private val catalog: ExerciseCatalog,
@@ -81,7 +81,7 @@ class ActiveSessionViewModel
         /** Set entry lives in its own state holder; see [SetEntryController]. */
         val setEntry =
             SetEntryController(
-                logSet = logSet,
+                logSets = logSets,
                 prefillFromLastSet = prefillFromLastSet,
                 unitPreference = unitPreference,
                 currentMember = currentMember,
