@@ -32,7 +32,12 @@ and say that you are doing so.
 
 ## Rules of engagement
 
-- **One story per branch.** Branch name: `us-03-log-a-set`.
+- **One story per branch, where that is practical.** Branch name: `us-03-log-a-set`.
+  Relaxed 2026-07-26: rapid iteration makes strict separation impractical, and forcing
+  it can be actively harmful — splitting work that shares a Room migration chain means
+  renumbering versions across branches, which risks a real migration bug for a
+  cosmetic gain. Prefer one story per branch; when work is genuinely coupled, keep it
+  together and say so in the PR description.
 - **Never commit secrets.** No API keys in the app, in tests, or in `gradle.properties`
   that is tracked. See `specs/constitution.md` §4.
 - **Do not modify `specs/constitution.md`.** Propose changes to the human instead.

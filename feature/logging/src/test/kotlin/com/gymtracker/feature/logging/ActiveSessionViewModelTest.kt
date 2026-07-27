@@ -3,9 +3,11 @@ package com.gymtracker.feature.logging
 import app.cash.turbine.test
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
@@ -16,6 +18,10 @@ import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
+import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.SetRepository
+import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -63,7 +69,10 @@ class ActiveSessionViewModelTest {
 
     private val catalog = FakeCatalog()
     private val sessionExercises = FakeSessionExercises()
+    private val sets = FakeSets()
+    private val units = FakeUnitPreference()
     private var nextSessionExercise = 1
+    private var nextSet = 1
 
     private fun viewModel(repository: FakeSessions) =
         ActiveSessionViewModel(
@@ -71,6 +80,10 @@ class ActiveSessionViewModelTest {
             sessionExercises = sessionExercises,
             catalog = catalog,
             currentMember = FakeCurrentMember(member),
+            sets = sets,
+            logSet = LogSet(sets, clock) { "set-${nextSet++}" },
+            prefillFromLastSet = PrefillFromLastSet(sets),
+            unitPreference = units,
             startSession = StartSession(repository, clock) { SessionId("new") },
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
@@ -223,6 +236,143 @@ class ActiveSessionViewModelTest {
 
             assertEquals(emptyList(), sessionExercises.all)
         }
+
+    @Test
+    fun `set entry opens empty for an exercise never performed`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+
+                val entry = expectMostRecentItem().setEntry
+                assertEquals("", entry?.weight)
+                assertEquals("", entry?.reps)
+                assertEquals(false, entry?.prefilled)
+            }
+        }
+
+    @Test
+    fun `set entry prefills from the last set, in the members unit`() =
+        runTest {
+            // US-03: two taps only works when the numbers are already right.
+            sets.seed(ExerciseSet("old", SessionExerciseId("se-old"), 1, 61.23, 5, null, now))
+            sets.lastFor[ExerciseId("bench")] = "old"
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+
+                val entry = expectMostRecentItem().setEntry
+                assertEquals("135", entry?.weight, "61.23 kg shown as 135 lb")
+                assertEquals("5", entry?.reps)
+                assertEquals(true, entry?.prefilled)
+            }
+        }
+
+    @Test
+    fun `confirming a set persists it in canonical kilograms and closes entry`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(weight = "135")
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+
+                assertEquals(null, expectMostRecentItem().setEntry, "entry closes only after the save")
+            }
+            val logged = sets.all.single()
+            assertEquals(61.23, logged.weightKg)
+            assertEquals(5, logged.reps)
+        }
+
+    @Test
+    fun `a blank weight logs a bodyweight set rather than zero`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "12")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertNull(sets.all.single().weightKg)
+        }
+
+    @Test
+    fun `confirming with unusable reps does nothing`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertEquals(emptyList(), sets.all)
+        }
+
+    private class FakeUnitPreference : UnitPreference {
+        private val state = MutableStateFlow(WeightUnit.LB)
+
+        override fun observe(): Flow<WeightUnit> = state
+
+        override suspend fun current(): WeightUnit = state.value
+
+        override suspend fun set(unit: WeightUnit) {
+            state.value = unit
+        }
+    }
+
+    private class FakeSets : SetRepository {
+        private val state = MutableStateFlow(emptyList<ExerciseSet>())
+        val lastFor = mutableMapOf<ExerciseId, String>()
+
+        val all: List<ExerciseSet> get() = state.value
+
+        fun seed(set: ExerciseSet) {
+            state.value = state.value + set
+        }
+
+        override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
+            state.map { rows -> rows.filter { it.sessionExerciseId == sessionExerciseId }.sortedBy { it.setIndex } }
+
+        override suspend fun lastSetOf(
+            exerciseId: ExerciseId,
+            member: UserId,
+        ): ExerciseSet? = lastFor[exerciseId]?.let { id -> state.value.firstOrNull { it.id == id } }
+
+        override suspend fun lastSetAtInSession(sessionId: SessionId): Instant? =
+            state.value.maxOfOrNull { it.performedAt }
+
+        override suspend fun nextSetIndex(sessionExerciseId: SessionExerciseId): Int =
+            state.value.count { it.sessionExerciseId == sessionExerciseId } + 1
+
+        override suspend fun add(set: ExerciseSet) {
+            state.value = state.value + set
+        }
+    }
 
     private class FakeCatalog : ExerciseCatalog {
         private fun exercise(

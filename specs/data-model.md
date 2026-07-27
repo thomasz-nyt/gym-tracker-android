@@ -149,7 +149,7 @@ create table profiles (
   id uuid primary key references auth.users on delete cascade,
   household_id uuid references households on delete set null,
   display_name text not null,
-  unit_preference text not null default 'kg' check (unit_preference in ('kg','lb')),
+  unit_preference text not null default 'lb' check (unit_preference in ('kg','lb')), -- ADR-0008
   share_details boolean not null default false,  -- US-09
   created_at timestamptz not null default now()
 );

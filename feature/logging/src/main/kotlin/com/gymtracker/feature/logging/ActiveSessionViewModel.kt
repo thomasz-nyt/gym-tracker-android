@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
@@ -15,6 +17,10 @@ import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
+import com.gymtracker.core.domain.set.LogSet
+import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.SetRepository
+import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -36,6 +42,7 @@ import javax.inject.Inject
 data class SessionExerciseRow(
     val sessionExercise: SessionExercise,
     val exercise: Exercise?,
+    val sets: List<ExerciseSet> = emptyList(),
 )
 
 /**
@@ -50,6 +57,8 @@ data class SessionUiState(
     val isSearching: Boolean = false,
     val query: String = "",
     val results: List<Exercise> = emptyList(),
+    val unit: WeightUnit = WeightUnit.LB,
+    val setEntry: SetEntry? = null,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -59,12 +68,26 @@ class ActiveSessionViewModel
     constructor(
         private val sessions: SessionRepository,
         private val sessionExercises: SessionExerciseRepository,
+        private val sets: SetRepository,
+        private val logSet: LogSet,
+        private val prefillFromLastSet: PrefillFromLastSet,
+        private val unitPreference: UnitPreference,
         private val catalog: ExerciseCatalog,
         private val currentMember: CurrentMember,
         private val startSession: StartSession,
         private val addExerciseToSession: AddExerciseToSession,
         private val clock: Clock,
     ) : ViewModel() {
+        /** Set entry lives in its own state holder; see [SetEntryController]. */
+        val setEntry =
+            SetEntryController(
+                logSet = logSet,
+                prefillFromLastSet = prefillFromLastSet,
+                unitPreference = unitPreference,
+                currentMember = currentMember,
+                scope = viewModelScope,
+            )
+
         private val stalePrompt = MutableStateFlow<StaleSessionPrompt?>(null)
         private val searching = MutableStateFlow(false)
         private val query = MutableStateFlow("")
@@ -88,6 +111,18 @@ class ActiveSessionViewModel
                         ) { inSession, allExercises ->
                             val byId = allExercises.associateBy(Exercise::id)
                             inSession.map { SessionExerciseRow(it, byId[it.exerciseId]) }
+                        }.flatMapLatest { rows ->
+                            if (rows.isEmpty()) {
+                                flowOf(emptyList())
+                            } else {
+                                combine(
+                                    rows.map { row ->
+                                        sets.observeForSessionExercise(row.sessionExercise.id)
+                                    },
+                                ) { perRow ->
+                                    rows.mapIndexed { index, row -> row.copy(sets = perRow[index]) }
+                                }
+                            }
                         }
                     }
                 }
@@ -107,9 +142,11 @@ class ActiveSessionViewModel
                 activeSession,
                 stalePrompt,
                 exercises,
-                searching,
-                combine(query, results) { text, found -> text to found },
-            ) { session, prompt, inSession, isSearching, (text, found) ->
+                combine(searching, query, results) { isSearching, text, found ->
+                    Triple(isSearching, text, found)
+                },
+                combine(unitPreference.observe(), setEntry.entry) { unit, entry -> unit to entry },
+            ) { session, prompt, inSession, (isSearching, text, found), (unit, entry) ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
@@ -118,6 +155,8 @@ class ActiveSessionViewModel
                     isSearching = isSearching,
                     query = text,
                     results = found,
+                    unit = unit,
+                    setEntry = entry,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 

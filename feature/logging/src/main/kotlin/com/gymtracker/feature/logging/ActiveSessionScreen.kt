@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,11 +42,15 @@ import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
+import com.gymtracker.core.domain.units.UnitConverter
+import com.gymtracker.core.domain.units.WeightFormatter
+import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -69,6 +75,11 @@ fun LoggingRoute(
         state = state,
         onStartWorkout = viewModel::onStartWorkout,
         onResolveStale = viewModel::onResolveStale,
+        onAddSet = viewModel.setEntry::open,
+        onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
+        onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
+        onConfirmSet = viewModel.setEntry::confirm,
+        onSetEntryDismissed = viewModel.setEntry::dismiss,
         onAddExercise = viewModel::onAddExerciseClicked,
         onQueryChanged = viewModel::onQueryChanged,
         onExerciseChosen = viewModel::onExerciseChosen,
@@ -82,6 +93,11 @@ internal fun LoggingScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit = {},
+    onSetWeightChanged: (String) -> Unit = {},
+    onSetRepsChanged: (String) -> Unit = {},
+    onConfirmSet: () -> Unit = {},
+    onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     onQueryChanged: (String) -> Unit = {},
     onExerciseChosen: (ExerciseId) -> Unit = {},
@@ -115,7 +131,9 @@ internal fun LoggingScreen(
                     ActiveSession(
                         session = state.activeSession,
                         exercises = state.exercises,
+                        unit = state.unit,
                         onAddExercise = onAddExercise,
+                        onAddSet = onAddSet,
                     )
                 else -> NoSession(onStartWorkout)
             }
@@ -123,6 +141,17 @@ internal fun LoggingScreen(
 
         state.stalePrompt?.let { prompt ->
             AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+        }
+
+        state.setEntry?.let { entry ->
+            SetEntryDialog(
+                entry = entry,
+                unit = state.unit,
+                onWeightChanged = onSetWeightChanged,
+                onRepsChanged = onSetRepsChanged,
+                onConfirm = onConfirmSet,
+                onDismiss = onSetEntryDismissed,
+            )
         }
     }
 }
@@ -152,7 +181,9 @@ private fun NoSession(onStartWorkout: () -> Unit) {
 private fun ActiveSession(
     session: WorkoutSession,
     exercises: List<SessionExerciseRow>,
+    unit: WeightUnit,
     onAddExercise: () -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -185,7 +216,15 @@ private fun ActiveSession(
                             Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
                         },
                         overlineContent = { Text("${row.sessionExercise.position}") },
-                        supportingContent = { Text("Logging sets arrives with US-03.") },
+                        supportingContent = { LoggedSets(row.sets, unit) },
+                        trailingContent = {
+                            TextButton(
+                                onClick = { onAddSet(row) },
+                                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                            ) {
+                                Text("Add set")
+                            }
+                        },
                     )
                     HorizontalDivider()
                 }
@@ -282,6 +321,100 @@ private fun AbandonedSessionDialog(
             TextButton(onClick = { onResolve(prompt) }) {
                 Text(if (prompt is StaleSessionPrompt.Finish) "Finish it" else "Discard it")
             }
+        },
+    )
+}
+
+/** The sets already logged against one exercise, each in both units (ADR-0008). */
+@Composable
+private fun LoggedSets(
+    sets: List<ExerciseSet>,
+    unit: WeightUnit,
+) {
+    if (sets.isEmpty()) {
+        Text("No sets yet", style = MaterialTheme.typography.bodySmall)
+        return
+    }
+
+    Column {
+        sets.forEach { set ->
+            val weight = WeightFormatter.format(set.weightKg, unit)
+            Text(
+                text =
+                    buildString {
+                        append("${set.setIndex}.  ${weight.primary} × ${set.reps}")
+                        weight.secondary?.let { append("   ·  $it") }
+                    },
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/**
+ * Set entry (US-03). Weight and reps arrive prefilled from the member's last set of this
+ * exercise, so when the numbers are already right, confirming is a single tap.
+ */
+@Composable
+private fun SetEntryDialog(
+    entry: SetEntry,
+    unit: WeightUnit,
+    onWeightChanged: (String) -> Unit,
+    onRepsChanged: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val enteredKilograms =
+        entry.weight
+            .trim()
+            .toDoubleOrNull()
+            ?.let { UnitConverter.toKilograms(it, unit) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(entry.exerciseName) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
+                OutlinedTextField(
+                    value = entry.weight,
+                    onValueChange = onWeightChanged,
+                    label = { Text("Weight (${unit.name.lowercase()})") },
+                    placeholder = { Text("Bodyweight") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                // The other unit, live, so nobody converts in their head mid-set (ADR-0008).
+                enteredKilograms?.let { kilograms ->
+                    WeightFormatter.format(kilograms, unit).secondary?.let { other ->
+                        Text(other, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                OutlinedTextField(
+                    value = entry.reps,
+                    onValueChange = onRepsChanged,
+                    label = { Text("Reps") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                if (!entry.prefilled) {
+                    Text(
+                        "First time logging this one.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = entry.reps.toIntOrNull()?.let { it >= 1 } == true,
+                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+            ) {
+                Text("Save set")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
