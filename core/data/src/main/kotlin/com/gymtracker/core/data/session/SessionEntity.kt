@@ -36,7 +36,7 @@ data class SessionEntity(
 )
 
 /** Not yet synced. The only value M1 ever writes; see `data-model.md` § Sync. */
-internal const val SYNC_STATE_PENDING = "PENDING"
+const val SYNC_STATE_PENDING = "PENDING"
 
 internal fun SessionEntity.toDomain(): WorkoutSession =
     WorkoutSession(

@@ -32,10 +32,10 @@ milestone that decides whether the app is good.
 
 Stories: US-01 … US-06
 
-- [~] Room schema: `sessions` done (US-01); `exercises`, `session_exercises`, `sets` follow
-- [ ] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
+- [~] Room schema: `sessions`, `exercises`, `session_exercises` done; `sets` follows in US-03
+- [x] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
 - [x] Start a session (US-01). Ending it is US-06.
-- [ ] Add an exercise to a session
+- [x] Add an exercise to a session
 - [ ] Log a set: weight, reps, optional RPE
 - [ ] Prefill from the last time this exercise was performed
 - [ ] Edit and delete a set

@@ -1,13 +1,21 @@
 package com.gymtracker.feature.logging
 
 import app.cash.turbine.test
+import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.model.Equipment
+import com.gymtracker.core.domain.model.Exercise
+import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.SessionExercise
+import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -53,11 +61,19 @@ class ActiveSessionViewModelTest {
         metrics = null,
     )
 
+    private val catalog = FakeCatalog()
+    private val sessionExercises = FakeSessionExercises()
+    private var nextSessionExercise = 1
+
     private fun viewModel(repository: FakeSessions) =
         ActiveSessionViewModel(
             sessions = repository,
+            sessionExercises = sessionExercises,
+            catalog = catalog,
             currentMember = FakeCurrentMember(member),
             startSession = StartSession(repository, clock) { SessionId("new") },
+            addExerciseToSession =
+                AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             clock = clock,
         )
 
@@ -150,6 +166,105 @@ class ActiveSessionViewModelTest {
 
             assertEquals(lastSetAt, repository.all.single().endedAt)
         }
+
+    @Test
+    fun `opening search shows the catalog`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onAddExerciseClicked()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(true, state.isSearching)
+                assertEquals(listOf("Bench Press", "Squat"), state.results.map { it.name })
+            }
+        }
+
+    @Test
+    fun `choosing an exercise appends it to the session and closes search`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onAddExerciseClicked()
+
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(false, state.isSearching)
+                assertEquals(listOf("Bench Press"), state.exercises.map { it.exercise?.name })
+            }
+        }
+
+    @Test
+    fun `the same exercise can be added twice`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val rows = expectMostRecentItem().exercises
+                assertEquals(2, rows.size)
+                assertEquals(listOf(1, 2), rows.map { it.sessionExercise.position })
+            }
+        }
+
+    @Test
+    fun `choosing an exercise with no active session does nothing`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions())
+
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            assertEquals(emptyList(), sessionExercises.all)
+        }
+
+    private class FakeCatalog : ExerciseCatalog {
+        private fun exercise(
+            id: String,
+            name: String,
+        ) = Exercise(
+            id = ExerciseId(id),
+            name = name,
+            aliases = emptyList(),
+            primaryMuscles = emptyList(),
+            secondaryMuscles = emptyList(),
+            equipment = Equipment.BARBELL,
+            instructions = emptyList(),
+            mediaUrl = null,
+            mediaType = null,
+            youtubeUrl = null,
+            source = "test",
+        )
+
+        private val all = listOf(exercise("bench", "Bench Press"), exercise("squat", "Squat"))
+
+        override fun search(
+            query: String,
+            forMember: UserId,
+        ): Flow<List<Exercise>> = MutableStateFlow(all.filter { it.name.contains(query, ignoreCase = true) })
+    }
+
+    private class FakeSessionExercises : SessionExerciseRepository {
+        private val state = MutableStateFlow(emptyList<SessionExercise>())
+
+        val all: List<SessionExercise> get() = state.value
+
+        override fun observeForSession(sessionId: SessionId): Flow<List<SessionExercise>> =
+            state.map { rows -> rows.filter { it.sessionId == sessionId }.sortedBy { it.position } }
+
+        override suspend fun add(sessionExercise: SessionExercise) {
+            state.value = state.value + sessionExercise
+        }
+
+        override suspend fun nextPosition(sessionId: SessionId): Int =
+            state.value.count { it.sessionId == sessionId } + 1
+    }
 
     private class FakeCurrentMember(
         private val id: UserId,

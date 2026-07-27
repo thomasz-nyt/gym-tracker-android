@@ -1,10 +1,18 @@
 plugins {
     id("gymtracker.android.library")
     id("gymtracker.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.gymtracker.core.data"
+
+    sourceSets {
+        // MigrationTestHelper reads the exported schema JSON to validate the migrated database.
+        getByName("test") {
+            assets.srcDir("$projectDir/schemas")
+        }
+    }
 
     testOptions {
         unitTests {
@@ -25,8 +33,10 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     ksp(libs.androidx.room.compiler)
 
+    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlin.test)

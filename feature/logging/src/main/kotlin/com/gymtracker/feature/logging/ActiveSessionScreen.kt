@@ -1,5 +1,6 @@
 package com.gymtracker.feature.logging
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,10 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.model.Exercise
+import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
@@ -55,6 +63,10 @@ fun LoggingRoute(
         state = state,
         onStartWorkout = viewModel::onStartWorkout,
         onResolveStale = viewModel::onResolveStale,
+        onAddExercise = viewModel::onAddExerciseClicked,
+        onQueryChanged = viewModel::onQueryChanged,
+        onExerciseChosen = viewModel::onExerciseChosen,
+        onSearchDismissed = viewModel::onSearchDismissed,
         modifier = modifier,
     )
 }
@@ -64,8 +76,24 @@ internal fun LoggingScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    onAddExercise: () -> Unit = {},
+    onQueryChanged: (String) -> Unit = {},
+    onExerciseChosen: (ExerciseId) -> Unit = {},
+    onSearchDismissed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    if (state.isSearching) {
+        ExerciseSearch(
+            query = state.query,
+            results = state.results,
+            onQueryChanged = onQueryChanged,
+            onExerciseChosen = onExerciseChosen,
+            onDismiss = onSearchDismissed,
+            modifier = modifier,
+        )
+        return
+    }
+
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
         Box(
             modifier =
@@ -77,7 +105,12 @@ internal fun LoggingScreen(
         ) {
             when {
                 state.isLoading -> CircularProgressIndicator()
-                state.activeSession != null -> ActiveSession(state.activeSession)
+                state.activeSession != null ->
+                    ActiveSession(
+                        session = state.activeSession,
+                        exercises = state.exercises,
+                        onAddExercise = onAddExercise,
+                    )
                 else -> NoSession(onStartWorkout)
             }
         }
@@ -110,9 +143,13 @@ private fun NoSession(onStartWorkout: () -> Unit) {
 }
 
 @Composable
-private fun ActiveSession(session: WorkoutSession) {
+private fun ActiveSession(
+    session: WorkoutSession,
+    exercises: List<SessionExerciseRow>,
+    onAddExercise: () -> Unit,
+) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(GAP),
     ) {
@@ -125,11 +162,101 @@ private fun ActiveSession(session: WorkoutSession) {
                     contentDescription = "Session started at ${session.startedAt.asLocalTime()}"
                 },
         )
-        Text(
-            text = "Adding exercises and logging sets arrives with US-02 and US-03.",
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-        )
+
+        if (exercises.isEmpty()) {
+            Text(
+                text = "No exercises yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                items(exercises, key = { it.sessionExercise.id.value }) { row ->
+                    ListItem(
+                        headlineContent = {
+                            // The catalog entry is only absent if the row outlived its exercise,
+                            // which the schema forbids; show the id rather than a blank line.
+                            Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
+                        },
+                        overlineContent = { Text("${row.sessionExercise.position}") },
+                        supportingContent = { Text("Logging sets arrives with US-03.") },
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+
+        Button(
+            onClick = onAddExercise,
+            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+        ) {
+            Text("Add exercise")
+        }
+    }
+}
+
+/**
+ * Catalog search (US-02). Results are ranked by how recently the member used each exercise,
+ * then alphabetically — the ordering comes from the query, not from this list.
+ */
+@Composable
+private fun ExerciseSearch(
+    query: String,
+    results: List<Exercise>,
+    onQueryChanged: (String) -> Unit,
+    onExerciseChosen: (ExerciseId) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = SCREEN_PADDING),
+            verticalArrangement = Arrangement.spacedBy(GAP),
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChanged,
+                label = { Text("Search exercises") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            if (results.isEmpty()) {
+                Text(
+                    text = if (query.isBlank()) "Loading the catalog…" else "Nothing matches \"$query\".",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                items(results, key = { it.id.value }) { exercise ->
+                    ListItem(
+                        headlineContent = { Text(exercise.name) },
+                        supportingContent = {
+                            Text(
+                                exercise.equipment.name
+                                    .lowercase()
+                                    .replaceFirstChar { it.uppercase() },
+                            )
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .sizeIn(minHeight = MIN_TOUCH_TARGET)
+                                .clickable { onExerciseChosen(exercise.id) },
+                    )
+                    HorizontalDivider()
+                }
+            }
+
+            TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
+                Text("Cancel")
+            }
+        }
     }
 }
 
