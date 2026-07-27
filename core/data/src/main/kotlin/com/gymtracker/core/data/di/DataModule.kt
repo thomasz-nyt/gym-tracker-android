@@ -2,9 +2,8 @@ package com.gymtracker.core.data.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.AndroidCatalogAssetReader
@@ -96,11 +95,18 @@ object DataModule {
         @ApplicationContext context: Context,
     ): CatalogAssetReader = AndroidCatalogAssetReader(context)
 
+    /**
+     * One DataStore per file per process, enforced by the delegate rather than by `@Singleton`.
+     *
+     * A Hilt singleton is per component, and components are recreated — between instrumented
+     * tests, for instance — which produces a second DataStore over the same file and throws.
+     * The property delegate is process-wide, so it cannot happen.
+     */
     @Provides
     @Singleton
     fun preferences(
         @ApplicationContext context: Context,
-    ): DataStore<Preferences> = PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("gym-tracker") }
+    ): DataStore<Preferences> = context.gymTrackerPreferences
 
     @Provides
     @IoDispatcher
@@ -144,3 +150,5 @@ abstract class DataBindings {
     @Binds
     abstract fun sets(impl: RoomSetRepository): SetRepository
 }
+
+private val Context.gymTrackerPreferences: DataStore<Preferences> by preferencesDataStore(name = "gym-tracker")
