@@ -1,5 +1,6 @@
 package com.gymtracker.feature.logging
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,9 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,6 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
@@ -243,6 +249,7 @@ private fun ExerciseSearch(
                                     .replaceFirstChar { it.uppercase() },
                             )
                         },
+                        leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -279,6 +286,33 @@ private fun AbandonedSessionDialog(
     )
 }
 
+/**
+ * A bundled photo of the movement, for the starter exercises that ship one (ADR-0007).
+ *
+ * When no image is bundled the space is left empty rather than filled with a generic icon:
+ * an image that says nothing is worse than no image, and constitution §2 says absent is
+ * shown as absent. The rest of the catalog gets media at M3.
+ */
+@Composable
+private fun ExerciseThumbnail(imageAsset: String?) {
+    if (imageAsset == null) {
+        Box(modifier = Modifier.size(THUMBNAIL))
+        return
+    }
+
+    AsyncImage(
+        model = "file:///android_asset/exercise_images/$imageAsset",
+        // The name is right beside it, so repeating it would only add noise for TalkBack.
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier =
+            Modifier
+                .size(THUMBNAIL)
+                .clip(RoundedCornerShape(THUMBNAIL_CORNER))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+    )
+}
+
 private fun StaleSessionPrompt.explanation(): String =
     when (this) {
         is StaleSessionPrompt.Finish ->
@@ -302,6 +336,8 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault
 private val SCREEN_PADDING = 24.dp
 private val GAP = 12.dp
 private val MIN_TOUCH_TARGET = 48.dp
+private val THUMBNAIL = 56.dp
+private val THUMBNAIL_CORNER = 8.dp
 
 @Preview
 @Composable

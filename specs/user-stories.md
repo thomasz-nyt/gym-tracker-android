@@ -26,6 +26,11 @@ As a member, I start a gym session so my sets are grouped.
 - Given an active session, when I search the catalog and select an exercise, it is
   appended to the session.
 - Recently used exercises appear first, before alphabetical results.
+- With no history yet, a curated set of common gym movements appears above the
+  alphabetical results, so a new member does not meet 873 exercises in alphabetical
+  order. History outranks it as soon as there is any (ADR-0007).
+- Starter exercises show a bundled photo of the movement. Exercises without one show
+  no image rather than a placeholder; the rest of the catalog gets media at M3.
 - The same exercise may appear twice in one session.
 
 ### US-03 — Log a set  ← the story that matters most

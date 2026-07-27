@@ -53,7 +53,10 @@ class SessionExerciseTest {
           {"id":"curl","name":"Curl","primaryMuscles":["BICEPS"],"secondaryMuscles":[],
            "equipment":"DUMBBELL","instructions":[],"source":"free-exercise-db"},
           {"id":"squat","name":"Squat","primaryMuscles":["QUADS"],"secondaryMuscles":[],
-           "equipment":"BARBELL","instructions":[],"source":"free-exercise-db"}
+           "equipment":"BARBELL","instructions":[],"source":"free-exercise-db"},
+          {"id":"zzz","name":"Zzz Obscure Machine","primaryMuscles":["CHEST"],"secondaryMuscles":[],
+           "equipment":"MACHINE","instructions":[],"source":"free-exercise-db",
+           "is_starter":true,"image_asset":"Zzz.jpg"}
         ]
         """.trimIndent()
 
@@ -169,11 +172,35 @@ class SessionExerciseTest {
         }
 
     @Test
-    fun `with no history the catalog is alphabetical`() =
+    fun `with no history starters come first, then everything else alphabetically`() =
         runTest {
+            // ADR-0007: a new member should not meet the catalog in alphabetical order.
+            // "Zzz Obscure Machine" is last alphabetically and still leads, because it is a starter.
             assertEquals(
-                listOf("Bench Press", "Curl", "Squat"),
+                listOf("Zzz Obscure Machine", "Bench Press", "Curl", "Squat"),
                 catalog.search("", alice).first().map { it.name },
+            )
+        }
+
+    @Test
+    fun `a starter carries its bundled image and a non-starter carries none`() =
+        runTest {
+            val all = catalog.search("", alice).first().associateBy { it.name }
+
+            assertEquals("Zzz.jpg", all.getValue("Zzz Obscure Machine").imageAsset)
+            assertEquals(null, all.getValue("Curl").imageAsset)
+        }
+
+    @Test
+    fun `history still outranks the starter set`() =
+        runTest {
+            val session = startSession("s1")
+            addExercise()(session, ExerciseId("curl"))
+
+            assertEquals(
+                listOf("Curl", "Zzz Obscure Machine", "Bench Press", "Squat"),
+                catalog.search("", alice).first().map { it.name },
+                "what you actually do beats what we guessed you might",
             )
         }
 
@@ -184,7 +211,7 @@ class SessionExerciseTest {
             addExercise()(session, ExerciseId("squat"))
 
             assertEquals(
-                listOf("Squat", "Bench Press", "Curl"),
+                listOf("Squat", "Zzz Obscure Machine", "Bench Press", "Curl"),
                 catalog.search("", alice).first().map { it.name },
                 "Squat is last alphabetically but was just used",
             )
@@ -199,7 +226,7 @@ class SessionExerciseTest {
             addExercise()(newer, ExerciseId("curl"))
 
             assertEquals(
-                listOf("Curl", "Squat", "Bench Press"),
+                listOf("Curl", "Squat", "Zzz Obscure Machine", "Bench Press"),
                 catalog.search("", alice).first().map { it.name },
             )
         }
@@ -214,7 +241,7 @@ class SessionExerciseTest {
 
             assertEquals(listOf("Squat"), catalog.search("qua", alice).first().map { it.name })
             assertEquals(
-                listOf("Squat", "Bench Press", "Curl"),
+                listOf("Squat", "Zzz Obscure Machine", "Bench Press", "Curl"),
                 catalog.search("", alice).first().map { it.name },
             )
         }
@@ -235,7 +262,7 @@ class SessionExerciseTest {
             addExercise()(bobs.id, ExerciseId("squat"))
 
             assertEquals(
-                listOf("Bench Press", "Curl", "Squat"),
+                listOf("Zzz Obscure Machine", "Bench Press", "Curl", "Squat"),
                 catalog.search("", alice).first().map { it.name },
             )
         }

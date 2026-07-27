@@ -18,7 +18,7 @@ import com.gymtracker.core.domain.model.MediaType
  */
 @Entity(
     tableName = "exercises",
-    indices = [Index(value = ["name"])],
+    indices = [Index(value = ["name"]), Index(value = ["is_starter"])],
 )
 data class ExerciseEntity(
     @PrimaryKey @ColumnInfo(name = "id") val id: String,
@@ -32,6 +32,8 @@ data class ExerciseEntity(
     @ColumnInfo(name = "media_type") val mediaType: String?,
     @ColumnInfo(name = "youtube_url") val youtubeUrl: String?,
     @ColumnInfo(name = "source") val source: String,
+    @ColumnInfo(name = "is_starter") val isStarter: Boolean,
+    @ColumnInfo(name = "image_asset") val imageAsset: String?,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )
 
@@ -48,4 +50,6 @@ internal fun ExerciseEntity.toDomain(decode: (String) -> List<String>): Exercise
         mediaType = mediaType?.let(MediaType::valueOf),
         youtubeUrl = youtubeUrl,
         source = source,
+        isStarter = isStarter,
+        imageAsset = imageAsset,
     )

@@ -31,6 +31,10 @@ data class CatalogExercise(
     @SerialName("media_url") val mediaUrl: String? = null,
     @SerialName("youtube_url") val youtubeUrl: String? = null,
     val source: String,
+    /** Pinned above the alphabetical tail when the member has no history (ADR-0007). */
+    @SerialName("is_starter") val isStarter: Boolean = false,
+    /** File name under `assets/exercise_images/`, or null when no image is bundled. */
+    @SerialName("image_asset") val imageAsset: String? = null,
 )
 
 /**
@@ -51,6 +55,17 @@ object CatalogConverter {
     val NAMESPACE: UUID = UUID.fromString("db4d89a0-3fb8-5863-a109-dee16d1e7566")
 
     fun convert(source: List<SourceExercise>): List<CatalogExercise> {
+        val starters = STARTER_EXERCISE_SLUGS.toSet()
+        val slugs = source.mapTo(mutableSetOf()) { it.id }
+        // Only enforced against a full catalog: unit tests convert two-row fixtures.
+        if (slugs.size > STARTER_EXERCISE_SLUGS.size) {
+            val absent = starters - slugs
+            require(absent.isEmpty()) {
+                "Starter slugs missing from the source catalog: $absent. " +
+                    "The catalog was refreshed and STARTER_EXERCISE_SLUGS needs updating."
+            }
+        }
+
         source
             .groupingBy { it.id }
             .eachCount()
@@ -73,6 +88,10 @@ object CatalogConverter {
                     mediaUrl = null,
                     youtubeUrl = null,
                     source = SOURCE,
+                    isStarter = exercise.id in starters,
+                    // Only starters ship an image; the rest stay null rather than pointing at
+                    // something that is not there (ADR-0007, constitution §2).
+                    imageAsset = if (exercise.id in starters) "${exercise.id}.jpg" else null,
                 )
             }.sortedBy { it.name }
     }

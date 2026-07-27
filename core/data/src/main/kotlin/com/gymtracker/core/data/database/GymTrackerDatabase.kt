@@ -21,7 +21,7 @@ import com.gymtracker.core.data.set.SetEntity
  */
 @Database(
     entities = [SessionEntity::class, ExerciseEntity::class, SessionExerciseEntity::class, SetEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -42,6 +42,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V2_CATALOG = 2
         private const val V3_SESSION_EXERCISES = 3
         private const val V4_SETS = 4
+        private const val V5_STARTER_EXERCISES = 5
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -129,6 +130,24 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                         "CREATE INDEX IF NOT EXISTS `index_sets_session_exercise_id_performed_at` " +
                             "ON `sets` (`session_exercise_id`, `performed_at`)",
                     )
+                }
+            }
+
+        /**
+         * Adds the starter flag and bundled image to `exercises` (ADR-0007).
+         *
+         * The catalog is re-seeded rather than back-filled: it is derived data with no member
+         * content in it, so wiping and re-inserting from the bundled asset is simpler and
+         * cannot leave half-populated rows. `session_exercises.exercise_id` still resolves,
+         * because ids are UUIDv5 over the source slug and therefore unchanged.
+         */
+        val MIGRATION_4_5 =
+            object : Migration(V4_SETS, V5_STARTER_EXERCISES) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `exercises` ADD COLUMN `is_starter` INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE `exercises` ADD COLUMN `image_asset` TEXT")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_exercises_is_starter` ON `exercises` (`is_starter`)")
+                    db.execSQL("DELETE FROM `exercises`")
                 }
             }
     }

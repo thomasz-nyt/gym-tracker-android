@@ -144,6 +144,60 @@ class CatalogTest {
 }
 
 /**
+ * The v4 to v5 migration adds the starter flag and bundled image, and re-seeds the catalog.
+ */
+@RunWith(RobolectricTestRunner::class)
+class StarterMigrationTest {
+    @get:Rule
+    val helper =
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            GymTrackerDatabase::class.java,
+        )
+
+    @Test
+    fun `migrating from 4 to 5 clears the catalog but keeps the members own rows`() {
+        val name = "migration-4-5.db"
+
+        helper.createDatabase(name, 4).use { v4 ->
+            v4.execSQL(
+                "INSERT INTO sessions (id, user_id, gym_name, started_at, ended_at, avg_hr, max_hr, " +
+                    "active_kcal, metrics_source, updated_at, sync_state) " +
+                    "VALUES ('s1', 'u1', NULL, 1000, NULL, NULL, NULL, NULL, NULL, 1000, 'PENDING')",
+            )
+            v4.execSQL(
+                "INSERT INTO exercises (id, name, aliases_json, primary_json, secondary_json, equipment, " +
+                    "instructions_json, media_url, media_type, youtube_url, source, updated_at) " +
+                    "VALUES ('e1', 'Bench Press', '[]', '[]', '[]', 'BARBELL', '[]', NULL, NULL, NULL, 'x', 1000)",
+            )
+            v4.execSQL(
+                "INSERT INTO session_exercises (id, session_id, exercise_id, position, updated_at, sync_state) " +
+                    "VALUES ('se1', 's1', 'e1', 1, 1000, 'PENDING')",
+            )
+            v4.execSQL(
+                "INSERT INTO sets (id, session_exercise_id, set_index, weight_kg, reps, rpe, performed_at, " +
+                    "updated_at, sync_state) VALUES ('set1', 'se1', 1, 60.0, 5, NULL, 1000, 1000, 'PENDING')",
+            )
+        }
+
+        val v5 = helper.runMigrationsAndValidate(name, 5, true, GymTrackerDatabase.MIGRATION_4_5)
+
+        v5.query("SELECT COUNT(*) FROM exercises").use {
+            assertTrue(it.moveToFirst())
+            assertEquals(0, it.getInt(0), "catalog is cleared so it re-seeds with starter data")
+        }
+        // The member's own rows are untouched: sets and session_exercises are their log, and
+        // exercise_id still resolves because UUIDv5 ids do not change when the catalog re-seeds.
+        listOf("sessions", "session_exercises", "sets").forEach { table ->
+            v5.query("SELECT COUNT(*) FROM $table").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1, it.getInt(0), "$table survived")
+            }
+        }
+    }
+}
+
+/**
  * The v1 to v2 migration adds the catalog table. It must not disturb `sessions`: a member with
  * a workout in progress when they install the update keeps it (US-01).
  */

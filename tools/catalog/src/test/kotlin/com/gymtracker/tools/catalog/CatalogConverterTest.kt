@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -129,6 +130,37 @@ class CatalogConverterTest {
             }
 
         assertTrue(error.message.orEmpty().contains("same"))
+    }
+
+    @Test
+    fun `starter exercises are flagged and everything else is not`() {
+        val converted =
+            CatalogConverter.convert(
+                listOf(source(id = "Barbell_Squat", name = "Barbell Squat"), source(id = "obscure", name = "Obscure")),
+            )
+
+        assertEquals(true, converted.single { it.name == "Barbell Squat" }.isStarter)
+        assertEquals(false, converted.single { it.name == "Obscure" }.isStarter)
+    }
+
+    @Test
+    fun `a starter exercise carries the image bundled for it`() {
+        val converted = CatalogConverter.convert(listOf(source(id = "Barbell_Squat", name = "Barbell Squat"))).single()
+
+        assertEquals("Barbell_Squat.jpg", converted.imageAsset)
+    }
+
+    @Test
+    fun `a non-starter exercise has no image rather than a broken one`() {
+        // constitution §2: absent is shown as absent, never faked.
+        val converted = CatalogConverter.convert(listOf(source(id = "obscure", name = "Obscure"))).single()
+
+        assertNull(converted.imageAsset)
+    }
+
+    @Test
+    fun `the starter list has no duplicates`() {
+        assertEquals(STARTER_EXERCISE_SLUGS.size, STARTER_EXERCISE_SLUGS.toSet().size)
     }
 
     @Test
