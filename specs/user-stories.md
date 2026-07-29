@@ -26,6 +26,11 @@ As a member, I start a gym session so my sets are grouped.
 - Given an active session, when I search the catalog and select an exercise, it is
   appended to the session.
 - Recently used exercises appear first, before alphabetical results.
+- With no history yet, a curated set of common gym movements appears above the
+  alphabetical results, so a new member does not meet 873 exercises in alphabetical
+  order. History outranks it as soon as there is any (ADR-0007).
+- Starter exercises show a bundled photo of the movement. Exercises without one show
+  no image rather than a placeholder; the rest of the catalog gets media at M3.
 - The same exercise may appear twice in one session.
 
 ### US-03 — Log a set  ← the story that matters most
@@ -34,7 +39,11 @@ As a member, I start a gym session so my sets are grouped.
 - When no prior set exists, the fields are empty and focused.
 - Confirming a set requires **no more than 2 taps** when the prefilled values are
   correct. Asserted by an instrumented test that counts interactions.
-- Weight accepts one decimal place; reps are whole numbers ≥ 1.
+- Weight accepts one decimal place, in the member's own unit; the other unit is shown
+  alongside (ADR-0006, ADR-0008). Reps are whole numbers ≥ 1.
+- A **sets** count may be entered — "3 sets of 12" — which records that many identical
+  sets, each as its own row (ADR-0009). It defaults to 1, so the two-tap path is
+  unaffected.
 - The set is persisted locally before any UI transition. Killing the app
   immediately after does not lose it.
 

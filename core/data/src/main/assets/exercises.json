@@ -48,7 +48,9 @@
       "After a second pause, slowly return to the starting position as you breathe in.",
       "Repeat the movement for the prescribed amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Ab_Crunch_Machine.jpg"
   },
   {
     "id": "2d4360f8-6389-5aa3-aceb-f68610199b00",
@@ -813,7 +815,9 @@
       "Repeat the movement for the prescribed amount of repetitions.",
       "When you are done, place the bar back in the rack."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Barbell_Bench_Press_-_Medium_Grip.jpg"
   },
   {
     "id": "0ad54402-8863-5726-add5-96c70b411380",
@@ -832,7 +836,9 @@
       "Slowly begin to bring the bar back to starting position as your breathe in.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Barbell_Curl.jpg"
   },
   {
     "id": "1a66103c-fe5f-5cb3-8e40-9a358f78beec",
@@ -874,7 +880,9 @@
       "Go back to the starting position by bending at the knees while simultaneously leaning the torso forward at the waist while keeping the back straight. When the weights on the bar touch the floor you are back at the starting position and ready to perform another repetition.",
       "Perform the amount of repetitions prescribed in the program."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Barbell_Deadlift.jpg"
   },
   {
     "id": "90ecc907-9018-51b1-92f0-5e1ac6537660",
@@ -915,7 +923,9 @@
       "Begin the movement by driving through with your heels, extending your hips vertically through the bar. Your weight should be supported by your upper back and the heels of your feet.",
       "Extend as far as possible, then reverse the motion to return to the starting position."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Barbell_Glute_Bridge.jpg"
   },
   {
     "id": "7c309f0b-e34e-5353-9177-bc3e47786a48",
@@ -1111,7 +1121,9 @@
       "Lift the bar back up to the starting position as you exhale.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Barbell_Shoulder_Press.jpg"
   },
   {
     "id": "f3347d1c-4d94-5517-adf3-8964e06970db",
@@ -1207,7 +1219,9 @@
       "Begin to raise the bar as you exhale by pushing the floor with the heel of your foot as you straighten the legs again and go back to the starting position.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Barbell_Squat.jpg"
   },
   {
     "id": "85f837a3-85db-5167-9497-608f99c9ebf2",
@@ -1471,7 +1485,9 @@
       "Then inhale and slowly lower the barbell back to the starting position.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Bent_Over_Barbell_Row.jpg"
   },
   {
     "id": "858e581b-9f77-552d-b79c-ad849c1282d5",
@@ -2134,7 +2150,9 @@
       "Return your arms back to the starting position as you breathe out. Make sure to use the same arc of motion used to lower the weights.",
       "Hold for a second at the starting position and repeat the movement for the prescribed amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Cable_Crossover.jpg"
   },
   {
     "id": "d2ac612e-c5b6-59fc-9e2e-c10f27e31dd6",
@@ -3603,7 +3621,9 @@
       "After the one second contraction, begin to come down slowly again to the starting position as you inhale.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Crunches.jpg"
   },
   {
     "id": "7ad8716e-bc7a-5d9c-9ecb-28bbfbba6542",
@@ -4014,7 +4034,9 @@
       "Then, exhale and push your torso back up using your triceps to bring your body back to the starting position.",
       "Repeat the movement for the prescribed amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Dips_-_Triceps_Version.jpg"
   },
   {
     "id": "f2a4a1bc-6f7d-511c-b825-afde43931675",
@@ -4250,7 +4272,9 @@
       "Then, as you breathe out, use your chest to push the dumbbells up. Lock your arms at the top of the lift and squeeze your chest, hold for a second and then begin coming down slowly. Tip: Ideally, lowering the weight should take about twice as long as raising it.",
       "Repeat the movement for the prescribed amount of repetitions of your training program."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Dumbbell_Bench_Press.jpg"
   },
   {
     "id": "f3410e68-b35e-5852-b7b5-437980578748",
@@ -4287,7 +4311,9 @@
       "Then, inhale and slowly begin to lower the dumbbells back to the starting position.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Dumbbell_Bicep_Curl.jpg"
   },
   {
     "id": "a749075c-151a-5100-854f-9ca7ef9b589f",
@@ -4347,7 +4373,9 @@
       "Return your arms back to the starting position as you squeeze your chest muscles and breathe out. Tip: Make sure to use the same arc of motion used to lower the weights.",
       "Hold for a second at the contracted position and repeat the movement for the prescribed amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Dumbbell_Flyes.jpg"
   },
   {
     "id": "87467c1a-8da6-56d6-b15f-63b621cb82bf",
@@ -4407,7 +4435,9 @@
       "Using mainly the heel of your foot, push up and go back to the starting position as you exhale.",
       "Repeat the movement for the recommended amount of repetitions and then perform with the left leg."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Dumbbell_Lunges.jpg"
   },
   {
     "id": "4a9bd558-96b3-5048-b5ce-572ab51030ac",
@@ -4668,7 +4698,9 @@
       "Then, after a brief pause at the top contracted position, slowly lower the weights back down to the starting position while inhaling.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Dumbbell_Shoulder_Press.jpg"
   },
   {
     "id": "3697a1b7-ae44-58a3-91e2-8310a3286308",
@@ -5070,7 +5102,9 @@
     "instructions": [
       "Facing a high pulley with a rope or dual handles attached, pull the weight directly towards your face, separating your hands as you do so. Keep your upper arms parallel to the ground."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Face_Pull.jpg"
   },
   {
     "id": "3c0d6a49-2f1f-5a6f-a258-d7495aa1680d",
@@ -5411,7 +5445,9 @@
       "Begin to raise the bar as you exhale by pushing the floor mainly with the middle of your foot as you straighten the legs again and go back to the starting position.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Front_Barbell_Squat.jpg"
   },
   {
     "id": "5c06ddba-692a-5422-8a5f-368e2c166768",
@@ -5855,7 +5891,9 @@
       "After the brief pause, inhale and slowly begin the lower the dumbbells back down to the starting position.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Hammer_Curls.jpg"
   },
   {
     "id": "f605d0cd-b736-5112-b42e-0a53f1f31717",
@@ -6059,7 +6097,9 @@
       "Go back slowly to the starting position as you breathe in.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Hanging_Leg_Raise.jpg"
   },
   {
     "id": "d451c31e-8721-59a0-8b7a-3e6a5e81aa91",
@@ -7733,7 +7773,9 @@
       "Slowly lower the weight back to the original position as you inhale, ensuring that you do not go past the 90-degree angle limit.",
       "Repeat for the recommended amount of times."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Leg_Extensions.jpg"
   },
   {
     "id": "e9b38b0b-1640-544c-a09b-f38e8bdc4704",
@@ -7773,7 +7815,9 @@
       "Pushing mainly with the heels of your feet and using the quadriceps go back to the starting position as you exhale.",
       "Repeat for the recommended amount of repetitions and ensure to lock the safety pins properly once you are done. You do not want that platform falling on you fully loaded."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Leg_Press.jpg"
   },
   {
     "id": "5e7c820a-90d8-568b-8a0c-7c3e292c63a7",
@@ -7841,7 +7885,9 @@
       "Press the handles forward by extending through the elbow.",
       "After a brief pause at the top, return the weight just above the start position, keeping tension on the muscles by not returning the weight to the stops until the set is complete."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Leverage_Chest_Press.jpg"
   },
   {
     "id": "b91fddb3-0723-5c1c-9ead-19886922a64b",
@@ -8450,7 +8496,9 @@
       "As you exhale, curl your legs up as far as possible without lifting the upper legs from the pad. Once you hit the fully contracted position, hold it for a second.",
       "As you inhale, bring the legs back to the initial position. Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Lying_Leg_Curls.jpg"
   },
   {
     "id": "ef7db17f-f987-5155-bf97-4fcd345cc6e0",
@@ -8599,7 +8647,9 @@
       "Repeat for the recommended amount of reps.",
       "When finished step on the lever again and slowly get the handles back to their original place."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Machine_Bench_Press.jpg"
   },
   {
     "id": "1765495f-b4ee-54f4-8544-31caeab1f6a3",
@@ -10164,7 +10214,9 @@
       "Get into a prone position on the floor, supporting your weight on your toes and your forearms. Your arms are bent and directly below the shoulder.",
       "Keep your body straight at all times, and hold this position as long as possible. To increase difficulty, an arm or leg can be raised."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Plank.jpg"
   },
   {
     "id": "aacca012-cc22-5590-ab8a-9cbf1ad91604",
@@ -10600,7 +10652,9 @@
       "After a second on the contracted position, start to inhale and slowly lower your torso back to the starting position when your arms are fully extended and the lats are fully stretched.",
       "Repeat this motion for the prescribed amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Pullups.jpg"
   },
   {
     "id": "e3f0e8fe-ee75-5e10-bc5d-02f631fffdbe",
@@ -10752,7 +10806,9 @@
       "Now breathe out and press your upper body back up to the starting position while squeezing your chest.",
       "After a brief pause at the top contracted position, you can begin to lower yourself downward again for as many repetitions as needed."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Pushups.jpg"
   },
   {
     "id": "85aaaf9f-c2f9-5887-9d1a-2a4f6fbfe00b",
@@ -11445,7 +11501,9 @@
       "Once you are standing completely straight up, lower the bar by pushing the hips back, only slightly bending the knees, unlike when squatting. Tip: Take a deep breath at the start of the movement and keep your chest up. Hold your breath as you lower and exhale as you complete the movement.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Romanian_Deadlift.jpg"
   },
   {
     "id": "1c9f806b-632e-524b-9287-acbcc0925342",
@@ -11859,7 +11917,9 @@
       "Keeping the torso stationary, pull the handles back towards your torso while keeping the arms close to it until you touch the abdominals. Breathe out as you perform that movement. At that point you should be squeezing your back muscles hard. Hold that contraction for a second and slowly go back to the original position while breathing in.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Seated_Cable_Rows.jpg"
   },
   {
     "id": "4544dde8-5527-57c5-a3a4-1fd615cbfdb8",
@@ -12176,7 +12236,9 @@
       "Slowly return to the starting position as you breathe in.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Seated_Leg_Curl.jpg"
   },
   {
     "id": "13e86801-00a7-5a22-b522-c8bba5bd76c9",
@@ -12513,7 +12575,9 @@
       "Lower the dumbbells back down slowly to the starting position as you inhale.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Side_Lateral_Raise.jpg"
   },
   {
     "id": "a8dc14bd-b7ef-5353-9ca9-39558ff3e104",
@@ -13161,7 +13225,9 @@
       "Repeat the movement for the prescribed amount of repetitions.",
       "When you are done, lock the bar back in the rack."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Smith_Machine_Bench_Press.jpg"
   },
   {
     "id": "09b77bf1-6b9f-5aa7-aa2b-fdcfc6047115",
@@ -14248,7 +14314,9 @@
       "Go back slowly to the starting position as you breathe in by lowering your heels as you bend the ankles until calves are stretched.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Standing_Calf_Raises.jpg"
   },
   {
     "id": "8cff193b-2b7f-5eb5-8e19-552838c5c7fa",
@@ -15596,7 +15664,9 @@
       "After a second hold at the contracted position, bring the bar slowly up to the starting point. Breathe in as you perform this step.",
       "Repeat for the recommended amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Triceps_Pushdown.jpg"
   },
   {
     "id": "b4079168-ebf1-5418-a3db-83963c047abe",
@@ -16251,7 +16321,9 @@
       "After a second at the contracted position squeezing your shoulder blades together, slowly raise the bar back to the starting position when your arms are fully extended and the lats are fully stretched. Inhale during this portion of the movement.",
       "Repeat this motion for the prescribed amount of repetitions."
     ],
-    "source": "free-exercise-db"
+    "source": "free-exercise-db",
+    "is_starter": true,
+    "image_asset": "Wide-Grip_Lat_Pulldown.jpg"
   },
   {
     "id": "fb98abd4-436e-5bfb-b495-3e843360d877",

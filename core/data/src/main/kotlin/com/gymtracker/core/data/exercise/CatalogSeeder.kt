@@ -23,6 +23,8 @@ internal data class BundledExercise(
     @SerialName("media_url") val mediaUrl: String? = null,
     @SerialName("youtube_url") val youtubeUrl: String? = null,
     val source: String,
+    @SerialName("is_starter") val isStarter: Boolean = false,
+    @SerialName("image_asset") val imageAsset: String? = null,
 )
 
 /**
@@ -71,6 +73,8 @@ class CatalogSeeder
                 mediaType = null,
                 youtubeUrl = youtubeUrl,
                 source = source,
+                isStarter = isStarter,
+                imageAsset = imageAsset,
                 updatedAt = now,
             )
     }
