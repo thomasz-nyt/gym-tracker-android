@@ -11,6 +11,7 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Duration
 import javax.inject.Inject
 
 /** An exercise in the session, paired with its catalog entry for display. */
@@ -59,6 +61,8 @@ data class SessionUiState(
     val results: List<Exercise> = emptyList(),
     val unit: WeightUnit = WeightUnit.LB,
     val setEntry: SetEntry? = null,
+    /** Time left in the current rest, or null when none is running (US-05). */
+    val restRemaining: Duration? = null,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -70,6 +74,8 @@ class ActiveSessionViewModel
         private val sessionExercises: SessionExerciseRepository,
         private val sets: SetRepository,
         private val logSets: LogSets,
+        private val restTimer: RestTimer,
+        private val restTimerStore: com.gymtracker.core.domain.rest.RestTimerStore,
         private val prefillFromLastSet: PrefillFromLastSet,
         private val unitPreference: UnitPreference,
         private val catalog: ExerciseCatalog,
@@ -78,10 +84,14 @@ class ActiveSessionViewModel
         private val addExerciseToSession: AddExerciseToSession,
         private val clock: Clock,
     ) : ViewModel() {
+        /** The rest between sets lives in its own state holder; see [RestController]. */
+        val rest = RestController(restTimer, restTimerStore, viewModelScope)
+
         /** Set entry lives in its own state holder; see [SetEntryController]. */
         val setEntry =
             SetEntryController(
                 logSets = logSets,
+                onSetLogged = rest::startAfterSet,
                 prefillFromLastSet = prefillFromLastSet,
                 unitPreference = unitPreference,
                 currentMember = currentMember,
@@ -145,8 +155,12 @@ class ActiveSessionViewModel
                 combine(searching, query, results) { isSearching, text, found ->
                     Triple(isSearching, text, found)
                 },
-                combine(unitPreference.observe(), setEntry.entry) { unit, entry -> unit to entry },
-            ) { session, prompt, inSession, (isSearching, text, found), (unit, entry) ->
+                combine(
+                    unitPreference.observe(),
+                    setEntry.entry,
+                    rest.remaining(),
+                ) { unit, entry, rest -> Triple(unit, entry, rest) },
+            ) { session, prompt, inSession, (isSearching, text, found), (unit, entry, rest) ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
@@ -157,6 +171,7 @@ class ActiveSessionViewModel
                     results = found,
                     unit = unit,
                     setEntry = entry,
+                    restRemaining = rest,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
@@ -165,6 +180,7 @@ class ActiveSessionViewModel
         }
 
         /** Starts a session, or does nothing visible if one is already running (US-01). */
+
         fun onStartWorkout() {
             viewModelScope.launch { startSession(currentMember.id()) }
         }
@@ -234,6 +250,7 @@ class ActiveSessionViewModel
 
         private companion object {
             const val STOP_TIMEOUT_MILLIS = 5_000L
+            const val TICK_MILLIS = 1_000L
 
             /** Enough to stop re-querying 873 rows on every keystroke, short enough to feel instant. */
             const val SEARCH_DEBOUNCE_MILLIS = 150L

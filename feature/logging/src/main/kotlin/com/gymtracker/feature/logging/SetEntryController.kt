@@ -34,6 +34,8 @@ data class SetEntry(
  */
 class SetEntryController(
     private val logSets: LogSets,
+    /** Runs once the set is safely on disk — US-05's rest starts from here. */
+    private val onSetLogged: suspend () -> Unit,
     private val prefillFromLastSet: PrefillFromLastSet,
     private val unitPreference: UnitPreference,
     private val currentMember: CurrentMember,
@@ -115,6 +117,10 @@ class SetEntryController(
                 sets = confirmed.sets,
             )
             state.value = null
+
+            // Called after the write, so a failed save cannot start a rest for a set that
+            // does not exist.
+            onSetLogged()
         }
     }
 

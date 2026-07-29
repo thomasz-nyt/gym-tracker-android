@@ -13,6 +13,8 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimer
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
@@ -27,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -72,6 +75,7 @@ class ActiveSessionViewModelTest {
     private val sessionExercises = FakeSessionExercises()
     private val sets = FakeSets()
     private val units = FakeUnitPreference()
+    private val restStore = FakeRestTimerStore()
     private var nextSessionExercise = 1
     private var nextSet = 1
 
@@ -83,6 +87,8 @@ class ActiveSessionViewModelTest {
             currentMember = FakeCurrentMember(member),
             sets = sets,
             logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
+            restTimer = RestTimer(restStore, clock),
+            restTimerStore = restStore,
             prefillFromLastSet = PrefillFromLastSet(sets),
             unitPreference = units,
             startSession = StartSession(repository, clock) { SessionId("new") },
@@ -443,6 +449,79 @@ class ActiveSessionViewModelTest {
 
             assertEquals(emptyList(), sets.all)
         }
+
+    @Test
+    fun `logging a set starts the rest automatically`() =
+        runTest {
+            // US-05, first criterion. Ninety seconds is the default until changed.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertEquals(now.plusSeconds(90), restStore.restEndsAt.first())
+        }
+
+    @Test
+    fun `a failed save leaves no rest running`() =
+        runTest {
+            // The rest starts after the write, so a set that never saved cannot leave a
+            // timer counting down for it.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertNull(restStore.restEndsAt.first())
+            assertEquals(emptyList(), sets.all)
+        }
+
+    @Test
+    fun `skipping the rest clears it`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            restStore.setRestEndsAt(now.plusSeconds(90))
+
+            viewModel.rest.skip()
+
+            assertNull(restStore.restEndsAt.first())
+        }
+
+    private class FakeRestTimerStore : RestTimerStore {
+        private val endsAt = MutableStateFlow<java.time.Instant?>(null)
+        private val default = MutableStateFlow(Duration.ofSeconds(90))
+        private val asked = MutableStateFlow(false)
+
+        override val restEndsAt = endsAt
+        override val defaultRest = default
+        override val shouldAskForNotificationPermission = asked.map { !it }
+
+        override suspend fun setRestEndsAt(instant: java.time.Instant?) {
+            endsAt.value = instant
+        }
+
+        override suspend fun setDefaultRest(rest: Duration) {
+            default.value = rest
+        }
+
+        override suspend fun markNotificationPermissionAsked() {
+            asked.value = true
+        }
+    }
 
     private class FakeUnitPreference : UnitPreference {
         private val state = MutableStateFlow(WeightUnit.LB)

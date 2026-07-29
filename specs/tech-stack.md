@@ -18,6 +18,7 @@ hard part and are native on both sides anyway).
 | Device-local prefs | DataStore (Preferences) | Unsynced, this-device-only state. ADR-0005 |
 | Async | Coroutines + Flow | |
 | Background sync | WorkManager | Constrained on network availability |
+| Rest timer | Persisted end time + `AlarmManager` exact alarm | ADR-0010. `USE_EXACT_ALARM` + `POST_NOTIFICATIONS`. WorkManager defers, so it cannot fire at a given second |
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions) | |
 | Supabase client | `supabase-kt` (jan-tennert) | Kotlin Multiplatform-ready, which helps the iOS port |
 | Charts | Vico | Compose-native, no `AndroidView` wrapper |

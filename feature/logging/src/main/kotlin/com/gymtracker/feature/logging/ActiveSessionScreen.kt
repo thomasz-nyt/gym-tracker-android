@@ -1,5 +1,9 @@
 package com.gymtracker.feature.logging
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -26,11 +31,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,6 +62,9 @@ import com.gymtracker.core.domain.set.SetGroup
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
+import com.gymtracker.feature.logging.rest.RestAlarm
+import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -72,12 +84,14 @@ fun LoggingRoute(
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    RestNotifications(viewModel)
 
     LoggingScreen(
         state = state,
         onStartWorkout = viewModel::onStartWorkout,
         onResolveStale = viewModel::onResolveStale,
         onAddSet = viewModel.setEntry::open,
+        onSkipRest = viewModel.rest::skip,
         onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
         onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
         onSetCountChanged = { viewModel.setEntry.change(sets = it) },
@@ -98,6 +112,7 @@ internal fun LoggingScreen(
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit = {},
+    onSkipRest: () -> Unit = {},
     onSetWeightChanged: (String) -> Unit = {},
     onSetRepsChanged: (String) -> Unit = {},
     onSetCountChanged: (String) -> Unit = {},
@@ -138,8 +153,10 @@ internal fun LoggingScreen(
                         session = state.activeSession,
                         exercises = state.exercises,
                         unit = state.unit,
+                        restRemaining = state.restRemaining,
                         onAddExercise = onAddExercise,
                         onAddSet = onAddSet,
+                        onSkipRest = onSkipRest,
                     )
                 else -> NoSession(onStartWorkout)
             }
@@ -190,8 +207,10 @@ private fun ActiveSession(
     session: WorkoutSession,
     exercises: List<SessionExerciseRow>,
     unit: WeightUnit,
+    restRemaining: Duration?,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onSkipRest: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -199,6 +218,16 @@ private fun ActiveSession(
         verticalArrangement = Arrangement.spacedBy(GAP),
     ) {
         Text(text = "Workout in progress", style = MaterialTheme.typography.titleLarge)
+
+        // Sits above the list and gates nothing: "Add set" stays live throughout, which is
+        // US-05's "it never blocks logging the next set".
+        restRemaining?.let { remaining ->
+            AssistChip(
+                onClick = onSkipRest,
+                label = { Text("Rest ${remaining.asCountdown()}  ·  Skip") },
+                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+            )
+        }
         Text(
             text = "Started ${session.startedAt.asLocalTime()}",
             style = MaterialTheme.typography.bodyMedium,
@@ -331,6 +360,59 @@ private fun AbandonedSessionDialog(
             }
         },
     )
+}
+
+/**
+ * mm:ss, so 90 seconds reads "1:30" rather than "PT1M30S".
+ *
+ * Arithmetic on [Duration.getSeconds] rather than `toMinutesPart`/`toSecondsPart`, which are
+ * API 31 and would crash on the API 26 devices `tech-stack.md` supports.
+ */
+private fun Duration.asCountdown(): String =
+    "%d:%02d".format(seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
+
+private const val SECONDS_PER_MINUTE = 60
+
+/**
+ * Schedules the rest notification and asks for permission once (US-05, ADR-0010).
+ *
+ * The alarm is a side effect of a rest starting, not part of the timer: the timer is the
+ * stored end time, so if this never runs the countdown on screen is still correct.
+ */
+@Composable
+private fun RestNotifications(viewModel: ActiveSessionViewModel) {
+    val context = LocalContext.current
+    val alarm = remember(context) { RestAlarm(context) }
+    val restStarted by viewModel.rest.restStarted.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    val requestPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // Scheduled here, not before launching: RestAlarm checks the permission, so
+            // scheduling while the dialog is still open silently does nothing. Found on a
+            // device — the countdown looked right and no notification ever arrived.
+            scope.launch {
+                viewModel.rest.endsAt()?.let(alarm::schedule)
+                viewModel.rest.onHandled()
+            }
+        }
+
+    LaunchedEffect(restStarted) {
+        if (!restStarted) return@LaunchedEffect
+
+        val mustAsk =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                viewModel.rest.shouldAskForNotifications()
+
+        if (mustAsk) {
+            // Once, ever (US-05). Denial is fine — the countdown still runs on screen.
+            viewModel.rest.onNotificationPermissionAsked()
+            requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.rest.endsAt()?.let(alarm::schedule) ?: alarm.cancel()
+            viewModel.rest.onHandled()
+        }
+    }
 }
 
 /** The sets already logged against one exercise, each in both units (ADR-0008). */
