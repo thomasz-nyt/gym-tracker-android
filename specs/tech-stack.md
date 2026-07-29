@@ -28,6 +28,7 @@ hard part and are native on both sides anyway).
 | Serialization | kotlinx.serialization | |
 | Build | Gradle KTS, version catalog (`libs.versions.toml`) | Convention plugins in `build-logic/` |
 | Lint | ktlint + detekt | Failing lint fails CI |
+| Debug signing | `debug.keystore`, checked in | So CI and local builds install over each other. Not a secret: it cannot sign a release |
 
 ## Testing
 

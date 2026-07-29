@@ -20,6 +20,27 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
 
             extensions.configure<ApplicationExtension> {
                 compileSdk = COMPILE_SDK
+
+                /*
+                 * A shared debug key, checked in, so every build signs identically.
+                 *
+                 * AGP otherwise generates a keystore per machine, which means a CI APK and a
+                 * local one cannot be installed over each other — Android rejects the update
+                 * and the only way through is uninstalling, which wipes the log. That makes
+                 * "install the new build and carry on" impossible, and M1's exit gate is the
+                 * maintainer logging three real workouts across builds.
+                 *
+                 * This is not a secret. The password is the Android-wide convention, the key
+                 * cannot sign a release, and constitution §4 is about keys that grant access
+                 * to data or paid APIs. Release signing, when it exists, uses a key that is
+                 * never in the repository.
+                 */
+                signingConfigs.getByName("debug") {
+                    storeFile = rootProject.file("debug.keystore")
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
                 defaultConfig {
                     minSdk = MIN_SDK
                     targetSdk = TARGET_SDK
