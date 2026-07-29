@@ -50,7 +50,10 @@ As a member, I start a gym session so my sets are grouped.
 ### US-04 — Correct a mistake
 - I can edit weight, reps, or RPE of any set in the current session.
 - I can delete a set, with undo available for 5 seconds.
-- Editing a past session's set is possible from history and recalculates PRs.
+- Editing a past session's set is possible from history. Recalculating PRs
+  activates at M4 with US-18 — PRs derive from `sets`, so edits already propagate
+  and there is nothing to recalculate until detection exists (maintainer decision,
+  2026-07-28).
 
 ### US-05 — Rest timer
 - After logging a set, a rest timer starts automatically at my configured
@@ -63,7 +66,9 @@ As a member, I start a gym session so my sets are grouped.
 ### US-06 — End a session and see history
 - Ending a session sets `ended_at` and returns me to home.
 - History lists sessions newest-first with date, duration, exercise count, and
-  total volume.
+  total volume. **Volume is Σ(weight × reps) over weighted sets only**; bodyweight
+  sets are excluded rather than counted as zero, and a session with no weighted
+  sets shows "—" rather than "0" (maintainer decision, 2026-07-28).
 - A session with no sets is discarded rather than saved.
 - A session finished via the stale-session prompt (US-01) gets `ended_at` = its
   last set's `performed_at`.

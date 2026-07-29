@@ -13,6 +13,7 @@ import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
+import com.gymtracker.core.data.session.RoomSessionHistory
 import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.session.SessionDao
 import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
@@ -20,12 +21,14 @@ import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.history.SessionHistory
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
+import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
@@ -84,6 +87,13 @@ object DataModule {
 
     @Provides
     fun logSets(logSet: LogSet): LogSets = LogSets(logSet)
+
+    @Provides
+    fun endSession(
+        sessions: SessionRepository,
+        sets: SetRepository,
+        clock: Clock,
+    ): EndSession = EndSession(sessions, sets, clock)
 
     @Provides
     fun restTimer(
@@ -156,6 +166,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun restTimerStore(impl: DataStoreRestTimerStore): RestTimerStore
+
+    @Binds
+    abstract fun sessionHistory(impl: RoomSessionHistory): SessionHistory
 
     @Binds
     abstract fun exerciseCatalog(impl: RoomExerciseCatalog): ExerciseCatalog

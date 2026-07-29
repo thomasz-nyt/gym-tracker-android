@@ -34,13 +34,13 @@ Stories: US-01 … US-06
 
 - [x] Room schema: `sessions`, `exercises`, `session_exercises`, `sets`
 - [x] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
-- [x] Start a session (US-01). Ending it is US-06.
+- [x] Start / end a session
 - [x] Add an exercise to a session
 - [x] Log a set: weight, reps (RPE in the domain; not yet in the UI)
 - [x] Prefill from the last time this exercise was performed
 - [ ] Edit and delete a set
 - [x] Rest timer between sets
-- [ ] Session history list
+- [x] Session history list
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
 
 **Exit:** two-tap set logging measured and asserted in an instrumented test. You
