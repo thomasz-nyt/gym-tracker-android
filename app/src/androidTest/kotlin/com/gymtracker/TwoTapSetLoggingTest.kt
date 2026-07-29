@@ -121,21 +121,26 @@ class TwoTapSetLoggingTest {
             sessions.startSession(WorkoutSession(today, member, null, now, null, null))
             sessionExercises.add(SessionExercise(TODAY, today, benchPress.id, 1))
         }
+
     }
 
     @Test
     fun aSetIsPersistedAfterTwoTaps() {
         runBlocking {
-            compose.waitForIdle()
+            awaitReadyToLogASet()
 
             // Tap 1 — open set entry. It arrives prefilled from last week.
             // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
             compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
             compose.waitForIdle()
 
+            // The whole reason two taps is possible: last week's numbers are already there.
+            compose.onNodeWithText("135").assertExists("weight should be prefilled from last week")
+            compose.onNodeWithText("8").assertExists("reps should be prefilled from last week")
+
             // Tap 2 — confirm. Nothing is typed: the prefilled values were already right.
             compose.onNodeWithText("Save set").performClick()
-            compose.waitForIdle()
+            awaitSheetClosed()
 
             val logged = sets.observeForSessionExercise(TODAY).first()
             assertEquals(1, logged.size, "one set, logged in two taps")
@@ -155,9 +160,7 @@ class TwoTapSetLoggingTest {
             compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Save set").performClick()
-            compose.waitForIdle()
-
-            compose.onNodeWithText("Save set").assertDoesNotExist()
+            awaitSheetClosed()
 
             assertNotNull(
                 sets.observeForSessionExercise(TODAY).first().singleOrNull(),
@@ -169,8 +172,22 @@ class TwoTapSetLoggingTest {
     /**
      * The activity launches when the compose rule applies, which is before `@Before` seeds the
      * database. The screen therefore starts on "no workout" and catches up when Room emits, so
-     * the test waits for the state it is actually about rather than assuming it is already there.
+     * the test waits for the state it is actually about rather than assuming it is there.
      */
+    /**
+     * Waits for the entry sheet to close, which is the production guarantee being tested:
+     * `LogSet` is awaited before the sheet closes, so once it is gone the row is committed.
+     *
+     * `waitForIdle` is not enough — it synchronises Compose, not the ViewModel coroutine
+     * doing the Room write. Asserting straight after it read the database before the write
+     * landed, which passed most of the time and failed on CI.
+     */
+    private fun awaitSheetClosed() {
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isEmpty()
+        }
+    }
+
     private fun awaitReadyToLogASet() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText("Add set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
