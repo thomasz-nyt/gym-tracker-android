@@ -135,7 +135,6 @@ class TwoTapSetLoggingTest {
             sessions.startSession(WorkoutSession(today, member, null, now, null, null))
             sessionExercises.add(SessionExercise(TODAY, today, benchPress.id, 1))
         }
-
     }
 
     @Test
@@ -184,11 +183,6 @@ class TwoTapSetLoggingTest {
     }
 
     /**
-     * The activity launches when the compose rule applies, which is before `@Before` seeds the
-     * database. The screen therefore starts on "no workout" and catches up when Room emits, so
-     * the test waits for the state it is actually about rather than assuming it is there.
-     */
-    /**
      * Waits for the entry sheet to close, which is the production guarantee being tested:
      * `LogSet` is awaited before the sheet closes, so once it is gone the row is committed.
      *
@@ -202,6 +196,11 @@ class TwoTapSetLoggingTest {
         }
     }
 
+    /**
+     * The activity launches when the compose rule applies, which is before `@Before` seeds the
+     * database. The screen therefore starts on "no workout" and catches up when Room emits, so
+     * the test waits for the state it is actually about rather than assuming it is there.
+     */
     private fun awaitReadyToLogASet() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText("Add set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
