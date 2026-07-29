@@ -1,10 +1,12 @@
 package com.gymtracker
 
+import android.Manifest
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
 import com.gymtracker.core.data.exercise.CatalogSeeder
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
@@ -51,7 +53,19 @@ class TwoTapSetLoggingTest {
     @get:Rule(order = 0)
     val hilt = HiltAndroidRule(this)
 
+    /**
+     * Granted up front so US-05's one-time notification prompt never appears.
+     *
+     * Without this the dialog opens the moment the first rest starts — which is the moment a
+     * set is saved — and the next test finds a system window over the app instead of the
+     * session. It passed locally, where the permission had already been answered, and failed
+     * on CI's clean emulator. This test is about logging a set in two taps, not about the
+     * permission flow.
+     */
     @get:Rule(order = 1)
+    val notifications: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+
+    @get:Rule(order = 2)
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Inject
