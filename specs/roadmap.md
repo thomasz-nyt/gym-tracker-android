@@ -32,16 +32,16 @@ milestone that decides whether the app is good.
 
 Stories: US-01 … US-06
 
-- [~] Room schema: `sessions`, `exercises`, `session_exercises` done; `sets` follows in US-03
+- [x] Room schema: `sessions`, `exercises`, `session_exercises`, `sets`
 - [x] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
 - [x] Start a session (US-01). Ending it is US-06.
 - [x] Add an exercise to a session
-- [ ] Log a set: weight, reps, optional RPE
-- [ ] Prefill from the last time this exercise was performed
+- [x] Log a set: weight, reps (RPE in the domain; not yet in the UI)
+- [x] Prefill from the last time this exercise was performed
 - [ ] Edit and delete a set
 - [ ] Rest timer between sets
 - [ ] Session history list
-- [ ] Unit preference (kg / lb), stored per user, converted at the edge only
+- [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
 
 **Exit:** two-tap set logging measured and asserted in an instrumented test. You
 personally log three real workouts on your own device without wanting to fix

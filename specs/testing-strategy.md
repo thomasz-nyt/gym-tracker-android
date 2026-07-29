@@ -48,6 +48,18 @@ An instrumented test that opens the app with an active session and a prior set f
 the exercise, then asserts the set is persisted after at most two interactions.
 Treat a regression here as a broken build, not a nit.
 
+Implemented as `TwoTapSetLoggingTest` in `:app`. The count is enforced structurally
+rather than by a counter: the test performs exactly two `performClick` calls before
+asserting, so adding a third interaction to the path means editing the test. Its
+fixture is built through the same domain interfaces the app uses, so it cannot pass
+by reaching around the production path.
+
+A true process-kill test is **not** covered: `am force-stop` would kill the
+instrumentation along with the app. What is covered is the guarantee that makes the
+kill survivable — `LogSet` is awaited before the entry sheet closes, so by the time
+the UI has moved on the row is already committed. Verified manually on device by
+force-stopping and relaunching.
+
 ### 3. RLS isolation
 See `data-model.md`. Includes a test that enumerates `public` tables and fails on
 any without RLS enabled — so the check keeps working as the schema grows.

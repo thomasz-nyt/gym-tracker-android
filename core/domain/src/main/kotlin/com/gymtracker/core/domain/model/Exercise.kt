@@ -44,6 +44,10 @@ enum class MediaType {
  *   (`kickoff.md` § Seed data).
  * @property source provenance: `free-exercise-db` for the bundled catalog, `household` for
  *   exercises a family member creates.
+ * @property isStarter a common gym movement, shown above the alphabetical tail to a member
+ *   with no history yet (ADR-0007).
+ * @property imageAsset a bundled photo of the movement, or null when none ships for it.
+ *   Null means no image — the UI shows nothing rather than a fake placeholder.
  */
 data class Exercise(
     val id: ExerciseId,
@@ -57,4 +61,6 @@ data class Exercise(
     val mediaType: MediaType?,
     val youtubeUrl: String?,
     val source: String,
+    val isStarter: Boolean = false,
+    val imageAsset: String? = null,
 )

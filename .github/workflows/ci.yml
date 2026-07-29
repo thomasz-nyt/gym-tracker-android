@@ -97,6 +97,56 @@ jobs:
             build-logic/**/build/reports/
           retention-days: 7
 
+  # testing-strategy.md: "Instrumented tests run on PRs to main only (they are slow);
+  # unit tests run on every push." This is the home of the two-tap assertion (§2), which
+  # that document says to treat a regression in as a broken build.
+  instrumented:
+    name: Instrumented tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # KVM is what makes the emulator usable rather than glacial on a runner.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # API 35: Robolectric's constraint does not apply here, but the emulator images for
+          # 36 are slower to come up and this suite is not testing platform behaviour.
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest
+
+      - name: Upload instrumented reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: instrumented-reports
+          path: app/build/reports/androidTests/
+          retention-days: 7
+
   # Constitution §4: no secret ever ships in the app binary.
   secret-scan:
     name: Secret scan

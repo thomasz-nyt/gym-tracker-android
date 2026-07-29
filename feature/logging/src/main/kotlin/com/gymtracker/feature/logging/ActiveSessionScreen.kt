@@ -1,15 +1,20 @@
 package com.gymtracker.feature.logging
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,21 +29,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
+import com.gymtracker.core.domain.set.SetGroup
+import com.gymtracker.core.domain.units.UnitConverter
+import com.gymtracker.core.domain.units.WeightFormatter
+import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -63,6 +77,12 @@ fun LoggingRoute(
         state = state,
         onStartWorkout = viewModel::onStartWorkout,
         onResolveStale = viewModel::onResolveStale,
+        onAddSet = viewModel.setEntry::open,
+        onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
+        onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
+        onSetCountChanged = { viewModel.setEntry.change(sets = it) },
+        onConfirmSet = viewModel.setEntry::confirm,
+        onSetEntryDismissed = viewModel.setEntry::dismiss,
         onAddExercise = viewModel::onAddExerciseClicked,
         onQueryChanged = viewModel::onQueryChanged,
         onExerciseChosen = viewModel::onExerciseChosen,
@@ -76,6 +96,12 @@ internal fun LoggingScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit = {},
+    onSetWeightChanged: (String) -> Unit = {},
+    onSetRepsChanged: (String) -> Unit = {},
+    onSetCountChanged: (String) -> Unit = {},
+    onConfirmSet: () -> Unit = {},
+    onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     onQueryChanged: (String) -> Unit = {},
     onExerciseChosen: (ExerciseId) -> Unit = {},
@@ -109,7 +135,9 @@ internal fun LoggingScreen(
                     ActiveSession(
                         session = state.activeSession,
                         exercises = state.exercises,
+                        unit = state.unit,
                         onAddExercise = onAddExercise,
+                        onAddSet = onAddSet,
                     )
                 else -> NoSession(onStartWorkout)
             }
@@ -117,6 +145,18 @@ internal fun LoggingScreen(
 
         state.stalePrompt?.let { prompt ->
             AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+        }
+
+        state.setEntry?.let { entry ->
+            SetEntryDialog(
+                entry = entry,
+                unit = state.unit,
+                onWeightChanged = onSetWeightChanged,
+                onRepsChanged = onSetRepsChanged,
+                onSetsChanged = onSetCountChanged,
+                onConfirm = onConfirmSet,
+                onDismiss = onSetEntryDismissed,
+            )
         }
     }
 }
@@ -146,7 +186,9 @@ private fun NoSession(onStartWorkout: () -> Unit) {
 private fun ActiveSession(
     session: WorkoutSession,
     exercises: List<SessionExerciseRow>,
+    unit: WeightUnit,
     onAddExercise: () -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -179,7 +221,15 @@ private fun ActiveSession(
                             Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
                         },
                         overlineContent = { Text("${row.sessionExercise.position}") },
-                        supportingContent = { Text("Logging sets arrives with US-03.") },
+                        supportingContent = { LoggedSets(row.sets, unit) },
+                        trailingContent = {
+                            TextButton(
+                                onClick = { onAddSet(row) },
+                                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                            ) {
+                                Text("Add set")
+                            }
+                        },
                     )
                     HorizontalDivider()
                 }
@@ -243,6 +293,7 @@ private fun ExerciseSearch(
                                     .replaceFirstChar { it.uppercase() },
                             )
                         },
+                        leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -279,6 +330,157 @@ private fun AbandonedSessionDialog(
     )
 }
 
+/** The sets already logged against one exercise, each in both units (ADR-0008). */
+@Composable
+private fun LoggedSets(
+    sets: List<ExerciseSet>,
+    unit: WeightUnit,
+) {
+    if (sets.isEmpty()) {
+        Text("No sets yet", style = MaterialTheme.typography.bodySmall)
+        return
+    }
+
+    Column {
+        // Identical consecutive sets read as "3 × 12" rather than three near-identical
+        // lines (ADR-0009). The rows underneath stay separate.
+        SetGroup.of(sets).forEach { group ->
+            val weight = WeightFormatter.format(group.weightKg, unit)
+            Text(
+                text =
+                    buildString {
+                        if (group.count > 1) {
+                            append("${group.count} × ${group.reps}")
+                        } else {
+                            append("${group.firstSetIndex}.  ${group.reps} reps")
+                        }
+                        append("   ${weight.primary}")
+                        weight.secondary?.let { append("  ·  $it") }
+                    },
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/**
+ * Set entry (US-03). Weight and reps arrive prefilled from the member's last set of this
+ * exercise, so when the numbers are already right, confirming is a single tap.
+ */
+@Composable
+private fun SetEntryDialog(
+    entry: SetEntry,
+    unit: WeightUnit,
+    onWeightChanged: (String) -> Unit,
+    onRepsChanged: (String) -> Unit,
+    onSetsChanged: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(entry.exerciseName) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
+                WeightField(entry.weight, unit, onWeightChanged)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(GAP)) {
+                    OutlinedTextField(
+                        value = entry.sets,
+                        onValueChange = onSetsChanged,
+                        label = { Text("Sets") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = entry.reps,
+                        onValueChange = onRepsChanged,
+                        label = { Text("Reps") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (!entry.prefilled) {
+                    Text(
+                        "First time logging this one.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled =
+                    entry.reps.toIntOrNull()?.let { it >= 1 } == true &&
+                        entry.sets.toIntOrNull()?.let { it >= 1 } == true,
+                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+            ) {
+                Text("Save set")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+/**
+ * The weight field, with the other unit updating live beneath it (ADR-0008), so nobody has to
+ * convert in their head between sets.
+ */
+@Composable
+private fun WeightField(
+    value: String,
+    unit: WeightUnit,
+    onChanged: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChanged,
+            label = { Text("Weight (${unit.name.lowercase()})") },
+            placeholder = { Text("Bodyweight") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        )
+        value
+            .trim()
+            .toDoubleOrNull()
+            ?.let { typed -> WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary }
+            ?.let { other -> Text(other, style = MaterialTheme.typography.bodySmall) }
+    }
+}
+
+/**
+ * A bundled photo of the movement, for the starter exercises that ship one (ADR-0007).
+ *
+ * When no image is bundled the space is left empty rather than filled with a generic icon:
+ * an image that says nothing is worse than no image, and constitution §2 says absent is
+ * shown as absent. The rest of the catalog gets media at M3.
+ */
+@Composable
+private fun ExerciseThumbnail(imageAsset: String?) {
+    if (imageAsset == null) {
+        Box(modifier = Modifier.size(THUMBNAIL))
+        return
+    }
+
+    AsyncImage(
+        model = "file:///android_asset/exercise_images/$imageAsset",
+        // The name is right beside it, so repeating it would only add noise for TalkBack.
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier =
+            Modifier
+                .size(THUMBNAIL)
+                .clip(RoundedCornerShape(THUMBNAIL_CORNER))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+    )
+}
+
 private fun StaleSessionPrompt.explanation(): String =
     when (this) {
         is StaleSessionPrompt.Finish ->
@@ -302,6 +504,8 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault
 private val SCREEN_PADDING = 24.dp
 private val GAP = 12.dp
 private val MIN_TOUCH_TARGET = 48.dp
+private val THUMBNAIL = 56.dp
+private val THUMBNAIL_CORNER = 8.dp
 
 @Preview
 @Composable

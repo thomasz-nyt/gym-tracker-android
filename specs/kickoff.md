@@ -52,7 +52,13 @@ minutes in the project.
 Run the six M1 stories in dependency order **US-01 → US-02 → US-03 → US-05 →
 US-06 → US-04** (US-04 edits sets "from history", which US-06 builds). Shared
 foundations land in the first story that needs them: the Room schema in US-01,
-the catalog seed in US-02, `UnitConverter` in US-03. Review each PR before
+the catalog seed in US-02, `UnitConverter` in US-03.
+
+One story per branch is the default, not a rule (relaxed 2026-07-26). Feedback on
+a shipped story often has to land on whatever branch is open, and work sharing a
+Room migration chain cannot be split without renumbering schema versions across
+branches. When a PR carries more than one story, the description says which
+commits belong to which. Review each PR before
 starting the next session. US-03 carries the two instrumented harnesses
 (two-tap assertion, app-kill persistence) — give it the strongest model; the
 other stories are well-specified TDD work.
