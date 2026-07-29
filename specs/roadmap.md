@@ -39,7 +39,7 @@ Stories: US-01 … US-06
 - [x] Log a set: weight, reps (RPE in the domain; not yet in the UI)
 - [x] Prefill from the last time this exercise was performed
 - [ ] Edit and delete a set
-- [ ] Rest timer between sets
+- [x] Rest timer between sets
 - [ ] Session history list
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
 

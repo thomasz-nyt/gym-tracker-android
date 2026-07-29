@@ -1,10 +1,12 @@
 package com.gymtracker
 
+import android.Manifest
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
 import com.gymtracker.core.data.exercise.CatalogSeeder
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
@@ -51,7 +53,19 @@ class TwoTapSetLoggingTest {
     @get:Rule(order = 0)
     val hilt = HiltAndroidRule(this)
 
+    /**
+     * Granted up front so US-05's one-time notification prompt never appears.
+     *
+     * Without this the dialog opens the moment the first rest starts — which is the moment a
+     * set is saved — and the next test finds a system window over the app instead of the
+     * session. It passed locally, where the permission had already been answered, and failed
+     * on CI's clean emulator. This test is about logging a set in two taps, not about the
+     * permission flow.
+     */
     @get:Rule(order = 1)
+    val notifications: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+
+    @get:Rule(order = 2)
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Inject
@@ -126,16 +140,20 @@ class TwoTapSetLoggingTest {
     @Test
     fun aSetIsPersistedAfterTwoTaps() {
         runBlocking {
-            compose.waitForIdle()
+            awaitReadyToLogASet()
 
             // Tap 1 — open set entry. It arrives prefilled from last week.
             // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
             compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
             compose.waitForIdle()
 
+            // The whole reason two taps is possible: last week's numbers are already there.
+            compose.onNodeWithText("135").assertExists("weight should be prefilled from last week")
+            compose.onNodeWithText("8").assertExists("reps should be prefilled from last week")
+
             // Tap 2 — confirm. Nothing is typed: the prefilled values were already right.
             compose.onNodeWithText("Save set").performClick()
-            compose.waitForIdle()
+            awaitSheetClosed()
 
             val logged = sets.observeForSessionExercise(TODAY).first()
             assertEquals(1, logged.size, "one set, logged in two taps")
@@ -155,9 +173,7 @@ class TwoTapSetLoggingTest {
             compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
             compose.waitForIdle()
             compose.onNodeWithText("Save set").performClick()
-            compose.waitForIdle()
-
-            compose.onNodeWithText("Save set").assertDoesNotExist()
+            awaitSheetClosed()
 
             assertNotNull(
                 sets.observeForSessionExercise(TODAY).first().singleOrNull(),
@@ -167,9 +183,23 @@ class TwoTapSetLoggingTest {
     }
 
     /**
+     * Waits for the entry sheet to close, which is the production guarantee being tested:
+     * `LogSet` is awaited before the sheet closes, so once it is gone the row is committed.
+     *
+     * `waitForIdle` is not enough — it synchronises Compose, not the ViewModel coroutine
+     * doing the Room write. Asserting straight after it read the database before the write
+     * landed, which passed most of the time and failed on CI.
+     */
+    private fun awaitSheetClosed() {
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    /**
      * The activity launches when the compose rule applies, which is before `@Before` seeds the
      * database. The screen therefore starts on "no workout" and catches up when Room emits, so
-     * the test waits for the state it is actually about rather than assuming it is already there.
+     * the test waits for the state it is actually about rather than assuming it is there.
      */
     private fun awaitReadyToLogASet() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {

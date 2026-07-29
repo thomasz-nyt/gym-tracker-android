@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      ADR-0010. A rest is 90 seconds, so an inexact alarm that lands minutes late is the
+      same as not firing. USE_EXACT_ALARM is granted on install for sideloaded apps, which
+      is how this household installs; publishing to Play would require moving to a
+      foreground service instead.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <receiver
+            android:name="com.gymtracker.feature.logging.rest.RestOverReceiver"
+            android:exported="false" />
+    </application>
+
+</manifest>

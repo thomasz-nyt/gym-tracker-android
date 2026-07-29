@@ -13,6 +13,8 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimer
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
@@ -27,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -72,6 +75,7 @@ class ActiveSessionViewModelTest {
     private val sessionExercises = FakeSessionExercises()
     private val sets = FakeSets()
     private val units = FakeUnitPreference()
+    private val restStore = FakeRestTimerStore()
     private var nextSessionExercise = 1
     private var nextSet = 1
 
@@ -83,6 +87,8 @@ class ActiveSessionViewModelTest {
             currentMember = FakeCurrentMember(member),
             sets = sets,
             logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
+            restTimer = RestTimer(restStore, clock),
+            restTimerStore = restStore,
             prefillFromLastSet = PrefillFromLastSet(sets),
             unitPreference = units,
             startSession = StartSession(repository, clock) { SessionId("new") },
@@ -146,6 +152,40 @@ class ActiveSessionViewModelTest {
 
             viewModel(FakeSessions(listOf(fresh))).uiState.test {
                 assertNull(expectMostRecentItem().stalePrompt)
+            }
+        }
+
+    @Test
+    fun `a long workout with a recent set is not abandoned`() =
+        runTest {
+            // The bug this replaced: staleness was measured from the session's start, so
+            // someone five hours into a workout who logged a set ten minutes ago was told
+            // they had left it running. Last activity is the test, not session age (US-01).
+            val longSession = session("s1", startedAt = now.minus(Duration.ofHours(5)))
+            sets.seed(
+                ExerciseSet("recent", SessionExerciseId("se-1"), 1, 60.0, 5, null, now.minus(Duration.ofMinutes(10))),
+            )
+
+            viewModel(FakeSessions(listOf(longSession))).uiState.test {
+                assertNull(expectMostRecentItem().stalePrompt)
+            }
+        }
+
+    @Test
+    fun `a long workout whose last set is old is abandoned`() =
+        runTest {
+            val longSession = session("s1", startedAt = now.minus(Duration.ofHours(9)))
+            sets.seed(
+                ExerciseSet("old", SessionExerciseId("se-1"), 1, 60.0, 5, null, now.minus(Duration.ofHours(6))),
+            )
+
+            viewModel(FakeSessions(listOf(longSession))).uiState.test {
+                val prompt = expectMostRecentItem().stalePrompt
+                assertEquals(
+                    StaleSessionPrompt.Finish(longSession, now.minus(Duration.ofHours(6))),
+                    prompt,
+                    "ended at the last set, never at now",
+                )
             }
         }
 
@@ -335,6 +375,46 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
+    fun `rpe is recorded when given and left absent when blank`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5", rpe = "8.5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertEquals(listOf(8.5, null), sets.all.map { it.rpe }, "blank is absent, not zero")
+        }
+
+    @Test
+    fun `rpe is never carried forward by the prefill`() =
+        runTest {
+            sets.seed(ExerciseSet("old", SessionExerciseId("se-old"), 1, 61.23, 5, 9.0, now))
+            sets.lastFor[ExerciseId("bench")] = "old"
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+
+                assertEquals("", expectMostRecentItem().setEntry?.rpe, "how hard last week felt is not today's data")
+            }
+        }
+
+    @Test
     fun `a blank weight logs a bodyweight set rather than zero`() =
         runTest {
             val repository = FakeSessions(listOf(session("s1")))
@@ -369,6 +449,79 @@ class ActiveSessionViewModelTest {
 
             assertEquals(emptyList(), sets.all)
         }
+
+    @Test
+    fun `logging a set starts the rest automatically`() =
+        runTest {
+            // US-05, first criterion. Ninety seconds is the default until changed.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertEquals(now.plusSeconds(90), restStore.restEndsAt.first())
+        }
+
+    @Test
+    fun `a failed save leaves no rest running`() =
+        runTest {
+            // The rest starts after the write, so a set that never saved cannot leave a
+            // timer counting down for it.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertNull(restStore.restEndsAt.first())
+            assertEquals(emptyList(), sets.all)
+        }
+
+    @Test
+    fun `skipping the rest clears it`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            restStore.setRestEndsAt(now.plusSeconds(90))
+
+            viewModel.rest.skip()
+
+            assertNull(restStore.restEndsAt.first())
+        }
+
+    private class FakeRestTimerStore : RestTimerStore {
+        private val endsAt = MutableStateFlow<java.time.Instant?>(null)
+        private val default = MutableStateFlow(Duration.ofSeconds(90))
+        private val asked = MutableStateFlow(false)
+
+        override val restEndsAt = endsAt
+        override val defaultRest = default
+        override val shouldAskForNotificationPermission = asked.map { !it }
+
+        override suspend fun setRestEndsAt(instant: java.time.Instant?) {
+            endsAt.value = instant
+        }
+
+        override suspend fun setDefaultRest(rest: Duration) {
+            default.value = rest
+        }
+
+        override suspend fun markNotificationPermissionAsked() {
+            asked.value = true
+        }
+    }
 
     private class FakeUnitPreference : UnitPreference {
         private val state = MutableStateFlow(WeightUnit.LB)

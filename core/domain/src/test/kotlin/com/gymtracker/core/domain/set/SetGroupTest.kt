@@ -14,7 +14,8 @@ class SetGroupTest {
         index: Int,
         weight: Double?,
         reps: Int,
-    ) = ExerciseSet("s$index", SessionExerciseId("se"), index, weight, reps, null, now)
+        rpe: Double? = null,
+    ) = ExerciseSet("s$index", SessionExerciseId("se"), index, weight, reps, rpe, now)
 
     @Test
     fun `nothing logged groups into nothing`() {
@@ -55,6 +56,23 @@ class SetGroupTest {
         assertEquals(1, groups.size)
         assertEquals(2, groups.single().count)
         assertEquals(null, groups.single().weightKg)
+    }
+
+    @Test
+    fun `sets that felt different do not merge`() {
+        // Two sets at the same weight and reps but RPE 7 and RPE 9 are not the same set.
+        val groups = SetGroup.of(listOf(set(1, 60.0, 12, rpe = 7.0), set(2, 60.0, 12, rpe = 9.0)))
+
+        assertEquals(2, groups.size)
+        assertEquals(listOf(7.0, 9.0), groups.map { it.rpe })
+    }
+
+    @Test
+    fun `identical sets with the same rpe still merge`() {
+        val groups = SetGroup.of(listOf(set(1, 60.0, 12, rpe = 8.0), set(2, 60.0, 12, rpe = 8.0)))
+
+        assertEquals(1, groups.size)
+        assertEquals(2, groups.single().count)
     }
 
     @Test

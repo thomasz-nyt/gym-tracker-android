@@ -35,6 +35,7 @@ dependencies {
     // Espresso 3.6.x calls InputManager.getInstance, removed in API 36; 3.7.0 fixes it.
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.hilt.android.testing)
     androidTestImplementation(libs.kotlin.test)

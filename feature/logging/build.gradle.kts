@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
 
+    implementation(libs.androidx.core.ktx)
     implementation(libs.coil.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
