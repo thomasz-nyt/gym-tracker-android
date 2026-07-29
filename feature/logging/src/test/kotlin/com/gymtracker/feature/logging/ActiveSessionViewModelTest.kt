@@ -369,6 +369,46 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
+    fun `rpe is recorded when given and left absent when blank`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5", rpe = "8.5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+            }
+
+            assertEquals(listOf(8.5, null), sets.all.map { it.rpe }, "blank is absent, not zero")
+        }
+
+    @Test
+    fun `rpe is never carried forward by the prefill`() =
+        runTest {
+            sets.seed(ExerciseSet("old", SessionExerciseId("se-old"), 1, 61.23, 5, 9.0, now))
+            sets.lastFor[ExerciseId("bench")] = "old"
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+
+                assertEquals("", expectMostRecentItem().setEntry?.rpe, "how hard last week felt is not today's data")
+            }
+        }
+
+    @Test
     fun `a blank weight logs a bodyweight set rather than zero`() =
         runTest {
             val repository = FakeSessions(listOf(session("s1")))

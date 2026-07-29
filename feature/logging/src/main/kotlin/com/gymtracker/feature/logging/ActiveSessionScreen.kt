@@ -81,6 +81,7 @@ fun LoggingRoute(
         onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
         onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
         onSetCountChanged = { viewModel.setEntry.change(sets = it) },
+        onSetRpeChanged = { viewModel.setEntry.change(rpe = it) },
         onConfirmSet = viewModel.setEntry::confirm,
         onSetEntryDismissed = viewModel.setEntry::dismiss,
         onAddExercise = viewModel::onAddExerciseClicked,
@@ -100,6 +101,7 @@ internal fun LoggingScreen(
     onSetWeightChanged: (String) -> Unit = {},
     onSetRepsChanged: (String) -> Unit = {},
     onSetCountChanged: (String) -> Unit = {},
+    onSetRpeChanged: (String) -> Unit = {},
     onConfirmSet: () -> Unit = {},
     onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
@@ -154,6 +156,7 @@ internal fun LoggingScreen(
                 onWeightChanged = onSetWeightChanged,
                 onRepsChanged = onSetRepsChanged,
                 onSetsChanged = onSetCountChanged,
+                onRpeChanged = onSetRpeChanged,
                 onConfirm = onConfirmSet,
                 onDismiss = onSetEntryDismissed,
             )
@@ -356,6 +359,7 @@ private fun LoggedSets(
                         }
                         append("   ${weight.primary}")
                         weight.secondary?.let { append("  ·  $it") }
+                        group.rpe?.let { append("   RPE $it") }
                     },
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -374,6 +378,7 @@ private fun SetEntryDialog(
     onWeightChanged: (String) -> Unit,
     onRepsChanged: (String) -> Unit,
     onSetsChanged: (String) -> Unit,
+    onRpeChanged: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -399,6 +404,17 @@ private fun SetEntryDialog(
                         label = { Text("Reps") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    // Optional (US-03). Left blank means not recorded, which is not a claim
+                    // that the set was easy — constitution §2, absence is not a value.
+                    OutlinedTextField(
+                        value = entry.rpe,
+                        onValueChange = onRpeChanged,
+                        label = { Text("RPE") },
+                        placeholder = { Text("—") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                     )
                 }
