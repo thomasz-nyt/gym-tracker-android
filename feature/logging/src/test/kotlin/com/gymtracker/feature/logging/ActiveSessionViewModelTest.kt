@@ -150,6 +150,40 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
+    fun `a long workout with a recent set is not abandoned`() =
+        runTest {
+            // The bug this replaced: staleness was measured from the session's start, so
+            // someone five hours into a workout who logged a set ten minutes ago was told
+            // they had left it running. Last activity is the test, not session age (US-01).
+            val longSession = session("s1", startedAt = now.minus(Duration.ofHours(5)))
+            sets.seed(
+                ExerciseSet("recent", SessionExerciseId("se-1"), 1, 60.0, 5, null, now.minus(Duration.ofMinutes(10))),
+            )
+
+            viewModel(FakeSessions(listOf(longSession))).uiState.test {
+                assertNull(expectMostRecentItem().stalePrompt)
+            }
+        }
+
+    @Test
+    fun `a long workout whose last set is old is abandoned`() =
+        runTest {
+            val longSession = session("s1", startedAt = now.minus(Duration.ofHours(9)))
+            sets.seed(
+                ExerciseSet("old", SessionExerciseId("se-1"), 1, 60.0, 5, null, now.minus(Duration.ofHours(6))),
+            )
+
+            viewModel(FakeSessions(listOf(longSession))).uiState.test {
+                val prompt = expectMostRecentItem().stalePrompt
+                assertEquals(
+                    StaleSessionPrompt.Finish(longSession, now.minus(Duration.ofHours(6))),
+                    prompt,
+                    "ended at the last set, never at now",
+                )
+            }
+        }
+
+    @Test
     fun `discarding an abandoned session clears both the prompt and the session`() =
         runTest {
             val stale = session("stale", startedAt = now.minus(Duration.ofHours(5)))

@@ -223,8 +223,10 @@ class ActiveSessionViewModel
                 stalePrompt.value =
                     StaleSessionPolicy.evaluate(
                         session = active,
-                        // No sets exist until US-03, so last activity is the session's start.
-                        lastSetAt = null,
+                        // Real last activity now that sets exist. Passing null here — as this
+                        // did while US-03 was unbuilt — measured staleness from the session's
+                        // start, so a long workout with a recent set looked abandoned.
+                        lastSetAt = sets.lastSetAtInSession(active.id),
                         now = clock.instant(),
                     )
             }
