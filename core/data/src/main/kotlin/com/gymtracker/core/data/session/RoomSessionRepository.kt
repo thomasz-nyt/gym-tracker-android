@@ -18,10 +18,24 @@ class RoomSessionRepository
         override fun observeActiveSession(userId: UserId): Flow<WorkoutSession?> =
             dao.observeActive(userId.value).map { it?.toDomain() }
 
+        override fun observeFinishedSessions(userId: UserId): Flow<List<WorkoutSession>> =
+            dao.observeFinished(userId.value).map { rows -> rows.map { it.toDomain() } }
+
         override suspend fun findActiveSession(userId: UserId): WorkoutSession? =
             dao.findActive(userId.value)?.toDomain()
 
+        override suspend fun findSession(id: SessionId): WorkoutSession? = dao.find(id.value)?.toDomain()
+
         override suspend fun startSession(session: WorkoutSession) {
+            dao.insert(session.toEntity())
+        }
+
+        /**
+         * The same insert as [startSession] — a restored session is a row that used to exist,
+         * with its own id and timestamps, so putting it back is nothing more than writing it.
+         * `updated_at` becomes now, which is what M2's last-write-wins will need to see.
+         */
+        override suspend fun restoreSession(session: WorkoutSession) {
             dao.insert(session.toEntity())
         }
 
@@ -32,10 +46,8 @@ class RoomSessionRepository
             dao.end(id = id.value, endedAt = endedAt.toEpochMilli(), updatedAt = Instant.now().toEpochMilli())
         }
 
-        override suspend fun discardSession(id: SessionId) {
+        /** The `ON DELETE CASCADE` on the child tables takes the exercises and sets with it. */
+        override suspend fun deleteSession(id: SessionId) {
             dao.delete(id.value)
         }
-
-        /** Any session by id, ended or not. Used by tests and by history in US-06. */
-        suspend fun findSession(id: SessionId): WorkoutSession? = dao.find(id.value)?.toDomain()
     }

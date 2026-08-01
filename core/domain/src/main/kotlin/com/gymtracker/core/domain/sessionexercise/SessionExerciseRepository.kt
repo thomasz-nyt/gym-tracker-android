@@ -9,6 +9,14 @@ interface SessionExerciseRepository {
     /** The session's exercises, ordered by position. */
     fun observeForSession(sessionId: SessionId): Flow<List<SessionExercise>>
 
+    /**
+     * The exercises of several sessions at once, ordered by position.
+     *
+     * History summarises a whole list of sessions (US-06); reading them one session at a time
+     * would be a query per row.
+     */
+    fun observeForSessions(sessionIds: List<SessionId>): Flow<List<SessionExercise>>
+
     /** Appends [sessionExercise]. Callers get its position from [nextPosition]. */
     suspend fun add(sessionExercise: SessionExercise)
 

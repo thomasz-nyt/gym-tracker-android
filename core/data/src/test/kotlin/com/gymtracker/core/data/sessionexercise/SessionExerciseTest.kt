@@ -166,7 +166,7 @@ class SessionExerciseTest {
             val session = startSession("s1")
             addExercise()(session, ExerciseId("bench"))
 
-            sessions.discardSession(session)
+            sessions.deleteSession(session)
 
             assertEquals(emptyList(), sessionExercises.observeForSession(session).first())
         }

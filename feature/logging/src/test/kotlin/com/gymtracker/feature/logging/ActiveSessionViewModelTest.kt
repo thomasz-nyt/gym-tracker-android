@@ -15,6 +15,10 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
+import com.gymtracker.core.domain.session.DeleteSession
+import com.gymtracker.core.domain.session.EndSession
+import com.gymtracker.core.domain.session.RestoreSession
+import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
@@ -32,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -73,11 +78,24 @@ class ActiveSessionViewModelTest {
 
     private val catalog = FakeCatalog()
     private val sessionExercises = FakeSessionExercises()
-    private val sets = FakeSets()
+    private val sets = FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
     private val units = FakeUnitPreference()
     private val restStore = FakeRestTimerStore()
     private var nextSessionExercise = 1
     private var nextSet = 1
+
+    /**
+     * Sessions wired to delete their children with them, as `ON DELETE CASCADE` does in Room
+     * (ADR-0012). Nothing in the domain deletes them explicitly, so nothing in the fake should.
+     */
+    private fun sessionsOf(vararg initial: WorkoutSession) =
+        FakeSessions(initial.toList()) { id ->
+            // Sets first: this fake finds a set's session by looking its appearance up in
+            // sessionExercises, so clearing that first would leave the sets unreachable and
+            // therefore undeleted. SQLite has the real graph and does not care about order.
+            sets.cascadeDelete(id)
+            sessionExercises.cascadeDelete(id)
+        }
 
     private fun viewModel(repository: FakeSessions) =
         ActiveSessionViewModel(
@@ -94,6 +112,10 @@ class ActiveSessionViewModelTest {
             startSession = StartSession(repository, clock) { SessionId("new") },
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
+            endSession = EndSession(repository, sets, clock),
+            sessionHistory = SessionHistory(repository, sessionExercises, sets),
+            deleteSession = DeleteSession(repository, sessionExercises, sets),
+            restoreSession = RestoreSession(repository, sessionExercises, sets),
             clock = clock,
         )
 
@@ -163,7 +185,7 @@ class ActiveSessionViewModelTest {
             // they had left it running. Last activity is the test, not session age (US-01).
             val longSession = session("s1", startedAt = now.minus(Duration.ofHours(5)))
             sets.seed(
-                ExerciseSet("recent", SessionExerciseId("se-1"), 1, 60.0, 5, null, now.minus(Duration.ofMinutes(10))),
+                ExerciseSet("recent", inSession("s1"), 1, 60.0, 5, null, now.minus(Duration.ofMinutes(10))),
             )
 
             viewModel(FakeSessions(listOf(longSession))).uiState.test {
@@ -176,7 +198,7 @@ class ActiveSessionViewModelTest {
         runTest {
             val longSession = session("s1", startedAt = now.minus(Duration.ofHours(9)))
             sets.seed(
-                ExerciseSet("old", SessionExerciseId("se-1"), 1, 60.0, 5, null, now.minus(Duration.ofHours(6))),
+                ExerciseSet("old", inSession("s1"), 1, 60.0, 5, null, now.minus(Duration.ofHours(6))),
             )
 
             viewModel(FakeSessions(listOf(longSession))).uiState.test {
@@ -501,6 +523,224 @@ class ActiveSessionViewModelTest {
             assertNull(restStore.restEndsAt.first())
         }
 
+    // ---- US-06: finishing a workout, and history -------------------------------------------
+
+    @Test
+    fun `finishing a workout with sets ends it and returns to home`() =
+        runTest {
+            val repository = sessionsOf(session("s1"))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+
+                viewModel.onFinishWorkout()
+
+                assertNull(expectMostRecentItem().activeSession, "US-06 returns me to home")
+            }
+            assertEquals(now, repository.all.single().endedAt)
+        }
+
+    @Test
+    fun `finishing a workout with no sets discards it rather than saving it`() =
+        runTest {
+            val repository = sessionsOf(session("s1"))
+            val viewModel = viewModel(repository)
+
+            viewModel.onFinishWorkout()
+
+            assertEquals(emptyList(), repository.all, "US-06: an empty session is not history")
+        }
+
+    @Test
+    fun `finishing with no session running does nothing`() =
+        runTest {
+            val repository = sessionsOf()
+            val viewModel = viewModel(repository)
+
+            viewModel.onFinishWorkout()
+
+            assertEquals(emptyList(), repository.all)
+        }
+
+    @Test
+    fun `history lists finished workouts with their counts and volume`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0, 60.0))
+            val viewModel = viewModel(repository)
+
+            viewModel.history.open()
+
+            viewModel.uiState.test {
+                val history = expectMostRecentItem().history
+                assertEquals(true, history.isOpen)
+                val row = history.sessions.single()
+                assertEquals(SessionId("last-week"), row.session.id)
+                assertEquals(1, row.exerciseCount)
+                assertEquals(2, row.setCount)
+                assertEquals(1200.0, row.volumeKg)
+            }
+        }
+
+    @Test
+    fun `the workout in progress is not offered for deletion`() =
+        runTest {
+            val repository = sessionsOf(session("today"), finished("last-week", now.minus(Duration.ofDays(7))))
+            val viewModel = viewModel(repository)
+
+            viewModel.history.open()
+
+            viewModel.uiState.test {
+                assertEquals(
+                    listOf(SessionId("last-week")),
+                    expectMostRecentItem().history.sessions.map { it.session.id },
+                )
+            }
+        }
+
+    // ---- US-06a: deleting a past workout ---------------------------------------------------
+
+    @Test
+    fun `deleting a past workout removes it and its sets, and offers undo`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0))
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+
+            viewModel.history.delete(SessionId("last-week"))
+
+            viewModel.uiState.test {
+                val history = expectMostRecentItem().history
+                assertEquals(emptyList(), history.sessions)
+                assertEquals(true, history.canUndo)
+            }
+            assertEquals(emptyList(), repository.all)
+            assertEquals(emptyList(), sets.all, "the sets went with it")
+        }
+
+    @Test
+    fun `undo brings the workout back with its sets`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0, 62.5))
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+            viewModel.history.delete(SessionId("last-week"))
+
+            viewModel.history.undo()
+
+            viewModel.uiState.test {
+                val history = expectMostRecentItem().history
+                assertEquals(listOf(SessionId("last-week")), history.sessions.map { it.session.id })
+                assertEquals(2, history.sessions.single().setCount)
+                assertEquals(false, history.canUndo, "there is nothing left to undo")
+            }
+        }
+
+    @Test
+    fun `undo expires after five seconds`() =
+        runTest {
+            // US-04's window, reused for US-06a so the two destructive actions behave alike.
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+            viewModel.history.delete(SessionId("last-week"))
+
+            advanceTimeBy(Duration.ofSeconds(5).toMillis() + 1)
+
+            viewModel.uiState.test {
+                assertEquals(false, expectMostRecentItem().history.canUndo)
+            }
+        }
+
+    @Test
+    fun `undo after the window has passed does nothing`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+            viewModel.history.delete(SessionId("last-week"))
+            advanceTimeBy(Duration.ofSeconds(5).toMillis() + 1)
+
+            viewModel.history.undo()
+
+            assertEquals(emptyList(), repository.all, "the delete stands")
+        }
+
+    @Test
+    fun `deleting the workout holding my last set changes what the next set prefills with`() =
+        runTest {
+            // US-06a's last criterion. The prefill reads the database, so a deleted set cannot
+            // come back through it — which is the whole point of deleting test data.
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))), session("today"))
+            seedWorkout(SessionId("last-week"), weights = listOf(61.23))
+            sets.lastFor[ExerciseId("bench")] = "seed-0"
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+
+            viewModel.history.delete(SessionId("last-week"))
+            viewModel.history.close()
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+
+                assertEquals("", expectMostRecentItem().setEntry?.weight, "the deleted set is gone for good")
+            }
+        }
+
+    @Test
+    fun `closing history returns to the session screen`() =
+        runTest {
+            val viewModel = viewModel(sessionsOf(session("s1")))
+            viewModel.history.open()
+
+            viewModel.history.close()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(false, state.history.isOpen)
+                assertEquals(SessionId("s1"), state.activeSession?.id)
+            }
+        }
+
+    private fun finished(
+        id: String,
+        startedAt: Instant,
+    ) = session(id, startedAt = startedAt, endedAt = startedAt.plus(Duration.ofHours(1)))
+
+    /**
+     * Registers an appearance of an exercise in a session and returns its id.
+     *
+     * A set reaches its session only through `session_exercises` (ADR-0004), so a set seeded
+     * against an appearance nobody declared belongs to no session at all.
+     */
+    private suspend fun inSession(session: String): SessionExerciseId {
+        val id = SessionExerciseId("se-${nextSessionExercise++}")
+        sessionExercises.add(SessionExercise(id, SessionId(session), ExerciseId("bench"), 1))
+        return id
+    }
+
+    /** One exercise in [session], with a set for each weight given. */
+    private suspend fun seedWorkout(
+        session: SessionId,
+        weights: List<Double?>,
+    ) {
+        val appearance = SessionExercise(SessionExerciseId("seed-se"), session, ExerciseId("bench"), 1)
+        sessionExercises.add(appearance)
+        weights.forEachIndexed { index, weight ->
+            sets.add(ExerciseSet("seed-$index", appearance.id, index + 1, weight, 10, null, now))
+        }
+    }
+
     private class FakeRestTimerStore : RestTimerStore {
         private val endsAt = MutableStateFlow<java.time.Instant?>(null)
         private val default = MutableStateFlow(Duration.ofSeconds(90))
@@ -535,7 +775,13 @@ class ActiveSessionViewModelTest {
         }
     }
 
-    private class FakeSets : SetRepository {
+    /**
+     * @param sessionOf stands in for the join through `session_exercises` that gives a set its
+     *   session (ADR-0004). Sets know their appearance; only that table knows the session.
+     */
+    private class FakeSets(
+        private val sessionOf: (SessionExerciseId) -> SessionId?,
+    ) : SetRepository {
         private val state = MutableStateFlow(emptyList<ExerciseSet>())
         val lastFor = mutableMapOf<ExerciseId, String>()
 
@@ -545,8 +791,16 @@ class ActiveSessionViewModelTest {
             state.value = state.value + set
         }
 
+        /** Stands in for the `ON DELETE CASCADE` from `sessions` through `session_exercises`. */
+        fun cascadeDelete(sessionId: SessionId) {
+            state.value = state.value.filterNot { sessionOf(it.sessionExerciseId) == sessionId }
+        }
+
         override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
             state.map { rows -> rows.filter { it.sessionExerciseId == sessionExerciseId }.sortedBy { it.setIndex } }
+
+        override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<ExerciseSet>> =
+            state.map { rows -> rows.filter { sessionOf(it.sessionExerciseId) in sessionIds } }
 
         override suspend fun lastSetOf(
             exerciseId: ExerciseId,
@@ -554,7 +808,7 @@ class ActiveSessionViewModelTest {
         ): ExerciseSet? = lastFor[exerciseId]?.let { id -> state.value.firstOrNull { it.id == id } }
 
         override suspend fun lastSetAtInSession(sessionId: SessionId): Instant? =
-            state.value.maxOfOrNull { it.performedAt }
+            state.value.filter { sessionOf(it.sessionExerciseId) == sessionId }.maxOfOrNull { it.performedAt }
 
         override suspend fun nextSetIndex(sessionExerciseId: SessionExerciseId): Int =
             state.value.count { it.sessionExerciseId == sessionExerciseId } + 1
@@ -595,8 +849,16 @@ class ActiveSessionViewModelTest {
 
         val all: List<SessionExercise> get() = state.value
 
+        /** Stands in for the `ON DELETE CASCADE` on `session_exercises.session_id`. */
+        fun cascadeDelete(sessionId: SessionId) {
+            state.value = state.value.filterNot { it.sessionId == sessionId }
+        }
+
         override fun observeForSession(sessionId: SessionId): Flow<List<SessionExercise>> =
             state.map { rows -> rows.filter { it.sessionId == sessionId }.sortedBy { it.position } }
+
+        override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<SessionExercise>> =
+            state.map { rows -> rows.filter { it.sessionId in sessionIds }.sortedBy { it.position } }
 
         override suspend fun add(sessionExercise: SessionExercise) {
             state.value = state.value + sessionExercise
@@ -614,6 +876,7 @@ class ActiveSessionViewModelTest {
 
     private class FakeSessions(
         initial: List<WorkoutSession> = emptyList(),
+        private val cascade: (SessionId) -> Unit = {},
     ) : SessionRepository {
         private val state = MutableStateFlow(initial)
 
@@ -622,10 +885,23 @@ class ActiveSessionViewModelTest {
         override fun observeActiveSession(userId: UserId): Flow<WorkoutSession?> =
             state.map { sessions -> sessions.lastOrNull { it.userId == userId && it.endedAt == null } }
 
+        override fun observeFinishedSessions(userId: UserId): Flow<List<WorkoutSession>> =
+            state.map { sessions ->
+                sessions
+                    .filter { it.userId == userId && it.endedAt != null }
+                    .sortedByDescending { it.startedAt }
+            }
+
         override suspend fun findActiveSession(userId: UserId): WorkoutSession? =
             state.value.lastOrNull { it.userId == userId && it.endedAt == null }
 
+        override suspend fun findSession(id: SessionId): WorkoutSession? = state.value.firstOrNull { it.id == id }
+
         override suspend fun startSession(session: WorkoutSession) {
+            state.value = state.value + session
+        }
+
+        override suspend fun restoreSession(session: WorkoutSession) {
             state.value = state.value + session
         }
 
@@ -636,8 +912,9 @@ class ActiveSessionViewModelTest {
             state.value = state.value.map { if (it.id == id) it.copy(endedAt = endedAt) else it }
         }
 
-        override suspend fun discardSession(id: SessionId) {
+        override suspend fun deleteSession(id: SessionId) {
             state.value = state.value.filterNot { it.id == id }
+            cascade(id)
         }
     }
 }

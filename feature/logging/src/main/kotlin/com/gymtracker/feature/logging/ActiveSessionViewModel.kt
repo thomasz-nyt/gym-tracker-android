@@ -12,6 +12,10 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimer
+import com.gymtracker.core.domain.session.DeleteSession
+import com.gymtracker.core.domain.session.EndSession
+import com.gymtracker.core.domain.session.RestoreSession
+import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
@@ -63,6 +67,19 @@ data class SessionUiState(
     val setEntry: SetEntry? = null,
     /** Time left in the current rest, or null when none is running (US-05). */
     val restRemaining: Duration? = null,
+    /** History, and the workout deleted from it that can still be put back (US-06, US-06a). */
+    val history: HistoryState = HistoryState(),
+)
+
+/**
+ * The tail of [SessionUiState], grouped only because `combine` takes a fixed number of flows.
+ * Not a concept — do not let it become one.
+ */
+private data class ScreenExtras(
+    val unit: WeightUnit,
+    val entry: SetEntry?,
+    val rest: Duration?,
+    val history: HistoryState,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -82,10 +99,24 @@ class ActiveSessionViewModel
         private val currentMember: CurrentMember,
         private val startSession: StartSession,
         private val addExerciseToSession: AddExerciseToSession,
+        private val endSession: EndSession,
+        sessionHistory: SessionHistory,
+        deleteSession: DeleteSession,
+        restoreSession: RestoreSession,
         private val clock: Clock,
     ) : ViewModel() {
         /** The rest between sets lives in its own state holder; see [RestController]. */
         val rest = RestController(restTimer, restTimerStore, viewModelScope)
+
+        /** History and deleting from it live in their own state holder; see [HistoryController]. */
+        val history =
+            HistoryController(
+                history = sessionHistory,
+                deleteSession = deleteSession,
+                restoreSession = restoreSession,
+                currentMember = currentMember,
+                scope = viewModelScope,
+            )
 
         /** Set entry lives in its own state holder; see [SetEntryController]. */
         val setEntry =
@@ -159,8 +190,9 @@ class ActiveSessionViewModel
                     unitPreference.observe(),
                     setEntry.entry,
                     rest.remaining(),
-                ) { unit, entry, rest -> Triple(unit, entry, rest) },
-            ) { session, prompt, inSession, (isSearching, text, found), (unit, entry, rest) ->
+                    history.state,
+                ) { unit, entry, rest, past -> ScreenExtras(unit, entry, rest, past) },
+            ) { session, prompt, inSession, (isSearching, text, found), extras ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
@@ -169,9 +201,10 @@ class ActiveSessionViewModel
                     isSearching = isSearching,
                     query = text,
                     results = found,
-                    unit = unit,
-                    setEntry = entry,
-                    restRemaining = rest,
+                    unit = extras.unit,
+                    setEntry = extras.entry,
+                    restRemaining = extras.rest,
+                    history = extras.history,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
@@ -183,6 +216,19 @@ class ActiveSessionViewModel
 
         fun onStartWorkout() {
             viewModelScope.launch { startSession(currentMember.id()) }
+        }
+
+        /**
+         * Ends the session and returns the member to home (US-06).
+         *
+         * The session is read from the repository rather than from `uiState`, for the same
+         * reason [onExerciseChosen] does: the database is the source of truth (§2).
+         */
+        fun onFinishWorkout() {
+            viewModelScope.launch {
+                val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
+                endSession(session.id)
+            }
         }
 
         /** Opens the catalog search (US-02). */
@@ -223,7 +269,7 @@ class ActiveSessionViewModel
             viewModelScope.launch {
                 when (prompt) {
                     is StaleSessionPrompt.Finish -> sessions.endSession(prompt.session.id, prompt.endedAt)
-                    is StaleSessionPrompt.Discard -> sessions.discardSession(prompt.session.id)
+                    is StaleSessionPrompt.Discard -> sessions.deleteSession(prompt.session.id)
                 }
                 stalePrompt.value = null
             }

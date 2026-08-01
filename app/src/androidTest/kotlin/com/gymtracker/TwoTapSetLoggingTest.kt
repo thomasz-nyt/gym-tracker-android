@@ -103,7 +103,7 @@ class TwoTapSetLoggingTest {
 
             // The app database is a real file that outlives a single test method, so start from
             // a known state. Discarding a session cascades to its exercises and sets.
-            listOf(LAST_WEEK, TODAY_SESSION).forEach { sessions.discardSession(it) }
+            listOf(LAST_WEEK, TODAY_SESSION).forEach { sessions.deleteSession(it) }
 
             val lastWeek = LAST_WEEK
             sessions.startSession(

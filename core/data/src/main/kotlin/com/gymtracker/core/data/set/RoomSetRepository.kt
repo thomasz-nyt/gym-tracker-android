@@ -21,6 +21,9 @@ class RoomSetRepository
         override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
             dao.observeForSessionExercise(sessionExerciseId.value).map { rows -> rows.map { it.toDomain() } }
 
+        override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<ExerciseSet>> =
+            dao.observeForSessions(sessionIds.map { it.value }).map { rows -> rows.map { it.toDomain() } }
+
         override suspend fun lastSetOf(
             exerciseId: ExerciseId,
             member: UserId,

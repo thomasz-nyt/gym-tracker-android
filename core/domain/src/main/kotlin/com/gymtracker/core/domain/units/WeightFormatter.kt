@@ -1,5 +1,8 @@
 package com.gymtracker.core.domain.units
 
+import java.util.Locale
+import kotlin.math.roundToLong
+
 /**
  * A weight as it appears on screen: the member's unit first, the other alongside.
  *
@@ -37,6 +40,26 @@ object WeightFormatter {
             // from the other would round twice and drift.
             secondary = render(kilograms, other),
         )
+    }
+
+    /**
+     * A whole session's volume, for a history row (US-06).
+     *
+     * Rounded to whole units and grouped: across a workout nobody cares about a tenth of a
+     * pound, and "9,083 lb" is readable at a glance where "9083.0 lb" is not. Only one unit,
+     * unlike [format] — a history row is a scan, not a number to act on.
+     *
+     * @param kilograms the summed volume, or null when nothing in the session had a weight
+     *   recorded. Null in, null out: there is no volume to claim, and 0 would be a lie.
+     */
+    fun formatVolume(
+        kilograms: Double?,
+        unit: WeightUnit,
+    ): String? {
+        if (kilograms == null) return null
+
+        val whole = UnitConverter.fromKilograms(kilograms, unit).roundToLong()
+        return "${"%,d".format(Locale.US, whole)} ${unit.label}"
     }
 
     /** The bare number for the entry field — no unit suffix for the member to delete. */

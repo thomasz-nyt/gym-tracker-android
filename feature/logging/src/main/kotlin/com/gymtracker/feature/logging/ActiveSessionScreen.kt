@@ -2,6 +2,7 @@ package com.gymtracker.feature.logging
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -89,9 +90,14 @@ fun LoggingRoute(
     LoggingScreen(
         state = state,
         onStartWorkout = viewModel::onStartWorkout,
+        onFinishWorkout = viewModel::onFinishWorkout,
         onResolveStale = viewModel::onResolveStale,
         onAddSet = viewModel.setEntry::open,
         onSkipRest = viewModel.rest::skip,
+        onOpenHistory = viewModel.history::open,
+        onCloseHistory = viewModel.history::close,
+        onDeleteWorkout = viewModel.history::delete,
+        onUndoDelete = viewModel.history::undo,
         onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
         onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
         onSetCountChanged = { viewModel.setEntry.change(sets = it) },
@@ -111,8 +117,13 @@ internal fun LoggingScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    onFinishWorkout: () -> Unit = {},
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onSkipRest: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
+    onCloseHistory: () -> Unit = {},
+    onDeleteWorkout: (SessionId) -> Unit = {},
+    onUndoDelete: () -> Unit = {},
     onSetWeightChanged: (String) -> Unit = {},
     onSetRepsChanged: (String) -> Unit = {},
     onSetCountChanged: (String) -> Unit = {},
@@ -137,52 +148,118 @@ internal fun LoggingScreen(
         return
     }
 
+    if (state.history.isOpen) {
+        // Back leaves history rather than the app — it is a side trip from the session
+        // screen, not a second entry point.
+        BackHandler(onBack = onCloseHistory)
+        HistoryScreen(
+            state = state.history,
+            unit = state.unit,
+            onDelete = onDeleteWorkout,
+            onUndo = onUndoDelete,
+            onDone = onCloseHistory,
+            modifier = modifier,
+        )
+        return
+    }
+
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(SCREEN_PADDING),
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                state.isLoading -> CircularProgressIndicator()
-                state.activeSession != null ->
-                    ActiveSession(
-                        session = state.activeSession,
-                        exercises = state.exercises,
-                        unit = state.unit,
-                        restRemaining = state.restRemaining,
-                        onAddExercise = onAddExercise,
-                        onAddSet = onAddSet,
-                        onSkipRest = onSkipRest,
-                    )
-                else -> NoSession(onStartWorkout)
-            }
-        }
+        SessionBody(
+            state = state,
+            onStartWorkout = onStartWorkout,
+            onOpenHistory = onOpenHistory,
+            onAddExercise = onAddExercise,
+            onAddSet = onAddSet,
+            onSkipRest = onSkipRest,
+            onFinishWorkout = onFinishWorkout,
+            modifier = Modifier.padding(padding),
+        )
 
-        state.stalePrompt?.let { prompt ->
-            AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
-        }
+        SessionDialogs(
+            state = state,
+            onResolveStale = onResolveStale,
+            onSetWeightChanged = onSetWeightChanged,
+            onSetRepsChanged = onSetRepsChanged,
+            onSetCountChanged = onSetCountChanged,
+            onSetRpeChanged = onSetRpeChanged,
+            onConfirmSet = onConfirmSet,
+            onSetEntryDismissed = onSetEntryDismissed,
+        )
+    }
+}
 
-        state.setEntry?.let { entry ->
-            SetEntryDialog(
-                entry = entry,
-                unit = state.unit,
-                onWeightChanged = onSetWeightChanged,
-                onRepsChanged = onSetRepsChanged,
-                onSetsChanged = onSetCountChanged,
-                onRpeChanged = onSetRpeChanged,
-                onConfirm = onConfirmSet,
-                onDismiss = onSetEntryDismissed,
-            )
+/**
+ * Which of the three session states is on screen. Derived from the database rather than from
+ * a back stack, which is what makes "reopen and you are back in your session" survive a kill.
+ */
+@Composable
+private fun SessionBody(
+    state: SessionUiState,
+    onStartWorkout: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onAddExercise: () -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    onSkipRest: () -> Unit,
+    onFinishWorkout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxSize().padding(SCREEN_PADDING),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            state.isLoading -> CircularProgressIndicator()
+            state.activeSession != null ->
+                ActiveSession(
+                    session = state.activeSession,
+                    exercises = state.exercises,
+                    unit = state.unit,
+                    restRemaining = state.restRemaining,
+                    onAddExercise = onAddExercise,
+                    onAddSet = onAddSet,
+                    onSkipRest = onSkipRest,
+                    onFinishWorkout = onFinishWorkout,
+                )
+            else -> NoSession(onStartWorkout, onOpenHistory)
         }
     }
 }
 
+/** The two things that can sit over the session screen: the stale prompt, and set entry. */
 @Composable
-private fun NoSession(onStartWorkout: () -> Unit) {
+private fun SessionDialogs(
+    state: SessionUiState,
+    onResolveStale: (StaleSessionPrompt) -> Unit,
+    onSetWeightChanged: (String) -> Unit,
+    onSetRepsChanged: (String) -> Unit,
+    onSetCountChanged: (String) -> Unit,
+    onSetRpeChanged: (String) -> Unit,
+    onConfirmSet: () -> Unit,
+    onSetEntryDismissed: () -> Unit,
+) {
+    state.stalePrompt?.let { prompt ->
+        AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+    }
+
+    state.setEntry?.let { entry ->
+        SetEntryDialog(
+            entry = entry,
+            unit = state.unit,
+            onWeightChanged = onSetWeightChanged,
+            onRepsChanged = onSetRepsChanged,
+            onSetsChanged = onSetCountChanged,
+            onRpeChanged = onSetRpeChanged,
+            onConfirm = onConfirmSet,
+            onDismiss = onSetEntryDismissed,
+        )
+    }
+}
+
+@Composable
+private fun NoSession(
+    onStartWorkout: () -> Unit,
+    onOpenHistory: () -> Unit,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(GAP),
@@ -199,6 +276,14 @@ private fun NoSession(onStartWorkout: () -> Unit) {
         ) {
             Text("Start workout")
         }
+        // Below "Start workout", and only here: the core loop is what this screen is for, and
+        // history is what you look at afterwards (constitution §2, principle 1).
+        TextButton(
+            onClick = onOpenHistory,
+            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+        ) {
+            Text("Past workouts")
+        }
     }
 }
 
@@ -211,6 +296,7 @@ private fun ActiveSession(
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
+    onFinishWorkout: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -244,28 +330,12 @@ private fun ActiveSession(
                 textAlign = TextAlign.Center,
             )
         } else {
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                items(exercises, key = { it.sessionExercise.id.value }) { row ->
-                    ListItem(
-                        headlineContent = {
-                            // The catalog entry is only absent if the row outlived its exercise,
-                            // which the schema forbids; show the id rather than a blank line.
-                            Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
-                        },
-                        overlineContent = { Text("${row.sessionExercise.position}") },
-                        supportingContent = { LoggedSets(row.sets, unit) },
-                        trailingContent = {
-                            TextButton(
-                                onClick = { onAddSet(row) },
-                                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
-                            ) {
-                                Text("Add set")
-                            }
-                        },
-                    )
-                    HorizontalDivider()
-                }
-            }
+            SessionExercises(
+                exercises = exercises,
+                unit = unit,
+                onAddSet = onAddSet,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
         }
 
         Button(
@@ -273,6 +343,46 @@ private fun ActiveSession(
             modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
         ) {
             Text("Add exercise")
+        }
+        // A text button rather than a second filled one: ending the workout is the rarer
+        // action of the two, and it should not compete with "Add exercise" for the thumb.
+        TextButton(
+            onClick = onFinishWorkout,
+            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+        ) {
+            Text("Finish workout")
+        }
+    }
+}
+
+/** The exercises in the session, each with its sets and its way to add another (US-03). */
+@Composable
+private fun SessionExercises(
+    exercises: List<SessionExerciseRow>,
+    unit: WeightUnit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(modifier = modifier) {
+        items(exercises, key = { it.sessionExercise.id.value }) { row ->
+            ListItem(
+                headlineContent = {
+                    // The catalog entry is only absent if the row outlived its exercise,
+                    // which the schema forbids; show the id rather than a blank line.
+                    Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
+                },
+                overlineContent = { Text("${row.sessionExercise.position}") },
+                supportingContent = { LoggedSets(row.sets, unit) },
+                trailingContent = {
+                    TextButton(
+                        onClick = { onAddSet(row) },
+                        modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                    ) {
+                        Text("Add set")
+                    }
+                },
+            )
+            HorizontalDivider()
         }
     }
 }
@@ -422,7 +532,7 @@ private fun LoggedSets(
     unit: WeightUnit,
 ) {
     if (sets.isEmpty()) {
-        Text("No sets yet", style = MaterialTheme.typography.bodySmall)
+        Text("No sets yet", style = MaterialTheme.typography.bodyMedium)
         return
     }
 
@@ -443,7 +553,9 @@ private fun LoggedSets(
                         weight.secondary?.let { append("  ·  $it") }
                         group.rpe?.let { append("   RPE $it") }
                     },
-                style = MaterialTheme.typography.bodySmall,
+                // The line you came back to the phone to read, so it takes the role that says
+                // so rather than the smallest one there is (ADR-0011).
+                style = MaterialTheme.typography.titleMedium,
             )
         }
     }

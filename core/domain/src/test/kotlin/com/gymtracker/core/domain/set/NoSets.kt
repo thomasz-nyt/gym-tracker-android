@@ -14,6 +14,8 @@ internal open class NoSets : SetRepository {
     override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
         flowOf(emptyList())
 
+    override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<ExerciseSet>> = flowOf(emptyList())
+
     override suspend fun lastSetOf(
         exerciseId: ExerciseId,
         member: UserId,

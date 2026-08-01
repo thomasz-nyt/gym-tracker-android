@@ -4,7 +4,8 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M0**
+Current milestone: **M1** — M0's boxes are all ticked and its exit criterion (green CI on a
+PR) was met at PR #4.
 
 ---
 
@@ -40,7 +41,8 @@ Stories: US-01 … US-06
 - [x] Prefill from the last time this exercise was performed
 - [ ] Edit and delete a set
 - [x] Rest timer between sets
-- [ ] Session history list
+- [x] End a session, and the session history list (US-06)
+- [x] Delete a past workout, with undo (US-06a, ADR-0012)
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
 
 **Exit:** two-tap set logging measured and asserted in an instrumented test. You
@@ -135,7 +137,11 @@ to elicit weight-loss and body-image advice.
 ## M7 — Polish and household rollout
 
 - [ ] Onboarding for a non-technical family member
-- [ ] Accessibility pass: TalkBack, 48dp targets, contrast, large-font layouts
+- [ ] Accessibility pass: TalkBack, 48dp targets, contrast, large-font layouts.
+      The app-wide type scale was raised early, at M1, because the maintainer was
+      logging real workouts and could not read the set list on a gym floor
+      (ADR-0011). This pass still owns the audit, including the 200% font-scale
+      layouts — it now just starts from a legible default.
 - [ ] Crash reporting (self-hosted or none — no third-party analytics, per §3)
 - [ ] Internal distribution track
 

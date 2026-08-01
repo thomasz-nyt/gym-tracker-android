@@ -59,6 +59,21 @@ class WeightFormatterTest {
     }
 
     @Test
+    fun `a session's volume reads as a whole grouped number`() {
+        // US-06's history row. Nobody cares about a tenth of a pound across a whole workout,
+        // and "9,083 lb" is readable at a glance where "9083.0 lb" is not.
+        assertEquals("9,083 lb", WeightFormatter.formatVolume(4120.0, WeightUnit.LB))
+        assertEquals("4,120 kg", WeightFormatter.formatVolume(4120.0, WeightUnit.KG))
+        assertEquals("600 kg", WeightFormatter.formatVolume(600.0, WeightUnit.KG))
+    }
+
+    @Test
+    fun `a session with nothing weighed has no volume rather than a volume of zero`() {
+        // constitution §2 again: a workout of bodyweight sets moved a load nobody recorded.
+        assertNull(WeightFormatter.formatVolume(null, WeightUnit.LB))
+    }
+
+    @Test
     fun `the entry field shows a bare number in the primary unit only`() {
         // What goes into the text box the member types in — no unit suffix to delete.
         assertEquals("135", WeightFormatter.forEntry(61.23, WeightUnit.LB))
