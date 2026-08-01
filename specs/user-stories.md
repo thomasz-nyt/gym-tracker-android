@@ -67,6 +67,21 @@ As a member, I start a gym session so my sets are grouped.
 - A session with no sets is discarded rather than saved.
 - A session finished via the stale-session prompt (US-01) gets `ended_at` = its
   last set's `performed_at`.
+- Total volume counts only sets with a recorded weight. Bodyweight sets are shown
+  as a count alongside it, never folded in as zero (constitution §2).
+
+### US-06a — Delete a past workout
+Added 2026-08-01. Real workouts now share the device with sessions logged while
+testing, and there was no way to remove one without clearing the other. See
+`adr/0012-deleting-a-past-session.md`.
+- From history, I can delete a past workout; it disappears from the list, and its
+  exercises and sets are deleted with it.
+- Undo is available for 5 seconds, as in US-04, and restores the workout with its
+  exercises and sets unchanged — same ids, same values, same order.
+- Only a finished workout can be deleted this way. The session I am currently in
+  is not in history; ending or discarding that one is US-01 and US-06.
+- Deleting the session holding my most recent set of an exercise changes what the
+  next set of it prefills with (US-03). The prefill never resurrects a deleted set.
 
 ---
 
