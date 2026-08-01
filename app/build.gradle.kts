@@ -32,7 +32,10 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.navigation.compose)
+    // navigation-compose arrives with hilt-navigation-compose, which already requires it.
+    // Pinning it separately would mean inventing a version: Google's Maven is unreachable
+    // from the environment this was written in, and a wrong pin overrides a working one.
+    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
