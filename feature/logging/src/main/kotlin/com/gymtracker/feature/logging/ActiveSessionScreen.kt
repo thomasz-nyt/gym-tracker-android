@@ -5,8 +5,6 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,11 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -38,8 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,9 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
-import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionId
@@ -81,17 +73,33 @@ import java.util.Locale
  * start destination is this screen precisely so that property survives; navigation decides
  * where *back* goes, not what you resume into.
  *
- * The exercise search and history are still selected by state within this route rather than
- * being destinations of their own. Migrating them is the remainder of ADR-0013.
+ * Picking an exercise is a destination now (US-12): "Add exercise" navigates to the shared
+ * browse screen, which hands an id back through [pickedExerciseId]. History is the last
+ * screen still selected by state within this route — the remainder of ADR-0013.
+ *
+ * @param pickedExerciseId an exercise chosen on the browse screen, appended to the session
+ *   once and then cleared through [onPickHandled].
  */
 @Composable
 fun LoggingRoute(
     onBrowseCatalog: () -> Unit = {},
+    onAddExercise: () -> Unit = {},
+    pickedExerciseId: String? = null,
+    onPickHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RestNotifications(viewModel)
+
+    // Browse is a destination of its own, so it hands an exercise back through the nav
+    // result rather than this screen owning a search overlay (US-12, ADR-0013).
+    LaunchedEffect(pickedExerciseId) {
+        pickedExerciseId?.let { id ->
+            viewModel.onExerciseChosen(ExerciseId(id))
+            onPickHandled()
+        }
+    }
 
     LoggingScreen(
         state = state,
@@ -111,10 +119,7 @@ fun LoggingRoute(
         onSetRpeChanged = { viewModel.setEntry.change(rpe = it) },
         onConfirmSet = viewModel.setEntry::confirm,
         onSetEntryDismissed = viewModel.setEntry::dismiss,
-        onAddExercise = viewModel::onAddExerciseClicked,
-        onQueryChanged = viewModel::onQueryChanged,
-        onExerciseChosen = viewModel::onExerciseChosen,
-        onSearchDismissed = viewModel::onSearchDismissed,
+        onAddExercise = onAddExercise,
         modifier = modifier,
     )
 }
@@ -139,23 +144,8 @@ internal fun LoggingScreen(
     onConfirmSet: () -> Unit = {},
     onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
-    onQueryChanged: (String) -> Unit = {},
-    onExerciseChosen: (ExerciseId) -> Unit = {},
-    onSearchDismissed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (state.isSearching) {
-        ExerciseSearch(
-            query = state.query,
-            results = state.results,
-            onQueryChanged = onQueryChanged,
-            onExerciseChosen = onExerciseChosen,
-            onDismiss = onSearchDismissed,
-            modifier = modifier,
-        )
-        return
-    }
-
     if (state.history.isOpen) {
         // Back leaves history rather than the app — it is a side trip from the session
         // screen, not a second entry point.
@@ -406,72 +396,6 @@ private fun SessionExercises(
     }
 }
 
-/**
- * Catalog search (US-02). Results are ranked by how recently the member used each exercise,
- * then alphabetically — the ordering comes from the query, not from this list.
- */
-@Composable
-private fun ExerciseSearch(
-    query: String,
-    results: List<Exercise>,
-    onQueryChanged: (String) -> Unit,
-    onExerciseChosen: (ExerciseId) -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = SCREEN_PADDING),
-            verticalArrangement = Arrangement.spacedBy(GAP),
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChanged,
-                label = { Text("Search exercises") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            if (results.isEmpty()) {
-                Text(
-                    text = if (query.isBlank()) "Loading the catalog…" else "Nothing matches \"$query\".",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                items(results, key = { it.id.value }) { exercise ->
-                    ListItem(
-                        headlineContent = { Text(exercise.name) },
-                        supportingContent = {
-                            Text(
-                                exercise.equipment.name
-                                    .lowercase()
-                                    .replaceFirstChar { it.uppercase() },
-                            )
-                        },
-                        leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .sizeIn(minHeight = MIN_TOUCH_TARGET)
-                                .clickable { onExerciseChosen(exercise.id) },
-                    )
-                    HorizontalDivider()
-                }
-            }
-
-            TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
-                Text("Cancel")
-            }
-        }
-    }
-}
-
 @Composable
 private fun AbandonedSessionDialog(
     prompt: StaleSessionPrompt,
@@ -683,33 +607,6 @@ private fun WeightField(
     }
 }
 
-/**
- * A bundled photo of the movement, for the starter exercises that ship one (ADR-0007).
- *
- * When no image is bundled the space is left empty rather than filled with a generic icon:
- * an image that says nothing is worse than no image, and constitution §2 says absent is
- * shown as absent. The rest of the catalog gets media at M3.
- */
-@Composable
-private fun ExerciseThumbnail(imageAsset: String?) {
-    if (imageAsset == null) {
-        Box(modifier = Modifier.size(THUMBNAIL))
-        return
-    }
-
-    AsyncImage(
-        model = "file:///android_asset/exercise_images/$imageAsset",
-        // The name is right beside it, so repeating it would only add noise for TalkBack.
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier =
-            Modifier
-                .size(THUMBNAIL)
-                .clip(RoundedCornerShape(THUMBNAIL_CORNER))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-    )
-}
-
 private fun StaleSessionPrompt.explanation(): String =
     when (this) {
         is StaleSessionPrompt.Finish ->
@@ -733,8 +630,6 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault
 private val SCREEN_PADDING = 24.dp
 private val GAP = 12.dp
 private val MIN_TOUCH_TARGET = 48.dp
-private val THUMBNAIL = 56.dp
-private val THUMBNAIL_CORNER = 8.dp
 
 @Preview
 @Composable

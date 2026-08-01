@@ -28,13 +28,11 @@ import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -60,9 +58,6 @@ data class SessionUiState(
     val activeSession: WorkoutSession? = null,
     val stalePrompt: StaleSessionPrompt? = null,
     val exercises: List<SessionExerciseRow> = emptyList(),
-    val isSearching: Boolean = false,
-    val query: String = "",
-    val results: List<Exercise> = emptyList(),
     val unit: WeightUnit = WeightUnit.LB,
     val setEntry: SetEntry? = null,
     /** Time left in the current rest, or null when none is running (US-05). */
@@ -130,8 +125,6 @@ class ActiveSessionViewModel
             )
 
         private val stalePrompt = MutableStateFlow<StaleSessionPrompt?>(null)
-        private val searching = MutableStateFlow(false)
-        private val query = MutableStateFlow("")
 
         private val member: Flow<UserId> = flow { emit(currentMember.id()) }
 
@@ -148,7 +141,7 @@ class ActiveSessionViewModel
                     } else {
                         combine(
                             sessionExercises.observeForSession(session.id),
-                            catalog.search("", memberId),
+                            catalog.observeRanked(memberId),
                         ) { inSession, allExercises ->
                             val byId = allExercises.associateBy(Exercise::id)
                             inSession.map { SessionExerciseRow(it, byId[it.exerciseId]) }
@@ -168,39 +161,23 @@ class ActiveSessionViewModel
                     }
                 }
 
-        @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-        private val results: Flow<List<Exercise>> =
-            combine(
-                // No delay on the empty query, so opening search shows the catalog at once;
-                // the debounce is only there to stop re-querying on every keystroke.
-                query.debounce { text -> if (text.isEmpty()) 0L else SEARCH_DEBOUNCE_MILLIS },
-                member,
-            ) { text, memberId -> text to memberId }
-                .flatMapLatest { (text, memberId) -> catalog.search(text, memberId) }
-
         val uiState: StateFlow<SessionUiState> =
             combine(
                 activeSession,
                 stalePrompt,
                 exercises,
-                combine(searching, query, results) { isSearching, text, found ->
-                    Triple(isSearching, text, found)
-                },
                 combine(
                     unitPreference.observe(),
                     setEntry.entry,
                     rest.remaining(),
                     history.state,
                 ) { unit, entry, rest, past -> ScreenExtras(unit, entry, rest, past) },
-            ) { session, prompt, inSession, (isSearching, text, found), extras ->
+            ) { session, prompt, inSession, extras ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
                     stalePrompt = prompt,
                     exercises = inSession,
-                    isSearching = isSearching,
-                    query = text,
-                    results = found,
                     unit = extras.unit,
                     setEntry = extras.entry,
                     restRemaining = extras.rest,
@@ -231,23 +208,12 @@ class ActiveSessionViewModel
             }
         }
 
-        /** Opens the catalog search (US-02). */
-        fun onAddExerciseClicked() {
-            query.value = ""
-            searching.value = true
-        }
-
-        fun onSearchDismissed() {
-            searching.value = false
-        }
-
-        fun onQueryChanged(text: String) {
-            query.value = text
-        }
-
         /**
-         * Appends the chosen exercise to the active session and closes the search. Adding the
-         * same exercise twice is allowed — US-02 says so, and each appearance is its own row.
+         * Appends an exercise the member picked on the browse screen (US-02, US-12).
+         *
+         * Browse is a navigation destination of its own now, so it hands an id back rather
+         * than this screen owning a search overlay. Adding the same exercise twice is allowed
+         * — US-02 says so, and each appearance is its own row.
          */
         fun onExerciseChosen(exerciseId: ExerciseId) {
             viewModelScope.launch {
@@ -256,7 +222,6 @@ class ActiveSessionViewModel
                 // is not currently collecting. The database is the source of truth (§2).
                 val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
                 addExerciseToSession(session.id, exerciseId)
-                searching.value = false
             }
         }
 
@@ -296,9 +261,5 @@ class ActiveSessionViewModel
 
         private companion object {
             const val STOP_TIMEOUT_MILLIS = 5_000L
-            const val TICK_MILLIS = 1_000L
-
-            /** Enough to stop re-querying 873 rows on every keystroke, short enough to feel instant. */
-            const val SEARCH_DEBOUNCE_MILLIS = 150L
         }
     }

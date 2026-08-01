@@ -244,33 +244,17 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
-    fun `opening search shows the catalog`() =
+    fun `an exercise picked on the browse screen is appended to the session`() =
         runTest {
+            // Choosing which exercise moved to :feature:catalog at M3 (US-12), so this screen
+            // no longer owns a search — it is handed an id and appends it (US-02).
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
-
-            viewModel.onAddExerciseClicked()
-
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(true, state.isSearching)
-                assertEquals(listOf("Bench Press", "Squat"), state.results.map { it.name })
-            }
-        }
-
-    @Test
-    fun `choosing an exercise appends it to the session and closes search`() =
-        runTest {
-            val repository = FakeSessions(listOf(session("s1")))
-            val viewModel = viewModel(repository)
-            viewModel.onAddExerciseClicked()
 
             viewModel.onExerciseChosen(ExerciseId("bench"))
 
             viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(false, state.isSearching)
-                assertEquals(listOf("Bench Press"), state.exercises.map { it.exercise?.name })
+                assertEquals(listOf("Bench Press"), expectMostRecentItem().exercises.map { it.exercise?.name })
             }
         }
 
