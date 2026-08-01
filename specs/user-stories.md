@@ -110,27 +110,51 @@ testing, and there was no way to remove one without clearing the other. See
 - I can export all my data as JSON to a file.
 - I can delete my account; all my rows are removed and this is verified by a test.
 
----
-
-## M3 — Catalog and media
-
-### US-12 — Browse and filter
-- Filter the catalog by body part and by equipment; combine both.
-- Search matches on name and common aliases.
-
-### US-13 — See how a machine works
-- The exercise detail screen shows a looping GIF (or a video, or text if neither).
-- It lists primary and secondary muscles worked.
-- It shows numbered instruction steps.
-- Media already viewed is available offline.
-
-### US-14 — Link out to a video
-- Where a YouTube link exists, tapping it opens the external browser or app.
-- No embedded player, no third-party SDK.
-
 ### US-15 — Record our own gym's equipment
+Moved here from M3 on 2026-08-01: it is written in terms of a household, and there is
+no household until this milestone (ADR-0014).
 - I can record or pick a short clip and attach it to a catalog exercise for my
   household, overriding the stock media for us only.
+- The clip is stored on the device and works offline; sharing it with the household
+  goes through the same sync engine as everything else in this milestone.
+
+---
+
+## M3 — Catalog
+
+Revised 2026-08-01, when M3 was taken before M2. Two criteria assumed catalog fields
+that do not exist and one assumed a backend that does not — see ADR-0014 and ADR-0015.
+
+### US-12 — Browse and filter
+- Filter the catalog by body part and by equipment; combine both. Clearing the
+  filters returns the full catalog.
+- Search matches on name **and on hand-authored aliases** (ADR-0015): "pulldown"
+  finds Wide-Grip Lat Pulldown, "pec deck" finds Butterfly.
+- Filters and the search query combine, rather than one replacing the other.
+- Browsing is reachable from home, without starting a workout.
+- The same screen is reached from an active session to add an exercise, where
+  tapping a result still adds it directly. **US-02's path gains no taps.**
+- Equipment the source never recorded reads as "Not specified", not as "Other"
+  (constitution §2, ADR-0015).
+
+### US-13 — See how a machine works
+- The exercise detail screen lists primary and secondary muscles worked.
+- It shows numbered instruction steps. Where the catalog records none — five
+  exercises — it says so, rather than rendering an empty panel.
+- It shows a bundled photo of the movement where one exists, and nothing in its
+  place where one does not (ADR-0007, ADR-0014).
+- Everything on the screen ships in the app, so it is **fully usable in airplane
+  mode on first launch**, with nothing to cache first.
+- GIF and video playback move to M2 with the Storage bucket they need (ADR-0014).
+
+### US-14 — Link out to a video
+- The detail screen offers a YouTube **search** for the exercise, opened in the
+  external browser or app.
+- It is labelled as a search. The catalog ships no curated links and the app does
+  not imply it has vetted one (constitution §2, ADR-0015).
+- No embedded player, no third-party SDK, no account (constitution §3).
+- It is the only thing in M3 that needs the network. Offline, it is unavailable and
+  nothing else on the screen is affected.
 
 ---
 

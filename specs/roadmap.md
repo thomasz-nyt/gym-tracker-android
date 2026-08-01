@@ -4,8 +4,9 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M1** — M0's boxes are all ticked and its exit criterion (green CI on a
-PR) was met at PR #4.
+Current milestone: **M3**, taken out of order — see that section. M0 and M1 are complete;
+M2 is deliberately postponed so the offline core can be finished before accounts and sync
+arrive.
 
 ---
 
@@ -53,7 +54,10 @@ anything mid-set.
 
 ## M2 — Accounts, household, sync
 
-Stories: US-07 … US-11
+Stories: US-07 … US-11, plus US-15 which moved here from M3.
+
+**Postponed until after M3** (2026-08-01). Nothing in M1 or M3 needs it, and the household
+does not need accounts to start using the app.
 
 - [ ] Supabase project, migrations in `supabase/migrations/`
 - [ ] Auth: sign up, sign in, sign out
@@ -63,25 +67,45 @@ Stories: US-07 … US-11
       `updated_at`, conflict cases documented
 - [ ] Offline queue survives app kill
 - [ ] Data export (JSON) and account deletion
+- [ ] Stock exercise media mirrored into Supabase Storage, never hotlinked (ADR-0014)
+- [ ] Family-recorded clips for a household (US-15, moved from M3)
 
 **Exit:** two devices, two family members, same household, log offline, reconnect,
 converge. A pgTAP suite proves isolation.
 
 ---
 
-## M3 — Exercise catalog and media
+## M3 — Exercise catalog
 
-Stories: US-12 … US-15
+Stories: US-12 … US-14. US-15 moved to M2.
 
-- [ ] Catalog browse and search by name, body part, equipment
-- [ ] Body-part tags rendered on the exercise detail screen
-- [ ] GIF playback via Coil; mirrored into Supabase Storage, never hotlinked
-- [ ] Optional YouTube link-out (external browser, no embedded SDK)
-- [ ] Family-recorded clips: record/upload a clip for a specific machine at your gym
-- [ ] Step-by-step text instructions, readable offline
+**Taken before M2** (maintainer decision, 2026-08-01), to keep the offline core moving
+without an account. Everything in this milestone works with no network and no backend,
+which is what makes the reordering possible at all.
 
-**Exit:** every exercise in the catalog has either a GIF, a clip, or text; the
-detail screen is fully usable in airplane mode for anything already cached.
+Renamed from "Exercise catalog and media". The media half assumed GIFs the seed data
+does not contain and a Storage bucket M2 has not built — see ADR-0014.
+
+- [ ] Catalog browse and filter by body part and equipment, combined
+- [ ] Search matches name and hand-authored aliases (ADR-0015)
+- [ ] Exercise detail: body-part tags, numbered instructions, bundled photo where one exists
+- [ ] YouTube **search** link-out, labelled as a search (external browser, no SDK, no account)
+- [ ] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
+- [ ] Navigation Compose replaces state-derived routing (ADR-0013)
+
+**Exit:** in airplane mode, standing at an unfamiliar machine, you can narrow the catalog
+by body part and equipment and confirm the machine from its photo or its numbered steps.
+Every detail screen renders honestly — the five exercises the catalog has no instructions
+for say so, rather than showing an empty panel.
+
+*(The previous exit criterion — "every exercise has either a GIF, a clip, or text" — was
+already satisfied by M1's seed data, since 868 of 873 ship instructions. It tested the
+catalog, not this milestone.)*
+
+Deferred to M2, where the backend they need exists:
+
+- Stock media mirrored into Supabase Storage, and any GIF or video playback (ADR-0014)
+- US-15, family-recorded clips for a household
 
 ---
 
