@@ -2,6 +2,8 @@ plugins {
     id("gymtracker.android.application")
     id("gymtracker.android.compose")
     id("gymtracker.hilt")
+    // Navigation's type-safe routes are @Serializable objects (ADR-0013, tech-stack.md).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -24,11 +26,14 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
+    implementation(project(":feature:catalog"))
     implementation(project(":feature:logging"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

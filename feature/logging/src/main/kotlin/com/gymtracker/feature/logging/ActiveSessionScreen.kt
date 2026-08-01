@@ -72,15 +72,21 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The core-loop screen. US-01 only: start a session, come back to it, resolve one that was
- * left running. Exercises and sets arrive in US-02 and US-03.
+ * The core-loop screen: start a session, come back to it, resolve one that was left running
+ * (US-01), add exercises (US-02), log sets (US-03).
  *
- * There is deliberately no navigation graph yet. Which screen you see is derived from the
- * database, not from a back stack, which is what makes "reopen and you are back in your
- * session" true even after the process is killed.
+ * **Which of home and session you see is still derived from the database, not from a back
+ * stack** — that is what makes "reopen and you are back in your session" true even after the
+ * process is killed. M3 put a navigation graph above this route (ADR-0013), and the graph's
+ * start destination is this screen precisely so that property survives; navigation decides
+ * where *back* goes, not what you resume into.
+ *
+ * The exercise search and history are still selected by state within this route rather than
+ * being destinations of their own. Migrating them is the remainder of ADR-0013.
  */
 @Composable
 fun LoggingRoute(
+    onBrowseCatalog: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
@@ -95,6 +101,7 @@ fun LoggingRoute(
         onAddSet = viewModel.setEntry::open,
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
+        onBrowseCatalog = onBrowseCatalog,
         onCloseHistory = viewModel.history::close,
         onDeleteWorkout = viewModel.history::delete,
         onUndoDelete = viewModel.history::undo,
@@ -121,6 +128,7 @@ internal fun LoggingScreen(
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
+    onBrowseCatalog: () -> Unit = {},
     onCloseHistory: () -> Unit = {},
     onDeleteWorkout: (SessionId) -> Unit = {},
     onUndoDelete: () -> Unit = {},
@@ -168,6 +176,7 @@ internal fun LoggingScreen(
             state = state,
             onStartWorkout = onStartWorkout,
             onOpenHistory = onOpenHistory,
+            onBrowseCatalog = onBrowseCatalog,
             onAddExercise = onAddExercise,
             onAddSet = onAddSet,
             onSkipRest = onSkipRest,
@@ -197,6 +206,7 @@ private fun SessionBody(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onOpenHistory: () -> Unit,
+    onBrowseCatalog: () -> Unit,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
@@ -220,7 +230,7 @@ private fun SessionBody(
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )
-            else -> NoSession(onStartWorkout, onOpenHistory)
+            else -> NoSession(onStartWorkout, onOpenHistory, onBrowseCatalog)
         }
     }
 }
@@ -259,6 +269,7 @@ private fun SessionDialogs(
 private fun NoSession(
     onStartWorkout: () -> Unit,
     onOpenHistory: () -> Unit,
+    onBrowseCatalog: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -283,6 +294,14 @@ private fun NoSession(
             modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
         ) {
             Text("Past workouts")
+        }
+        // Looking a machine up without starting a workout (US-12). Below the two actions
+        // that are about training, because that is what this screen is for.
+        TextButton(
+            onClick = onBrowseCatalog,
+            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+        ) {
+            Text("Browse exercises")
         }
     }
 }
