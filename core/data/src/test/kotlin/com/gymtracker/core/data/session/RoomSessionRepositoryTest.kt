@@ -113,7 +113,7 @@ class RoomSessionRepositoryTest {
         runTest {
             repository.startSession(session("s1"))
 
-            repository.discardSession(SessionId("s1"))
+            repository.deleteSession(SessionId("s1"))
 
             assertNull(repository.findSession(SessionId("s1")))
         }
@@ -137,7 +137,7 @@ class RoomSessionRepositoryTest {
                 repository.startSession(session("s1"))
                 assertEquals(SessionId("s1"), awaitItem()?.id)
 
-                repository.discardSession(SessionId("s1"))
+                repository.deleteSession(SessionId("s1"))
                 assertNull(awaitItem())
             }
         }

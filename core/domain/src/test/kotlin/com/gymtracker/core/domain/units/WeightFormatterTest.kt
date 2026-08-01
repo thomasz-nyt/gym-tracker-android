@@ -61,8 +61,8 @@ class WeightFormatterTest {
     @Test
     fun `a session's volume reads as a whole grouped number`() {
         // US-06's history row. Nobody cares about a tenth of a pound across a whole workout,
-        // and "9,085 lb" is readable at a glance where "9084.5 lb" is not.
-        assertEquals("9,085 lb", WeightFormatter.formatVolume(4120.0, WeightUnit.LB))
+        // and "9,083 lb" is readable at a glance where "9083.0 lb" is not.
+        assertEquals("9,083 lb", WeightFormatter.formatVolume(4120.0, WeightUnit.LB))
         assertEquals("4,120 kg", WeightFormatter.formatVolume(4120.0, WeightUnit.KG))
         assertEquals("600 kg", WeightFormatter.formatVolume(600.0, WeightUnit.KG))
     }

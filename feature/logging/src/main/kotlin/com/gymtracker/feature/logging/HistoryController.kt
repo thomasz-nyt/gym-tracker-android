@@ -1,0 +1,114 @@
+package com.gymtracker.feature.logging
+
+import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.session.DeleteSession
+import com.gymtracker.core.domain.session.DeletedSession
+import com.gymtracker.core.domain.session.RestoreSession
+import com.gymtracker.core.domain.session.SessionHistory
+import com.gymtracker.core.domain.session.SessionSummary
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import java.time.Duration
+
+/** The history screen's slice of [SessionUiState] (US-06, US-06a). */
+data class HistoryState(
+    val isOpen: Boolean = false,
+    /** Finished workouts, newest first. The session in progress is never among them. */
+    val sessions: List<SessionSummary> = emptyList(),
+    /** Whether the last delete can still be taken back — true for five seconds after it. */
+    val canUndo: Boolean = false,
+)
+
+/**
+ * History, and deleting from it (US-06, US-06a).
+ *
+ * Its own state holder rather than more surface on [ActiveSessionViewModel], following
+ * [RestController] and [SetEntryController]. Nothing here is loaded until the screen is
+ * opened: history is a side trip, and the core loop should not pay for it.
+ *
+ * Deleting is immediate and undo restores from the snapshot [DeleteSession] hands back
+ * (ADR-0012). Only the most recent delete can be undone; a second delete inside the window
+ * replaces the first, which is by then already committed.
+ */
+class HistoryController(
+    private val history: SessionHistory,
+    private val deleteSession: DeleteSession,
+    private val restoreSession: RestoreSession,
+    private val currentMember: CurrentMember,
+    private val scope: CoroutineScope,
+) {
+    private val open = MutableStateFlow(false)
+    private val undoable = MutableStateFlow<DeletedSession?>(null)
+    private var expiry: Job? = null
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val entries: Flow<List<SessionSummary>> =
+        open.flatMapLatest { isOpen ->
+            if (!isOpen) {
+                flowOf(emptyList())
+            } else {
+                flow { emit(currentMember.id()) }.flatMapLatest { member -> history(member) }
+            }
+        }
+
+    val state: Flow<HistoryState> =
+        combine(open, entries, undoable) { isOpen, sessions, undo ->
+            HistoryState(isOpen = isOpen, sessions = sessions, canUndo = undo != null)
+        }
+
+    fun open() {
+        open.value = true
+    }
+
+    /** Leaves history. Any undo still on offer expires with the screen it belonged to. */
+    fun close() {
+        open.value = false
+        forget()
+    }
+
+    /**
+     * Deletes a past workout and starts the undo window (US-06a).
+     *
+     * The row is gone from the database before the list re-renders without it, so what is on
+     * screen is never ahead of what is stored.
+     */
+    fun delete(id: SessionId) {
+        scope.launch {
+            val deleted = deleteSession(id) ?: return@launch
+            undoable.value = deleted
+            expiry?.cancel()
+            expiry =
+                scope.launch {
+                    delay(UNDO_WINDOW.toMillis())
+                    undoable.value = null
+                }
+        }
+    }
+
+    /** Puts the last deleted workout back, if the window has not closed. */
+    fun undo() {
+        val deleted = undoable.value ?: return
+        forget()
+        scope.launch { restoreSession(deleted) }
+    }
+
+    private fun forget() {
+        expiry?.cancel()
+        undoable.value = null
+    }
+
+    private companion object {
+        /** US-04's window, reused so the app's two destructive actions behave alike. */
+        val UNDO_WINDOW: Duration = Duration.ofSeconds(5)
+    }
+}

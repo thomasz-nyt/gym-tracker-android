@@ -205,7 +205,7 @@ class SetRepositoryTest {
             val se = appearance("s1")
             logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = null)
 
-            sessions.discardSession(SessionId("s1"))
+            sessions.deleteSession(SessionId("s1"))
 
             assertTrue(sets.observeForSessionExercise(se).first().isEmpty(), "cascade through session_exercises")
         }

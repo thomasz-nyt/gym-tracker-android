@@ -26,6 +26,10 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
+import com.gymtracker.core.domain.session.DeleteSession
+import com.gymtracker.core.domain.session.EndSession
+import com.gymtracker.core.domain.session.RestoreSession
+import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
@@ -140,6 +144,34 @@ object DataModule {
         clock: Clock,
     ): StartSession =
         StartSession(sessions = sessions, clock = clock, newId = { SessionId(UUID.randomUUID().toString()) })
+
+    @Provides
+    fun endSession(
+        sessions: SessionRepository,
+        sets: SetRepository,
+        clock: Clock,
+    ): EndSession = EndSession(sessions, sets, clock)
+
+    @Provides
+    fun sessionHistory(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): SessionHistory = SessionHistory(sessions, sessionExercises, sets)
+
+    @Provides
+    fun deleteSession(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): DeleteSession = DeleteSession(sessions, sessionExercises, sets)
+
+    @Provides
+    fun restoreSession(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): RestoreSession = RestoreSession(sessions, sessionExercises, sets)
 }
 
 @Module

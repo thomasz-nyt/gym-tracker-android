@@ -18,6 +18,9 @@ class RoomSessionExerciseRepository
         override fun observeForSession(sessionId: SessionId): Flow<List<SessionExercise>> =
             dao.observeForSession(sessionId.value).map { rows -> rows.map { it.toDomain() } }
 
+        override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<SessionExercise>> =
+            dao.observeForSessions(sessionIds.map { it.value }).map { rows -> rows.map { it.toDomain() } }
+
         override suspend fun add(sessionExercise: SessionExercise) {
             dao.insert(
                 SessionExerciseEntity(

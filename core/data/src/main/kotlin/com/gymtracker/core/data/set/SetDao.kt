@@ -12,6 +12,22 @@ interface SetDao {
     fun observeForSessionExercise(sessionExerciseId: String): Flow<List<SetEntity>>
 
     /**
+     * Every set in any of these sessions, for the volume on each history row (US-06).
+     *
+     * Reaches the session through `session_exercises`, the same join ADR-0004 chose over
+     * denormalising a `session_id` onto `sets`.
+     */
+    @Query(
+        """
+        SELECT s.* FROM sets s
+        JOIN session_exercises se ON se.id = s.session_exercise_id
+        WHERE se.session_id IN (:sessionIds)
+        ORDER BY s.set_index ASC
+        """,
+    )
+    fun observeForSessions(sessionIds: List<String>): Flow<List<SetEntity>>
+
+    /**
      * The member's most recent set of an exercise, in any session — the US-03 prefill.
      *
      * This is the join ADR-0004 chose over a denormalised `exercise_id` on `sets`: it reaches

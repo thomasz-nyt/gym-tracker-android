@@ -31,8 +31,8 @@ class DeleteSessionTest {
         FakeSessionRepository(
             initial = listOf(finished(target), finished(other)),
             cascade = { id ->
-                sessionExercises.cascadeDelete(id)
                 sets.cascadeDelete(id)
+                sessionExercises.cascadeDelete(id)
             },
         )
 

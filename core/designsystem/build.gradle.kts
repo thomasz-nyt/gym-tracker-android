@@ -5,6 +5,14 @@ plugins {
 
 android {
     namespace = "com.gymtracker.core.designsystem"
+
+    testOptions {
+        unitTests {
+            // Constructing a TextStyle should not reach the platform, but if some corner of
+            // Compose ever does, a default beats an exception in a test about font sizes.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

@@ -14,6 +14,16 @@ interface SessionDao {
     @Query(ACTIVE_SESSION)
     suspend fun findActive(userId: String): SessionEntity?
 
+    /**
+     * History (US-06): finished sessions only, newest first. Backed by the
+     * `sessions(user_id, started_at)` index from `data-model.md`.
+     */
+    @Query(
+        "SELECT * FROM sessions WHERE user_id = :userId AND ended_at IS NOT NULL " +
+            "ORDER BY started_at DESC",
+    )
+    fun observeFinished(userId: String): Flow<List<SessionEntity>>
+
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun find(id: String): SessionEntity?
 

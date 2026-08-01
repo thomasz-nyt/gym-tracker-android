@@ -90,8 +90,11 @@ class ActiveSessionViewModelTest {
      */
     private fun sessionsOf(vararg initial: WorkoutSession) =
         FakeSessions(initial.toList()) { id ->
-            sessionExercises.cascadeDelete(id)
+            // Sets first: this fake finds a set's session by looking its appearance up in
+            // sessionExercises, so clearing that first would leave the sets unreachable and
+            // therefore undeleted. SQLite has the real graph and does not care about order.
             sets.cascadeDelete(id)
+            sessionExercises.cascadeDelete(id)
         }
 
     private fun viewModel(repository: FakeSessions) =

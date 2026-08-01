@@ -8,7 +8,8 @@ import androidx.compose.runtime.Composable
 
 /**
  * The app theme. Colour tokens are deliberately left at the Material 3 defaults for now;
- * real tokens arrive with the first screens that need them.
+ * real tokens arrive with the first screens that need them. The type scale is not a default —
+ * see [GymTypography] and ADR-0011.
  */
 @Composable
 fun GymTrackerTheme(
@@ -17,6 +18,7 @@ fun GymTrackerTheme(
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme(),
+        typography = GymTypography,
         content = content,
     )
 }

@@ -113,7 +113,7 @@ class StartSessionTest {
                 val started = assertIs<StartSessionResult.Started>(useCase(alice))
                 assertEquals(started.session, awaitItem())
 
-                repository.discardSession(started.session.id)
+                repository.deleteSession(started.session.id)
                 assertEquals(null, awaitItem())
             }
         }
