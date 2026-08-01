@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.flowOf
 import java.time.Instant
 
 /** Every method throws or returns nothing, so a test fake only overrides what it uses. */
-internal open class NoSets : SetRepository {
+open class NoSets : SetRepository {
     override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
         flowOf(emptyList())
 

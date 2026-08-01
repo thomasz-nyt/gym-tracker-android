@@ -2,6 +2,8 @@ package com.gymtracker.feature.logging
 
 import app.cash.turbine.test
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.history.SessionHistory
+import com.gymtracker.core.domain.history.SessionSummary
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Equipment
@@ -15,6 +17,7 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
+import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
@@ -87,6 +90,8 @@ class ActiveSessionViewModelTest {
             currentMember = FakeCurrentMember(member),
             sets = sets,
             logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
+            endSession = EndSession(repository, sets, clock),
+            sessionHistory = FakeHistory(),
             restTimer = RestTimer(restStore, clock),
             restTimerStore = restStore,
             prefillFromLastSet = PrefillFromLastSet(sets),
@@ -500,6 +505,55 @@ class ActiveSessionViewModelTest {
 
             assertNull(restStore.restEndsAt.first())
         }
+
+    @Test
+    fun `ending a workout with sets keeps it`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.setEntry.open(row)
+                viewModel.setEntry.change(reps = "5")
+                viewModel.setEntry.confirm()
+                expectMostRecentItem()
+
+                viewModel.onEndWorkout()
+                expectMostRecentItem()
+            }
+
+            assertEquals(now, repository.all.single().endedAt)
+        }
+
+    @Test
+    fun `ending a workout with no sets discards it`() =
+        runTest {
+            // US-06: an empty session is not a workout that happened.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onEndWorkout()
+
+            assertEquals(emptyList(), repository.all)
+        }
+
+    @Test
+    fun `ending a workout also clears any running rest`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            restStore.setRestEndsAt(now.plusSeconds(90))
+
+            viewModel.onEndWorkout()
+
+            assertNull(restStore.restEndsAt.first(), "no rest for a workout that is over")
+        }
+
+    private class FakeHistory : SessionHistory {
+        override fun observeHistory(userId: UserId): Flow<List<SessionSummary>> = MutableStateFlow(emptyList())
+    }
 
     private class FakeRestTimerStore : RestTimerStore {
         private val endsAt = MutableStateFlow<java.time.Instant?>(null)

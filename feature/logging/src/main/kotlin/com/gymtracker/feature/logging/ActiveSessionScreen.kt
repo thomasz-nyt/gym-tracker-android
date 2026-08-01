@@ -50,6 +50,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.history.SessionSummary
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
@@ -68,6 +69,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 /**
@@ -99,6 +101,9 @@ fun LoggingRoute(
         onConfirmSet = viewModel.setEntry::confirm,
         onSetEntryDismissed = viewModel.setEntry::dismiss,
         onAddExercise = viewModel::onAddExerciseClicked,
+        onEndWorkout = viewModel::onEndWorkout,
+        onShowHistory = viewModel::onShowHistory,
+        onHistoryDismissed = viewModel::onHistoryDismissed,
         onQueryChanged = viewModel::onQueryChanged,
         onExerciseChosen = viewModel::onExerciseChosen,
         onSearchDismissed = viewModel::onSearchDismissed,
@@ -120,11 +125,19 @@ internal fun LoggingScreen(
     onConfirmSet: () -> Unit = {},
     onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
+    onEndWorkout: () -> Unit = {},
+    onShowHistory: () -> Unit = {},
+    onHistoryDismissed: () -> Unit = {},
     onQueryChanged: (String) -> Unit = {},
     onExerciseChosen: (ExerciseId) -> Unit = {},
     onSearchDismissed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    if (state.showingHistory) {
+        History(state.history, state.unit, onHistoryDismissed, modifier)
+        return
+    }
+
     if (state.isSearching) {
         ExerciseSearch(
             query = state.query,
@@ -157,8 +170,9 @@ internal fun LoggingScreen(
                         onAddExercise = onAddExercise,
                         onAddSet = onAddSet,
                         onSkipRest = onSkipRest,
+                        onEndWorkout = onEndWorkout,
                     )
-                else -> NoSession(onStartWorkout)
+                else -> NoSession(onStartWorkout, onShowHistory)
             }
         }
 
@@ -182,7 +196,10 @@ internal fun LoggingScreen(
 }
 
 @Composable
-private fun NoSession(onStartWorkout: () -> Unit) {
+private fun NoSession(
+    onStartWorkout: () -> Unit,
+    onShowHistory: () -> Unit,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(GAP),
@@ -199,6 +216,9 @@ private fun NoSession(onStartWorkout: () -> Unit) {
         ) {
             Text("Start workout")
         }
+        TextButton(onClick = onShowHistory, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
+            Text("Past workouts")
+        }
     }
 }
 
@@ -211,6 +231,7 @@ private fun ActiveSession(
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
+    onEndWorkout: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -237,42 +258,16 @@ private fun ActiveSession(
                 },
         )
 
-        if (exercises.isEmpty()) {
-            Text(
-                text = "No exercises yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                items(exercises, key = { it.sessionExercise.id.value }) { row ->
-                    ListItem(
-                        headlineContent = {
-                            // The catalog entry is only absent if the row outlived its exercise,
-                            // which the schema forbids; show the id rather than a blank line.
-                            Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
-                        },
-                        overlineContent = { Text("${row.sessionExercise.position}") },
-                        supportingContent = { LoggedSets(row.sets, unit) },
-                        trailingContent = {
-                            TextButton(
-                                onClick = { onAddSet(row) },
-                                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
-                            ) {
-                                Text("Add set")
-                            }
-                        },
-                    )
-                    HorizontalDivider()
-                }
-            }
-        }
+        SessionExercises(exercises, unit, onAddSet, Modifier.weight(1f))
 
         Button(
             onClick = onAddExercise,
             modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
         ) {
             Text("Add exercise")
+        }
+        TextButton(onClick = onEndWorkout, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
+            Text("End workout")
         }
     }
 }
@@ -361,6 +356,124 @@ private fun AbandonedSessionDialog(
         },
     )
 }
+
+/** The exercises in this session, each with its sets and a way to add another. */
+@Composable
+private fun SessionExercises(
+    exercises: List<SessionExerciseRow>,
+    unit: WeightUnit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (exercises.isEmpty()) {
+        Text(
+            text = "No exercises yet.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+        )
+        return
+    }
+
+    LazyColumn(modifier = modifier.fillMaxWidth()) {
+        items(exercises, key = { it.sessionExercise.id.value }) { row ->
+            ListItem(
+                headlineContent = {
+                    // The catalog entry is only absent if the row outlived its exercise, which
+                    // the schema forbids; show the id rather than a blank line.
+                    Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
+                },
+                overlineContent = { Text("${row.sessionExercise.position}") },
+                supportingContent = { LoggedSets(row.sets, unit) },
+                trailingContent = {
+                    TextButton(
+                        onClick = { onAddSet(row) },
+                        modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                    ) {
+                        Text("Add set")
+                    }
+                },
+            )
+            HorizontalDivider()
+        }
+    }
+}
+
+/**
+ * Past workouts, newest first (US-06).
+ *
+ * No navigation graph yet: which screen you see is still derived from state, the same reason
+ * given for the search screen. A real graph arrives when there is somewhere to go from here.
+ */
+@Composable
+private fun History(
+    sessions: List<SessionSummary>,
+    unit: WeightUnit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = SCREEN_PADDING),
+            verticalArrangement = Arrangement.spacedBy(GAP),
+        ) {
+            Text("Past workouts", style = MaterialTheme.typography.titleLarge)
+
+            if (sessions.isEmpty()) {
+                Text(
+                    "Nothing finished yet. Workouts appear here once you end them.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                items(sessions, key = { it.id.value }) { session ->
+                    ListItem(
+                        headlineContent = { Text(session.startedAt.asLocalDate()) },
+                        supportingContent = {
+                            Text(
+                                "${session.duration.asCountdown()}  ·  " +
+                                    "${session.exerciseCount.plural("exercise")}  ·  " +
+                                    session.setCount.plural("set"),
+                            )
+                        },
+                        trailingContent = { Text(session.volumeKg.asVolume(unit)) },
+                    )
+                    HorizontalDivider()
+                }
+            }
+
+            TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
+                Text("Back")
+            }
+        }
+    }
+}
+
+/**
+ * Total volume, or a dash.
+ *
+ * A session of nothing but bodyweight work has no volume we can state, and "0 kg" would
+ * claim they lifted nothing (constitution §2). The dash says we cannot say.
+ */
+private fun Double?.asVolume(unit: WeightUnit): String = this?.let { WeightFormatter.format(it, unit).primary } ?: "—"
+
+/**
+ * "1 exercise" rather than "1 exercises".
+ *
+ * A helper rather than a plurals resource because every other string on this screen is a
+ * hardcoded literal; when the app is localised (M7) they all move together, and having one
+ * string in resources and thirty in code would be worse than having none.
+ */
+private fun Int.plural(noun: String): String = if (this == 1) "$this $noun" else "$this ${noun}s"
+
+private fun Instant.asLocalDate(): String = DATE_FORMAT.format(atZone(ZoneId.systemDefault()))
+
+private val DATE_FORMAT: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
 
 /**
  * mm:ss, so 90 seconds reads "1:30" rather than "PT1M30S".

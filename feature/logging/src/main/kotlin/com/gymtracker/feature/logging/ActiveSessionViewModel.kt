@@ -3,6 +3,8 @@ package com.gymtracker.feature.logging
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.history.SessionHistory
+import com.gymtracker.core.domain.history.SessionSummary
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Exercise
@@ -12,6 +14,7 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimer
+import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
@@ -63,6 +66,9 @@ data class SessionUiState(
     val setEntry: SetEntry? = null,
     /** Time left in the current rest, or null when none is running (US-05). */
     val restRemaining: Duration? = null,
+    /** Finished sessions, newest first (US-06). */
+    val history: List<SessionSummary> = emptyList(),
+    val showingHistory: Boolean = false,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -82,6 +88,8 @@ class ActiveSessionViewModel
         private val currentMember: CurrentMember,
         private val startSession: StartSession,
         private val addExerciseToSession: AddExerciseToSession,
+        private val endSession: EndSession,
+        private val sessionHistory: SessionHistory,
         private val clock: Clock,
     ) : ViewModel() {
         /** The rest between sets lives in its own state holder; see [RestController]. */
@@ -100,9 +108,14 @@ class ActiveSessionViewModel
 
         private val stalePrompt = MutableStateFlow<StaleSessionPrompt?>(null)
         private val searching = MutableStateFlow(false)
+        private val showingHistory = MutableStateFlow(false)
         private val query = MutableStateFlow("")
 
         private val member: Flow<UserId> = flow { emit(currentMember.id()) }
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val history: Flow<List<SessionSummary>> =
+            member.flatMapLatest { sessionHistory.observeHistory(it) }
 
         @OptIn(ExperimentalCoroutinesApi::class)
         private val activeSession: Flow<WorkoutSession?> =
@@ -155,12 +168,18 @@ class ActiveSessionViewModel
                 combine(searching, query, results) { isSearching, text, found ->
                     Triple(isSearching, text, found)
                 },
+                // Grouped because combine's typed overloads stop at five flows, and a vararg
+                // combine would give up the types.
                 combine(
                     unitPreference.observe(),
                     setEntry.entry,
                     rest.remaining(),
-                ) { unit, entry, rest -> Triple(unit, entry, rest) },
-            ) { session, prompt, inSession, (isSearching, text, found), (unit, entry, rest) ->
+                    history,
+                    showingHistory,
+                ) { unit, entry, remaining, past, showing ->
+                    Peripherals(unit, entry, remaining, past, showing)
+                },
+            ) { session, prompt, inSession, (isSearching, text, found), peripheral ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
@@ -169,9 +188,11 @@ class ActiveSessionViewModel
                     isSearching = isSearching,
                     query = text,
                     results = found,
-                    unit = unit,
-                    setEntry = entry,
-                    restRemaining = rest,
+                    unit = peripheral.unit,
+                    setEntry = peripheral.entry,
+                    restRemaining = peripheral.restRemaining,
+                    history = peripheral.history,
+                    showingHistory = peripheral.showingHistory,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
@@ -180,6 +201,26 @@ class ActiveSessionViewModel
         }
 
         /** Starts a session, or does nothing visible if one is already running (US-01). */
+
+        fun onShowHistory() {
+            showingHistory.value = true
+        }
+
+        fun onHistoryDismissed() {
+            showingHistory.value = false
+        }
+
+        /**
+         * Ends the workout (US-06). A session with no sets is discarded rather than saved —
+         * the decision lives in [EndSession], not here.
+         */
+        fun onEndWorkout() {
+            viewModelScope.launch {
+                val active = sessions.findActiveSession(currentMember.id()) ?: return@launch
+                endSession(active.id)
+                rest.skip()
+            }
+        }
 
         fun onStartWorkout() {
             viewModelScope.launch { startSession(currentMember.id()) }
@@ -247,6 +288,15 @@ class ActiveSessionViewModel
                     )
             }
         }
+
+        /** The screen's peripheral state, bundled so `combine` keeps its types. */
+        private data class Peripherals(
+            val unit: WeightUnit,
+            val entry: SetEntry?,
+            val restRemaining: Duration?,
+            val history: List<SessionSummary>,
+            val showingHistory: Boolean,
+        )
 
         private companion object {
             const val STOP_TIMEOUT_MILLIS = 5_000L
