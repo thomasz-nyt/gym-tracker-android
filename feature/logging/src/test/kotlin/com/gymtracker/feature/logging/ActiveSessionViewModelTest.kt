@@ -838,10 +838,10 @@ class ActiveSessionViewModelTest {
 
         private val all = listOf(exercise("bench", "Bench Press"), exercise("squat", "Squat"))
 
-        override fun search(
-            query: String,
-            forMember: UserId,
-        ): Flow<List<Exercise>> = MutableStateFlow(all.filter { it.name.contains(query, ignoreCase = true) })
+        // Ranking is all this has to supply now; narrowing is CatalogQuery's, and the
+        // interface's search() runs it for us. The fake no longer reimplements matching,
+        // so it cannot drift from the real thing.
+        override fun observeRanked(forMember: UserId): Flow<List<Exercise>> = MutableStateFlow(all)
     }
 
     private class FakeSessionExercises : SessionExerciseRepository {

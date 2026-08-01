@@ -68,10 +68,20 @@ class ExerciseTaxonomyTest {
     }
 
     @Test
-    fun `absent equipment is OTHER, not a guess`() {
-        // 77 of the 873 source exercises have no equipment field at all.
-        assertEquals(Equipment.OTHER, ExerciseTaxonomy.equipment(null))
-        assertEquals(Equipment.OTHER, ExerciseTaxonomy.equipment(""))
+    fun `absent equipment is UNSPECIFIED, not a guess and not OTHER`() {
+        // 77 of the 873 source exercises have no equipment field at all. Until M3 they were
+        // folded into OTHER, which made 27% of the catalog claim to be "other equipment"
+        // when a third of that was really "we do not know" (ADR-0015, constitution §2).
+        assertEquals(Equipment.UNSPECIFIED, ExerciseTaxonomy.equipment(null))
+        assertEquals(Equipment.UNSPECIFIED, ExerciseTaxonomy.equipment(""))
+    }
+
+    @Test
+    fun `equipment that is recorded as miscellaneous stays OTHER`() {
+        // The distinction only means something if OTHER still has real members.
+        assertEquals(Equipment.OTHER, ExerciseTaxonomy.equipment("medicine ball"))
+        assertEquals(Equipment.OTHER, ExerciseTaxonomy.equipment("foam roll"))
+        assertEquals(Equipment.OTHER, ExerciseTaxonomy.equipment("other"))
     }
 
     @Test

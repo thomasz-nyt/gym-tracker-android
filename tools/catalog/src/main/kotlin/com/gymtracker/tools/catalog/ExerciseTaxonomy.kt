@@ -70,12 +70,14 @@ object ExerciseTaxonomy {
 
     /**
      * @param source the raw equipment value, which is absent for 77 of the 873 source
-     *   exercises. Absent means "the catalog does not say", which is [Equipment.OTHER].
+     *   exercises. Absent is [Equipment.UNSPECIFIED], **not** [Equipment.OTHER] (ADR-0015):
+     *   "the catalog does not say" and "miscellaneous equipment" are different answers, and
+     *   collapsing them made the M3 equipment filter claim knowledge it did not have.
      * @throws IllegalArgumentException if [source] is present but unrecognised.
      */
     fun equipment(source: String?): Equipment {
         val normalised = source?.normalise().orEmpty()
-        if (normalised.isEmpty()) return Equipment.OTHER
+        if (normalised.isEmpty()) return Equipment.UNSPECIFIED
 
         return EQUIPMENT[normalised]
             ?: throw IllegalArgumentException(
