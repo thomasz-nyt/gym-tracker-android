@@ -150,6 +150,9 @@ class LogSetTest {
         override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
             state.map { rows -> rows.filter { it.sessionExerciseId == sessionExerciseId }.sortedBy { it.setIndex } }
 
+        // Nothing in US-03 reaches sets by session; history does, and it has its own fake.
+        override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<ExerciseSet>> = state
+
         override suspend fun lastSetOf(
             exerciseId: ExerciseId,
             member: UserId,
