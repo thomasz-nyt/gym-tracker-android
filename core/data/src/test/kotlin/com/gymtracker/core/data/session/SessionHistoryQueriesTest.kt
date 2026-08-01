@@ -158,7 +158,11 @@ class SessionHistoryQueriesTest {
             assertEquals(1, sessionExercises.observeForSessions(listOf(session)).first().size)
             assertEquals(
                 listOf("s1-0", "s1-1"),
-                sets.observeForSessions(listOf(session)).first().map { it.id }.sorted(),
+                sets
+                    .observeForSessions(listOf(session))
+                    .first()
+                    .map { it.id }
+                    .sorted(),
             )
         }
 

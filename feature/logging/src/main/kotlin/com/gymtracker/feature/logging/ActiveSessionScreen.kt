@@ -164,47 +164,94 @@ internal fun LoggingScreen(
     }
 
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(SCREEN_PADDING),
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                state.isLoading -> CircularProgressIndicator()
-                state.activeSession != null ->
-                    ActiveSession(
-                        session = state.activeSession,
-                        exercises = state.exercises,
-                        unit = state.unit,
-                        restRemaining = state.restRemaining,
-                        onAddExercise = onAddExercise,
-                        onAddSet = onAddSet,
-                        onSkipRest = onSkipRest,
-                        onFinishWorkout = onFinishWorkout,
-                    )
-                else -> NoSession(onStartWorkout, onOpenHistory)
-            }
-        }
+        SessionBody(
+            state = state,
+            onStartWorkout = onStartWorkout,
+            onOpenHistory = onOpenHistory,
+            onAddExercise = onAddExercise,
+            onAddSet = onAddSet,
+            onSkipRest = onSkipRest,
+            onFinishWorkout = onFinishWorkout,
+            modifier = Modifier.padding(padding),
+        )
 
-        state.stalePrompt?.let { prompt ->
-            AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
-        }
+        SessionDialogs(
+            state = state,
+            onResolveStale = onResolveStale,
+            onSetWeightChanged = onSetWeightChanged,
+            onSetRepsChanged = onSetRepsChanged,
+            onSetCountChanged = onSetCountChanged,
+            onSetRpeChanged = onSetRpeChanged,
+            onConfirmSet = onConfirmSet,
+            onSetEntryDismissed = onSetEntryDismissed,
+        )
+    }
+}
 
-        state.setEntry?.let { entry ->
-            SetEntryDialog(
-                entry = entry,
-                unit = state.unit,
-                onWeightChanged = onSetWeightChanged,
-                onRepsChanged = onSetRepsChanged,
-                onSetsChanged = onSetCountChanged,
-                onRpeChanged = onSetRpeChanged,
-                onConfirm = onConfirmSet,
-                onDismiss = onSetEntryDismissed,
-            )
+/**
+ * Which of the three session states is on screen. Derived from the database rather than from
+ * a back stack, which is what makes "reopen and you are back in your session" survive a kill.
+ */
+@Composable
+private fun SessionBody(
+    state: SessionUiState,
+    onStartWorkout: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onAddExercise: () -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    onSkipRest: () -> Unit,
+    onFinishWorkout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxSize().padding(SCREEN_PADDING),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            state.isLoading -> CircularProgressIndicator()
+            state.activeSession != null ->
+                ActiveSession(
+                    session = state.activeSession,
+                    exercises = state.exercises,
+                    unit = state.unit,
+                    restRemaining = state.restRemaining,
+                    onAddExercise = onAddExercise,
+                    onAddSet = onAddSet,
+                    onSkipRest = onSkipRest,
+                    onFinishWorkout = onFinishWorkout,
+                )
+            else -> NoSession(onStartWorkout, onOpenHistory)
         }
+    }
+}
+
+/** The two things that can sit over the session screen: the stale prompt, and set entry. */
+@Composable
+private fun SessionDialogs(
+    state: SessionUiState,
+    onResolveStale: (StaleSessionPrompt) -> Unit,
+    onSetWeightChanged: (String) -> Unit,
+    onSetRepsChanged: (String) -> Unit,
+    onSetCountChanged: (String) -> Unit,
+    onSetRpeChanged: (String) -> Unit,
+    onConfirmSet: () -> Unit,
+    onSetEntryDismissed: () -> Unit,
+) {
+    state.stalePrompt?.let { prompt ->
+        AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+    }
+
+    state.setEntry?.let { entry ->
+        SetEntryDialog(
+            entry = entry,
+            unit = state.unit,
+            onWeightChanged = onSetWeightChanged,
+            onRepsChanged = onSetRepsChanged,
+            onSetsChanged = onSetCountChanged,
+            onRpeChanged = onSetRpeChanged,
+            onConfirm = onConfirmSet,
+            onDismiss = onSetEntryDismissed,
+        )
     }
 }
 
