@@ -2,7 +2,6 @@ package com.gymtracker.core.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.isSp
 import androidx.compose.ui.unit.sp
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -61,6 +60,7 @@ class GymTypographyTest {
         // A member who has already turned system text up gets larger text still. Expressing a
         // size in dp would silently cap them, which is the accessibility bug M7 exists to
         // catch — this scale must not introduce it.
+        // isSp is a member of TextUnit, not a top-level function — importing it does not compile.
         roles.forEach { (role, styles) ->
             assertTrue(styles.first.fontSize.isSp, "$role is not expressed in sp")
         }
