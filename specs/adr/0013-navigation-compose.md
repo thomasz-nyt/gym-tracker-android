@@ -78,5 +78,12 @@ Consequences for the screens that exist:
 - **The risk is the two-tap path**, which is the one thing `roadmap.md` calls "the milestone
   that decides whether the app is good". Set entry stays a dialog specifically so that path
   never crosses a navigation boundary, and `TwoTapSetLoggingTest` fails the build if it does.
+**Implementation status, 2026-08-01.** Adopted in stages rather than in one change, because
+the refactor touches every screen M1 built and the two-tap assertion runs on an emulator —
+the slowest feedback in this project. Landed so far: the graph itself, browse, exercise
+detail, and the exercise search, which is now a destination instead of an overlay on the
+session screen. Outstanding: history, which is still chosen by a flag in `SessionUiState`.
+Until that lands, this ADR describes more than the code does.
+
 - **Revisit if** the start destination ever stops being derived from Room. That is the line
   this ADR draws; crossing it silently would give back the property M1 was built around.

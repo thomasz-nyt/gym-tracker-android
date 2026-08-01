@@ -86,12 +86,15 @@ which is what makes the reordering possible at all.
 Renamed from "Exercise catalog and media". The media half assumed GIFs the seed data
 does not contain and a Storage bucket M2 has not built — see ADR-0014.
 
-- [ ] Catalog browse and filter by body part and equipment, combined
-- [ ] Search matches name and hand-authored aliases (ADR-0015)
-- [ ] Exercise detail: body-part tags, numbered instructions, bundled photo where one exists
-- [ ] YouTube **search** link-out, labelled as a search (external browser, no SDK, no account)
-- [ ] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
-- [ ] Navigation Compose replaces state-derived routing (ADR-0013)
+- [x] Catalog browse and filter by body part and equipment, combined
+- [x] Search matches name and hand-authored aliases (ADR-0015)
+- [x] Exercise detail: body-part tags, numbered instructions, bundled photo where one exists
+- [x] YouTube **search** link-out, labelled as a search (external browser, no SDK, no account)
+- [x] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
+- [ ] Navigation Compose replaces state-derived routing (ADR-0013). **Partly done:** the
+      graph covers home/session, browse and detail, and the exercise search is a destination
+      rather than an overlay. History is the one screen still selected by state inside the
+      logging route.
 
 **Exit:** in airplane mode, standing at an unfamiliar machine, you can narrow the catalog
 by body part and equipment and confirm the machine from its photo or its numbered steps.
