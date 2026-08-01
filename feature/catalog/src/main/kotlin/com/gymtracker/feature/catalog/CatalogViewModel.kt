@@ -89,8 +89,13 @@ class CatalogViewModel
             filter.update { it.copy(equipment = it.equipment.toggle(equipment)) }
         }
 
-        /** Back to the whole catalog — US-12's "clearing them returns the full catalog". */
-        fun onCleared() {
+        /**
+         * Back to the whole catalog — US-12's "clearing them returns the full catalog".
+         *
+         * Not `onCleared`: that is ViewModel's own protected teardown callback, and taking
+         * the name both hides it and makes this uncallable from the screen.
+         */
+        fun onFiltersCleared() {
             query.value = ""
             filter.value = CatalogFilter()
         }

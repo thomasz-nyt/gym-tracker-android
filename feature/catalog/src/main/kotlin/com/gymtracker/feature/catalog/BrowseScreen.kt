@@ -36,6 +36,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.exercise.CatalogFilter
 import com.gymtracker.core.domain.model.BodyPart
 import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
@@ -65,7 +66,7 @@ fun BrowseRoute(
         onQueryChanged = viewModel::onQueryChanged,
         onBodyPartToggled = viewModel::onBodyPartToggled,
         onEquipmentToggled = viewModel::onEquipmentToggled,
-        onClearFilters = viewModel::onCleared,
+        onClearFilters = viewModel::onFiltersCleared,
         onChosen = onChosen,
         onBack = onBack,
         modifier = modifier,
@@ -156,7 +157,7 @@ private fun ResultCount(
  */
 @Composable
 private fun FilterChips(
-    filter: com.gymtracker.core.domain.exercise.CatalogFilter,
+    filter: CatalogFilter,
     onBodyPartToggled: (BodyPart) -> Unit,
     onEquipmentToggled: (Equipment) -> Unit,
 ) {
