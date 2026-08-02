@@ -51,8 +51,9 @@ three-exercise workout meant three trips through the search field.
 Added 2026-08-02. The exercise I just added was the one furthest from my thumb, at
 the bottom of a growing list.
 - In the active session, exercises are listed **newest first**.
-- The number shown against each exercise is its place in the list as displayed, so
-  the list always reads 1, 2, 3 downward with no gaps after a removal (US-02c).
+- The number shown against each exercise counts the exercises done so far, so the
+  newest carries the highest one and the list never shows a gap after a removal
+  (US-02c). Adding an exercise does not renumber the ones already there.
 - Past workouts (US-06, US-06b) and a restored workout (US-06a) are unaffected: both
   read in `position` order, the order I performed them.
 

@@ -9,7 +9,9 @@ import com.gymtracker.core.data.exercise.CatalogAssetReader
 import com.gymtracker.core.data.exercise.CatalogSeeder
 import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.session.RoomSessionRepository
+import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -38,6 +40,7 @@ class SessionExerciseTest {
     private lateinit var database: GymTrackerDatabase
     private lateinit var sessionExercises: RoomSessionExerciseRepository
     private lateinit var sessions: RoomSessionRepository
+    private lateinit var sets: RoomSetRepository
     private lateinit var catalog: RoomExerciseCatalog
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -75,6 +78,7 @@ class SessionExerciseTest {
                     ).build()
             sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao())
             sessions = RoomSessionRepository(database.sessionDao())
+            sets = RoomSetRepository(database.setDao())
             catalog = RoomExerciseCatalog(database.exerciseDao(), json)
             CatalogSeeder(
                 dao = database.exerciseDao(),
@@ -169,6 +173,47 @@ class SessionExerciseTest {
             sessions.deleteSession(session)
 
             assertEquals(emptyList(), sessionExercises.observeForSession(session).first())
+        }
+
+    @Test
+    fun `removing an exercise takes the sets logged against it`() =
+        runTest {
+            // US-02c. The cascade is declared on `sets`, so this asserts the schema does it
+            // rather than the domain remembering to.
+            val session = startSession("s1")
+            val add = addExercise()
+            val bench = add(session, ExerciseId("bench"))
+            val squat = add(session, ExerciseId("squat"))
+            sets.add(ExerciseSet("a", bench.id, 1, 60.0, 10, null, now))
+            sets.add(ExerciseSet("b", squat.id, 1, 80.0, 5, null, now))
+
+            sessionExercises.remove(bench.id)
+
+            assertEquals(listOf(squat.id), sessionExercises.observeForSession(session).first().map { it.id })
+            assertEquals(emptyList(), sets.observeForSessionExercise(bench.id).first())
+            assertEquals(listOf("b"), sets.observeForSessionExercise(squat.id).first().map { it.id })
+        }
+
+    @Test
+    fun `a removed exercise leaves a gap that the next position does not reuse`() =
+        runTest {
+            // MAX(position) + 1. A count would mint 3 here, colliding with the surviving row.
+            val session = startSession("s1")
+            val add = addExercise()
+            add(session, ExerciseId("bench"))
+            val squat = add(session, ExerciseId("squat"))
+            add(session, ExerciseId("curl"))
+
+            sessionExercises.remove(squat.id)
+
+            assertEquals(listOf(1, 3), sessionExercises.observeForSession(session).first().map { it.position })
+            assertEquals(4, sessionExercises.nextPosition(session))
+        }
+
+    @Test
+    fun `finding an exercise that is not there returns null`() =
+        runTest {
+            assertEquals(null, sessionExercises.find(SessionExerciseId("never-existed")))
         }
 
     @Test

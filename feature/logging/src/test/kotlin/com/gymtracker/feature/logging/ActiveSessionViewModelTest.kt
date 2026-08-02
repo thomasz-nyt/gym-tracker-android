@@ -23,6 +23,8 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
+import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
@@ -77,7 +79,9 @@ class ActiveSessionViewModelTest {
     )
 
     private val catalog = FakeCatalog()
-    private val sessionExercises = FakeSessionExercises()
+
+    // The cascade runs at call time, by which point `sets` below is initialised.
+    private val sessionExercises = FakeSessionExercises(cascade = { id -> sets.cascadeDeleteExercise(id) })
     private val sets = FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
     private val units = FakeUnitPreference()
     private val restStore = FakeRestTimerStore()
@@ -116,6 +120,8 @@ class ActiveSessionViewModelTest {
             sessionHistory = SessionHistory(repository, sessionExercises, sets),
             deleteSession = DeleteSession(repository, sessionExercises, sets),
             restoreSession = RestoreSession(repository, sessionExercises, sets),
+            removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
+            restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
             clock = clock,
         )
 
@@ -259,8 +265,10 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
-    fun `choosing an exercise appends it to the session and closes search`() =
+    fun `choosing an exercise appends it and leaves the search open`() =
         runTest {
+            // US-02a. It used to close on every pick, so a three-exercise workout was three
+            // trips through the search field.
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
             viewModel.onAddExerciseClicked()
@@ -269,8 +277,46 @@ class ActiveSessionViewModelTest {
 
             viewModel.uiState.test {
                 val state = expectMostRecentItem()
-                assertEquals(false, state.isSearching)
+                assertEquals(true, state.isSearching)
                 assertEquals(listOf("Bench Press"), state.exercises.map { it.exercise?.name })
+                assertEquals(listOf(ExerciseId("bench")), state.addedThisVisit)
+            }
+        }
+
+    @Test
+    fun `several exercises can be added in one visit to the search`() =
+        runTest {
+            // US-02a, and the reason the FAB can report a count.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onAddExerciseClicked()
+
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.onExerciseChosen(ExerciseId("squat"))
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(true, state.isSearching)
+                assertEquals(2, state.addedThisVisit.size)
+                assertEquals(2, state.exercises.size)
+            }
+        }
+
+    @Test
+    fun `the added count is per visit, not for all time`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onAddExerciseClicked()
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.onSearchDismissed()
+
+            viewModel.onAddExerciseClicked()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(emptyList(), state.addedThisVisit)
+                assertEquals(1, state.exercises.size, "the exercise itself is still in the session")
             }
         }
 
@@ -286,7 +332,83 @@ class ActiveSessionViewModelTest {
             viewModel.uiState.test {
                 val rows = expectMostRecentItem().exercises
                 assertEquals(2, rows.size)
-                assertEquals(listOf(1, 2), rows.map { it.sessionExercise.position })
+                // Newest first (US-02b), so the second appearance leads.
+                assertEquals(listOf(2, 1), rows.map { it.sessionExercise.position })
+            }
+        }
+
+    @Test
+    fun `the newest exercise is at the top of the session`() =
+        runTest {
+            // US-02b: the one just added should be under the thumb, not at the bottom of a
+            // growing list. `position` still records the order it was performed in.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.onExerciseChosen(ExerciseId("squat"))
+
+            viewModel.uiState.test {
+                val rows = expectMostRecentItem().exercises
+                assertEquals(listOf("Squat", "Bench Press"), rows.map { it.exercise?.name })
+                assertEquals(listOf(2, 1), rows.map { it.sessionExercise.position })
+            }
+        }
+
+    @Test
+    fun `removing an exercise takes it and its sets off the screen`() =
+        runTest {
+            // US-02c: the machine was taken.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.onExerciseChosen(ExerciseId("squat"))
+            val doomed = sessionExercises.all.first { it.exerciseId == ExerciseId("bench") }
+
+            viewModel.removal.remove(doomed.id)
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(listOf("Squat"), state.exercises.map { it.exercise?.name })
+                assertEquals(true, state.canUndoRemoval)
+            }
+        }
+
+    @Test
+    fun `undo puts a removed exercise back where it was`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.onExerciseChosen(ExerciseId("squat"))
+            val doomed = sessionExercises.all.first { it.exerciseId == ExerciseId("bench") }
+
+            viewModel.removal.remove(doomed.id)
+            viewModel.removal.undo()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(listOf("Squat", "Bench Press"), state.exercises.map { it.exercise?.name })
+                assertEquals(listOf(2, 1), state.exercises.map { it.sessionExercise.position })
+                assertEquals(false, state.canUndoRemoval)
+            }
+        }
+
+    @Test
+    fun `removing the last exercise leaves an empty session, not a finished one`() =
+        runTest {
+            // US-02c: ending or discarding the session is still US-01 and US-06.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val only = sessionExercises.all.single()
+
+            viewModel.removal.remove(only.id)
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(emptyList(), state.exercises)
+                assertEquals(SessionId("s1"), state.activeSession?.id)
             }
         }
 
@@ -796,6 +918,11 @@ class ActiveSessionViewModelTest {
             state.value = state.value.filterNot { sessionOf(it.sessionExerciseId) == sessionId }
         }
 
+        /** Stands in for the `ON DELETE CASCADE` from one `session_exercises` row (US-02c). */
+        fun cascadeDeleteExercise(sessionExerciseId: SessionExerciseId) {
+            state.value = state.value.filterNot { it.sessionExerciseId == sessionExerciseId }
+        }
+
         override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
             state.map { rows -> rows.filter { it.sessionExerciseId == sessionExerciseId }.sortedBy { it.setIndex } }
 
@@ -844,7 +971,9 @@ class ActiveSessionViewModelTest {
         ): Flow<List<Exercise>> = MutableStateFlow(all.filter { it.name.contains(query, ignoreCase = true) })
     }
 
-    private class FakeSessionExercises : SessionExerciseRepository {
+    private class FakeSessionExercises(
+        private val cascade: (SessionExerciseId) -> Unit = {},
+    ) : SessionExerciseRepository {
         private val state = MutableStateFlow(emptyList<SessionExercise>())
 
         val all: List<SessionExercise> get() = state.value
@@ -860,12 +989,21 @@ class ActiveSessionViewModelTest {
         override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<SessionExercise>> =
             state.map { rows -> rows.filter { it.sessionId in sessionIds }.sortedBy { it.position } }
 
+        override suspend fun find(id: SessionExerciseId): SessionExercise? = state.value.firstOrNull { it.id == id }
+
         override suspend fun add(sessionExercise: SessionExercise) {
             state.value = state.value + sessionExercise
         }
 
+        override suspend fun remove(id: SessionExerciseId) {
+            state.value = state.value.filterNot { it.id == id }
+            cascade(id)
+        }
+
+        // MAX(position) + 1, as the DAO does it. A count would reuse a position after a
+        // removal from the middle of a session (US-02c).
         override suspend fun nextPosition(sessionId: SessionId): Int =
-            state.value.count { it.sessionId == sessionId } + 1
+            (state.value.filter { it.sessionId == sessionId }.maxOfOrNull { it.position } ?: 0) + 1
     }
 
     private class FakeCurrentMember(

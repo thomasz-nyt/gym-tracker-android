@@ -44,9 +44,9 @@ Stories: US-01 … US-06b
 - [x] End a session, and the session history list (US-06)
 - [x] Delete a past workout, with undo (US-06a, ADR-0012)
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
-- [ ] Add several exercises without leaving the search (US-02a)
-- [ ] Newest exercise first in the active session (US-02b)
-- [ ] Remove an exercise from the session, with undo (US-02c)
+- [x] Add several exercises without leaving the search (US-02a)
+- [x] Newest exercise first in the active session (US-02b)
+- [x] Remove an exercise from the session, with undo (US-02c)
 - [ ] Guided flow through one exercise (US-05a, ADR-0013)
 - [ ] Workout detail from history (US-06b)
 

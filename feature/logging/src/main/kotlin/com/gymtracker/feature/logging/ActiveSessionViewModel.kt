@@ -21,6 +21,8 @@ import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
+import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -63,12 +66,27 @@ data class SessionUiState(
     val isSearching: Boolean = false,
     val query: String = "",
     val results: List<Exercise> = emptyList(),
+    /** Appearances added since the search was opened, so it can say what it did (US-02a). */
+    val addedThisVisit: List<ExerciseId> = emptyList(),
     val unit: WeightUnit = WeightUnit.LB,
     val setEntry: SetEntry? = null,
     /** Time left in the current rest, or null when none is running (US-05). */
     val restRemaining: Duration? = null,
     /** History, and the workout deleted from it that can still be put back (US-06, US-06a). */
     val history: HistoryState = HistoryState(),
+    /** Whether the exercise just removed from the session can still be put back (US-02c). */
+    val canUndoRemoval: Boolean = false,
+)
+
+/**
+ * The search's slice of [SessionUiState], grouped only because `combine` takes a fixed number
+ * of flows. Not a concept — do not let it become one.
+ */
+private data class SearchState(
+    val isSearching: Boolean,
+    val query: String,
+    val results: List<Exercise>,
+    val addedThisVisit: List<ExerciseId>,
 )
 
 /**
@@ -80,6 +98,7 @@ private data class ScreenExtras(
     val entry: SetEntry?,
     val rest: Duration?,
     val history: HistoryState,
+    val canUndoRemoval: Boolean,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -103,6 +122,8 @@ class ActiveSessionViewModel
         sessionHistory: SessionHistory,
         deleteSession: DeleteSession,
         restoreSession: RestoreSession,
+        removeExerciseFromSession: RemoveExerciseFromSession,
+        restoreExerciseToSession: RestoreExerciseToSession,
         private val clock: Clock,
     ) : ViewModel() {
         /** The rest between sets lives in its own state holder; see [RestController]. */
@@ -115,6 +136,14 @@ class ActiveSessionViewModel
                 deleteSession = deleteSession,
                 restoreSession = restoreSession,
                 currentMember = currentMember,
+                scope = viewModelScope,
+            )
+
+        /** Removing an exercise lives in its own state holder; see [ExerciseRemovalController]. */
+        val removal =
+            ExerciseRemovalController(
+                removeExercise = removeExerciseFromSession,
+                restoreExercise = restoreExerciseToSession,
                 scope = viewModelScope,
             )
 
@@ -132,6 +161,9 @@ class ActiveSessionViewModel
         private val stalePrompt = MutableStateFlow<StaleSessionPrompt?>(null)
         private val searching = MutableStateFlow(false)
         private val query = MutableStateFlow("")
+
+        /** Reset each time search opens, so the count means "this visit" (US-02a). */
+        private val addedThisVisit = MutableStateFlow(emptyList<ExerciseId>())
 
         private val member: Flow<UserId> = flow { emit(currentMember.id()) }
 
@@ -166,6 +198,14 @@ class ActiveSessionViewModel
                             }
                         }
                     }
+                }.map { rows ->
+                    // US-02b: newest first, so the exercise just added is under the thumb rather
+                    // than at the bottom of a growing list.
+                    //
+                    // Reversed here and not in SQL on purpose. `position` stays the order the
+                    // workout was performed in, which is what history (US-06b) reads and what
+                    // US-06a's restore promises to give back unchanged.
+                    rows.asReversed()
                 }
 
         @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
@@ -183,28 +223,33 @@ class ActiveSessionViewModel
                 activeSession,
                 stalePrompt,
                 exercises,
-                combine(searching, query, results) { isSearching, text, found ->
-                    Triple(isSearching, text, found)
+                combine(searching, query, results, addedThisVisit) { isSearching, text, found, added ->
+                    SearchState(isSearching, text, found, added)
                 },
                 combine(
                     unitPreference.observe(),
                     setEntry.entry,
                     rest.remaining(),
                     history.state,
-                ) { unit, entry, rest, past -> ScreenExtras(unit, entry, rest, past) },
-            ) { session, prompt, inSession, (isSearching, text, found), extras ->
+                    removal.canUndo,
+                ) { unit, entry, rest, past, canUndoRemoval ->
+                    ScreenExtras(unit, entry, rest, past, canUndoRemoval)
+                },
+            ) { session, prompt, inSession, search, extras ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
                     stalePrompt = prompt,
                     exercises = inSession,
-                    isSearching = isSearching,
-                    query = text,
-                    results = found,
+                    isSearching = search.isSearching,
+                    query = search.query,
+                    results = search.results,
+                    addedThisVisit = search.addedThisVisit,
                     unit = extras.unit,
                     setEntry = extras.entry,
                     restRemaining = extras.rest,
                     history = extras.history,
+                    canUndoRemoval = extras.canUndoRemoval,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
@@ -234,6 +279,7 @@ class ActiveSessionViewModel
         /** Opens the catalog search (US-02). */
         fun onAddExerciseClicked() {
             query.value = ""
+            addedThisVisit.value = emptyList()
             searching.value = true
         }
 
@@ -246,8 +292,12 @@ class ActiveSessionViewModel
         }
 
         /**
-         * Appends the chosen exercise to the active session and closes the search. Adding the
-         * same exercise twice is allowed — US-02 says so, and each appearance is its own row.
+         * Appends the chosen exercise to the active session, leaving the search open (US-02a).
+         *
+         * It used to close on every pick, which made setting up a three-exercise workout three
+         * trips through the search field. Staying open is also what keeps US-02's "the same
+         * exercise may appear twice" reachable — tap it twice — where a multi-select checkbox
+         * could not express it. Each appearance is its own row.
          */
         fun onExerciseChosen(exerciseId: ExerciseId) {
             viewModelScope.launch {
@@ -256,7 +306,7 @@ class ActiveSessionViewModel
                 // is not currently collecting. The database is the source of truth (§2).
                 val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
                 addExerciseToSession(session.id, exerciseId)
-                searching.value = false
+                addedThisVisit.value = addedThisVisit.value + exerciseId
             }
         }
 

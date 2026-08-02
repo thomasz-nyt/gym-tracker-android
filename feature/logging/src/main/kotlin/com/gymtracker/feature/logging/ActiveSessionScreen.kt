@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,17 +19,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +58,7 @@ import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
@@ -93,6 +98,8 @@ fun LoggingRoute(
         onFinishWorkout = viewModel::onFinishWorkout,
         onResolveStale = viewModel::onResolveStale,
         onAddSet = viewModel.setEntry::open,
+        onRemoveExercise = viewModel.removal::remove,
+        onUndoRemoval = viewModel.removal::undo,
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
         onCloseHistory = viewModel.history::close,
@@ -119,6 +126,8 @@ internal fun LoggingScreen(
     onResolveStale: (StaleSessionPrompt) -> Unit,
     onFinishWorkout: () -> Unit = {},
     onAddSet: (SessionExerciseRow) -> Unit = {},
+    onRemoveExercise: (SessionExerciseId) -> Unit = {},
+    onUndoRemoval: () -> Unit = {},
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onCloseHistory: () -> Unit = {},
@@ -137,9 +146,13 @@ internal fun LoggingScreen(
     modifier: Modifier = Modifier,
 ) {
     if (state.isSearching) {
+        // Back closes the search rather than the app. Its absence was a real bug: history had
+        // a handler and this did not, so hardware back from the catalog left the app entirely.
+        BackHandler(onBack = onSearchDismissed)
         ExerciseSearch(
             query = state.query,
             results = state.results,
+            addedThisVisit = state.addedThisVisit,
             onQueryChanged = onQueryChanged,
             onExerciseChosen = onExerciseChosen,
             onDismiss = onSearchDismissed,
@@ -170,6 +183,8 @@ internal fun LoggingScreen(
             onOpenHistory = onOpenHistory,
             onAddExercise = onAddExercise,
             onAddSet = onAddSet,
+            onRemoveExercise = onRemoveExercise,
+            onUndoRemoval = onUndoRemoval,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             modifier = Modifier.padding(padding),
@@ -199,6 +214,8 @@ private fun SessionBody(
     onOpenHistory: () -> Unit,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onUndoRemoval: () -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -217,6 +234,9 @@ private fun SessionBody(
                     restRemaining = state.restRemaining,
                     onAddExercise = onAddExercise,
                     onAddSet = onAddSet,
+                    onRemoveExercise = onRemoveExercise,
+                    canUndoRemoval = state.canUndoRemoval,
+                    onUndoRemoval = onUndoRemoval,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )
@@ -295,6 +315,9 @@ private fun ActiveSession(
     restRemaining: Duration?,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    canUndoRemoval: Boolean,
+    onUndoRemoval: () -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
 ) {
@@ -334,8 +357,15 @@ private fun ActiveSession(
                 exercises = exercises,
                 unit = unit,
                 onAddSet = onAddSet,
+                onRemoveExercise = onRemoveExercise,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
+        }
+
+        // Below the list rather than floating over it, as in history: it can never cover the
+        // row you were about to read or the button you were about to press (US-02c).
+        if (canUndoRemoval) {
+            RemovalUndoBar(onUndoRemoval)
         }
 
         Button(
@@ -361,18 +391,34 @@ private fun SessionExercises(
     exercises: List<SessionExerciseRow>,
     unit: WeightUnit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier) {
-        items(exercises, key = { it.sessionExercise.id.value }) { row ->
+        itemsIndexed(exercises, key = { _, row -> row.sessionExercise.id.value }) { index, row ->
             ListItem(
                 headlineContent = {
                     // The catalog entry is only absent if the row outlived its exercise,
                     // which the schema forbids; show the id rather than a blank line.
                     Text(row.exercise?.name ?: row.sessionExercise.exerciseId.value)
                 },
-                overlineContent = { Text("${row.sessionExercise.position}") },
-                supportingContent = { LoggedSets(row.sets, unit) },
+                // The place in the list as shown, not `position` (US-02b). Removing an exercise
+                // leaves a gap in the stored positions on purpose; the list closes it.
+                overlineContent = { Text("${exercises.size - index}") },
+                supportingContent = {
+                    Column {
+                        LoggedSets(row.sets, unit)
+                        // A secondary line rather than a second trailing button: "Add set"
+                        // must keep its place and its label, because the two-tap path of
+                        // US-03 runs through it (constitution §2.1).
+                        TextButton(
+                            onClick = { onRemoveExercise(row.sessionExercise.id) },
+                            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                        ) {
+                            Text("Remove")
+                        }
+                    }
+                },
                 trailingContent = {
                     TextButton(
                         onClick = { onAddSet(row) },
@@ -387,6 +433,29 @@ private fun SessionExercises(
     }
 }
 
+/** US-02c's five-second window, worded like history's so the two read alike. */
+@Composable
+private fun RemovalUndoBar(onUndo: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = GAP),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Exercise removed", style = MaterialTheme.typography.bodyMedium)
+            TextButton(
+                onClick = onUndo,
+                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+            ) {
+                Text("Undo")
+            }
+        }
+    }
+}
+
 /**
  * Catalog search (US-02). Results are ranked by how recently the member used each exercise,
  * then alphabetically — the ordering comes from the query, not from this list.
@@ -395,12 +464,31 @@ private fun SessionExercises(
 private fun ExerciseSearch(
     query: String,
     results: List<Exercise>,
+    addedThisVisit: List<ExerciseId>,
     onQueryChanged: (String) -> Unit,
     onExerciseChosen: (ExerciseId) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        floatingActionButton = {
+            // US-02a. Choosing an exercise adds it and leaves the list up, so this is the way
+            // back rather than a second way to add — the count is what makes that legible.
+            ExtendedFloatingActionButton(
+                onClick = onDismiss,
+                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+            ) {
+                Text(
+                    if (addedThisVisit.isEmpty()) {
+                        "Done"
+                    } else {
+                        "Done  ·  ${addedThisVisit.size} added"
+                    },
+                )
+            }
+        },
+    ) { padding ->
         Column(
             modifier =
                 Modifier
@@ -424,8 +512,16 @@ private fun ExerciseSearch(
                 )
             }
 
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                // The FAB floats over the list, so the last result would sit under it and be
+                // unreachable without this.
+                contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
+            ) {
                 items(results, key = { it.id.value }) { exercise ->
+                    // Counted, not just flagged: US-02 allows the same exercise twice, so
+                    // tapping it again is a real action and the row should say "Added 2×".
+                    val added = addedThisVisit.count { it == exercise.id }
                     ListItem(
                         headlineContent = { Text(exercise.name) },
                         supportingContent = {
@@ -436,6 +532,14 @@ private fun ExerciseSearch(
                             )
                         },
                         leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
+                        trailingContent = {
+                            if (added > 0) {
+                                Text(
+                                    text = if (added == 1) "Added" else "Added $added×",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -444,10 +548,6 @@ private fun ExerciseSearch(
                     )
                     HorizontalDivider()
                 }
-            }
-
-            TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
-                Text("Cancel")
             }
         }
     }
@@ -716,6 +816,9 @@ private val GAP = 12.dp
 private val MIN_TOUCH_TARGET = 48.dp
 private val THUMBNAIL = 56.dp
 private val THUMBNAIL_CORNER = 8.dp
+
+/** Enough for the extended FAB plus its margin, so the last search result clears it. */
+private val FAB_CLEARANCE = 88.dp
 
 @Preview
 @Composable
