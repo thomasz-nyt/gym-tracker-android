@@ -6,9 +6,9 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
+import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetGroup
 import com.gymtracker.core.domain.set.SetRepository
-import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
