@@ -32,6 +32,7 @@ import com.gymtracker.core.domain.session.RestoreSession
 import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -174,6 +175,14 @@ object DataModule {
         sessionExercises: SessionExerciseRepository,
         sets: SetRepository,
     ): RestoreSession = RestoreSession(sessions, sessionExercises, sets)
+
+    @Provides
+    fun workoutDetail(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        catalog: ExerciseCatalog,
+    ): WorkoutDetail = WorkoutDetail(sessions, sessionExercises, sets, catalog)
 
     @Provides
     fun removeExerciseFromSession(

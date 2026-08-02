@@ -105,6 +105,8 @@ fun LoggingRoute(
         onCloseHistory = viewModel.history::close,
         onDeleteWorkout = viewModel.history::delete,
         onUndoDelete = viewModel.history::undo,
+        onOpenWorkout = viewModel.history::openWorkout,
+        onCloseWorkout = viewModel.history::closeWorkout,
         onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
         onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
         onSetCountChanged = { viewModel.setEntry.change(sets = it) },
@@ -133,6 +135,8 @@ internal fun LoggingScreen(
     onCloseHistory: () -> Unit = {},
     onDeleteWorkout: (SessionId) -> Unit = {},
     onUndoDelete: () -> Unit = {},
+    onOpenWorkout: (SessionId) -> Unit = {},
+    onCloseWorkout: () -> Unit = {},
     onSetWeightChanged: (String) -> Unit = {},
     onSetRepsChanged: (String) -> Unit = {},
     onSetCountChanged: (String) -> Unit = {},
@@ -161,6 +165,18 @@ internal fun LoggingScreen(
         return
     }
 
+    // Checked before the list, because a workout is only ever open while history is (US-06b).
+    state.history.detail?.let { detail ->
+        BackHandler(onBack = onCloseWorkout)
+        WorkoutDetailScreen(
+            detail = detail,
+            unit = state.unit,
+            onBack = onCloseWorkout,
+            modifier = modifier,
+        )
+        return
+    }
+
     if (state.history.isOpen) {
         // Back leaves history rather than the app — it is a side trip from the session
         // screen, not a second entry point.
@@ -171,6 +187,7 @@ internal fun LoggingScreen(
             onDelete = onDeleteWorkout,
             onUndo = onUndoDelete,
             onDone = onCloseHistory,
+            onOpenWorkout = onOpenWorkout,
             modifier = modifier,
         )
         return

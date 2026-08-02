@@ -48,7 +48,7 @@ Stories: US-01 … US-06b
 - [x] Newest exercise first in the active session (US-02b)
 - [x] Remove an exercise from the session, with undo (US-02c)
 - [ ] Guided flow through one exercise (US-05a, ADR-0013)
-- [ ] Workout detail from history (US-06b)
+- [x] Workout detail from history (US-06b)
 
 The last five were added 2026-08-02 from a real session on the gym floor, the same
 way US-06a and ADR-0011 arrived. They are ergonomics on the core loop, not new

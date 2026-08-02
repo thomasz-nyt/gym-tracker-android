@@ -22,6 +22,7 @@ import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -118,6 +119,7 @@ class ActiveSessionViewModelTest {
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),
             sessionHistory = SessionHistory(repository, sessionExercises, sets),
+            workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
             deleteSession = DeleteSession(repository, sessionExercises, sets),
             restoreSession = RestoreSession(repository, sessionExercises, sets),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
@@ -723,6 +725,61 @@ class ActiveSessionViewModelTest {
                     listOf(SessionId("last-week")),
                     expectMostRecentItem().history.sessions.map { it.session.id },
                 )
+            }
+        }
+
+    // ---- US-06b: what a past workout contained ---------------------------------------------
+
+    @Test
+    fun `opening a past workout shows what it contained`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0, 60.0))
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+
+            viewModel.history.openWorkout(SessionId("last-week"))
+
+            viewModel.uiState.test {
+                val detail = checkNotNull(expectMostRecentItem().history.detail)
+                val performed = detail.exercises.single()
+                assertEquals("Bench Press", performed.exercise?.name)
+                assertEquals(2, performed.sets.size)
+                assertEquals(listOf(2), performed.groups.map { it.count }, "identical sets group")
+            }
+        }
+
+    @Test
+    fun `nothing is read until a workout is actually opened`() =
+        runTest {
+            // History is a side trip, and the detail is a side trip from that. The core loop
+            // should pay for neither.
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0))
+            val viewModel = viewModel(repository)
+
+            viewModel.history.open()
+
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().history.detail)
+            }
+        }
+
+    @Test
+    fun `closing a workout goes back to the list, not out of history`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0))
+            val viewModel = viewModel(repository)
+            viewModel.history.open()
+            viewModel.history.openWorkout(SessionId("last-week"))
+
+            viewModel.history.closeWorkout()
+
+            viewModel.uiState.test {
+                val history = expectMostRecentItem().history
+                assertNull(history.detail)
+                assertEquals(true, history.isOpen)
             }
         }
 

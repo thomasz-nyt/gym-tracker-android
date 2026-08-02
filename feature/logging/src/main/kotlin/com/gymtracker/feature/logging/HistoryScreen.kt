@@ -1,5 +1,6 @@
 package com.gymtracker.feature.logging
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,7 @@ internal fun HistoryScreen(
     onUndo: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenWorkout: (SessionId) -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
         Column(
@@ -77,6 +79,7 @@ internal fun HistoryScreen(
                     sessions = state.sessions,
                     unit = unit,
                     onDelete = onDelete,
+                    onOpen = onOpenWorkout,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             }
@@ -103,11 +106,18 @@ private fun WorkoutList(
     sessions: List<SessionSummary>,
     unit: WeightUnit,
     onDelete: (SessionId) -> Unit,
+    onOpen: (SessionId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier) {
         items(sessions, key = { it.session.id.value }) { summary ->
             ListItem(
+                // Tapping the row opens what it contained (US-06b); "Delete" is a button of
+                // its own, so opening cannot be mistaken for deleting.
+                modifier =
+                    Modifier
+                        .sizeIn(minHeight = MIN_HISTORY_TARGET)
+                        .clickable { onOpen(summary.session.id) },
                 headlineContent = {
                     Text(
                         text = summary.session.startedAt.asWorkoutDate(),

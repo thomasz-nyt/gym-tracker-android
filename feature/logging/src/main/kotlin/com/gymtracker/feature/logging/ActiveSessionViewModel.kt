@@ -20,6 +20,7 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -120,6 +121,7 @@ class ActiveSessionViewModel
         private val addExerciseToSession: AddExerciseToSession,
         private val endSession: EndSession,
         sessionHistory: SessionHistory,
+        workoutDetail: WorkoutDetail,
         deleteSession: DeleteSession,
         restoreSession: RestoreSession,
         removeExerciseFromSession: RemoveExerciseFromSession,
@@ -133,6 +135,7 @@ class ActiveSessionViewModel
         val history =
             HistoryController(
                 history = sessionHistory,
+                workoutDetail = workoutDetail,
                 deleteSession = deleteSession,
                 restoreSession = restoreSession,
                 currentMember = currentMember,
