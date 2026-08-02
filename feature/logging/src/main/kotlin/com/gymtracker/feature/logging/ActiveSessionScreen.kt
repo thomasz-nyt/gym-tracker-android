@@ -100,6 +100,16 @@ fun LoggingRoute(
         onAddSet = viewModel.setEntry::open,
         onRemoveExercise = viewModel.removal::remove,
         onUndoRemoval = viewModel.removal::undo,
+        onStartExercise = viewModel::onStartExercise,
+        onStartNextExercise = viewModel::onStartNextExercise,
+        onGuidedWeightChanged = { viewModel.guided.changeSetup(weight = it) },
+        onGuidedSetupRepsChanged = { viewModel.guided.changeSetup(reps = it) },
+        onGuidedRepsChanged = viewModel.guided::changeReps,
+        onGuidedSetsChanged = { viewModel.guided.changeSetup(sets = it) },
+        onBeginGuided = viewModel.guided::begin,
+        onDismissGuidedSetup = viewModel.guided::dismissSetup,
+        onFinishGuidedSet = viewModel.guided::finishSet,
+        onStopGuided = viewModel.guided::stop,
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
         onCloseHistory = viewModel.history::close,
@@ -130,6 +140,18 @@ internal fun LoggingScreen(
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onRemoveExercise: (SessionExerciseId) -> Unit = {},
     onUndoRemoval: () -> Unit = {},
+    onStartExercise: (SessionExerciseRow) -> Unit = {},
+    onStartNextExercise: (SessionExerciseRow) -> Unit = {},
+    onGuidedWeightChanged: (String) -> Unit = {},
+    /** The target typed in the start dialog. */
+    onGuidedSetupRepsChanged: (String) -> Unit = {},
+    /** The count actually managed on the set about to be finished — not the same thing. */
+    onGuidedRepsChanged: (String) -> Unit = {},
+    onGuidedSetsChanged: (String) -> Unit = {},
+    onBeginGuided: () -> Unit = {},
+    onDismissGuidedSetup: () -> Unit = {},
+    onFinishGuidedSet: () -> Unit = {},
+    onStopGuided: () -> Unit = {},
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onCloseHistory: () -> Unit = {},
@@ -160,6 +182,23 @@ internal fun LoggingScreen(
             onQueryChanged = onQueryChanged,
             onExerciseChosen = onExerciseChosen,
             onDismiss = onSearchDismissed,
+            modifier = modifier,
+        )
+        return
+    }
+
+    // Guided mode takes the screen while it runs, but it is a lens over the same rows — every
+    // set is already logged, so leaving it loses nothing (US-05a, ADR-0013).
+    state.guided.running?.let { running ->
+        BackHandler(onBack = onStopGuided)
+        GuidedExerciseScreen(
+            running = running,
+            unit = state.unit,
+            restRemaining = state.restRemaining,
+            onRepsChanged = onGuidedRepsChanged,
+            onFinishSet = onFinishGuidedSet,
+            onStartNext = onStartNextExercise,
+            onStop = onStopGuided,
             modifier = modifier,
         )
         return
@@ -202,6 +241,7 @@ internal fun LoggingScreen(
             onAddSet = onAddSet,
             onRemoveExercise = onRemoveExercise,
             onUndoRemoval = onUndoRemoval,
+            onStartExercise = onStartExercise,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             modifier = Modifier.padding(padding),
@@ -210,6 +250,11 @@ internal fun LoggingScreen(
         SessionDialogs(
             state = state,
             onResolveStale = onResolveStale,
+            onGuidedWeightChanged = onGuidedWeightChanged,
+            onGuidedSetupRepsChanged = onGuidedSetupRepsChanged,
+            onGuidedSetsChanged = onGuidedSetsChanged,
+            onBeginGuided = onBeginGuided,
+            onDismissGuidedSetup = onDismissGuidedSetup,
             onSetWeightChanged = onSetWeightChanged,
             onSetRepsChanged = onSetRepsChanged,
             onSetCountChanged = onSetCountChanged,
@@ -233,6 +278,7 @@ private fun SessionBody(
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onUndoRemoval: () -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -273,9 +319,26 @@ private fun SessionDialogs(
     onSetRpeChanged: (String) -> Unit,
     onConfirmSet: () -> Unit,
     onSetEntryDismissed: () -> Unit,
+    onGuidedWeightChanged: (String) -> Unit,
+    onGuidedSetupRepsChanged: (String) -> Unit,
+    onGuidedSetsChanged: (String) -> Unit,
+    onBeginGuided: () -> Unit,
+    onDismissGuidedSetup: () -> Unit,
 ) {
     state.stalePrompt?.let { prompt ->
         AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+    }
+
+    state.guided.setup?.let { setup ->
+        GuidedSetupDialog(
+            setup = setup,
+            unit = state.unit,
+            onWeightChanged = onGuidedWeightChanged,
+            onRepsChanged = onGuidedSetupRepsChanged,
+            onSetsChanged = onGuidedSetsChanged,
+            onBegin = onBeginGuided,
+            onDismiss = onDismissGuidedSetup,
+        )
     }
 
     state.setEntry?.let { entry ->
@@ -335,6 +398,7 @@ private fun ActiveSession(
     onRemoveExercise: (SessionExerciseId) -> Unit,
     canUndoRemoval: Boolean,
     onUndoRemoval: () -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
 ) {
@@ -375,6 +439,7 @@ private fun ActiveSession(
                 unit = unit,
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
+                onStartExercise = onStartExercise,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
         }
@@ -409,6 +474,7 @@ private fun SessionExercises(
     unit: WeightUnit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier) {
@@ -425,14 +491,22 @@ private fun SessionExercises(
                 supportingContent = {
                     Column {
                         LoggedSets(row.sets, unit)
-                        // A secondary line rather than a second trailing button: "Add set"
-                        // must keep its place and its label, because the two-tap path of
-                        // US-03 runs through it (constitution §2.1).
-                        TextButton(
-                            onClick = { onRemoveExercise(row.sessionExercise.id) },
-                            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
-                        ) {
-                            Text("Remove")
+                        // A secondary line rather than more trailing buttons: "Add set" must
+                        // keep its place and its label, because the two-tap path of US-03
+                        // runs through it (constitution §2.1, ADR-0013).
+                        Row {
+                            TextButton(
+                                onClick = { onStartExercise(row) },
+                                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                            ) {
+                                Text("Start exercise")
+                            }
+                            TextButton(
+                                onClick = { onRemoveExercise(row.sessionExercise.id) },
+                                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+                            ) {
+                                Text("Remove")
+                            }
                         }
                     }
                 },

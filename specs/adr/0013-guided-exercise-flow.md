@@ -94,9 +94,12 @@ exercise from a "Start exercise" button, and it introduces no new persisted doma
   place the data lives.
 - The rest default drops to 60 seconds in the same milestone (US-05), which is what makes a
   guided run feel continuous rather than stalled.
-- `SessionUiState` is assembled by nested `combine`, and the inner group goes from four flows
-  to five — exactly Compose's fixed arity. **A sixth forces a restructure.** That ceiling is
-  now spent, and the next thing added to that screen pays for it.
+- `SessionUiState` is assembled by nested `combine`, which tops out at five flows. Guided state
+  made that group the sixth, so it is now nested one level deeper again — a `Triple` of unit,
+  set entry and rest, then history, removal and guided around it. **That is the second grouping
+  record on this screen and it is the signal, not the fix.** `ActiveSessionViewModel` now drives
+  the session, the search, history, the workout detail, set entry, removal and this; the next
+  thing added should split the ViewModel rather than add a third tuple.
 - **What this does not become.** No workout templates, no programmes, no cross-session plans,
   no "planned vs actual" reporting. Each of those is a new story and would need to answer §1
   again, from a worse position than this one — because each of them is the abstraction, where

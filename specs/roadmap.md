@@ -47,7 +47,7 @@ Stories: US-01 … US-06b
 - [x] Add several exercises without leaving the search (US-02a)
 - [x] Newest exercise first in the active session (US-02b)
 - [x] Remove an exercise from the session, with undo (US-02c)
-- [ ] Guided flow through one exercise (US-05a, ADR-0013)
+- [x] Guided flow through one exercise (US-05a, ADR-0013)
 - [x] Workout detail from history (US-06b)
 
 The last five were added 2026-08-02 from a real session on the gym floor, the same
