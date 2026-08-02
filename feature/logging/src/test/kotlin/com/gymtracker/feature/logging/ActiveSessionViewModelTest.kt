@@ -475,7 +475,7 @@ class ActiveSessionViewModelTest {
     @Test
     fun `logging a set starts the rest automatically`() =
         runTest {
-            // US-05, first criterion. Ninety seconds is the default until changed.
+            // US-05, first criterion. Sixty seconds is the default until changed.
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
             viewModel.onExerciseChosen(ExerciseId("bench"))
@@ -488,7 +488,7 @@ class ActiveSessionViewModelTest {
                 expectMostRecentItem()
             }
 
-            assertEquals(now.plusSeconds(90), restStore.restEndsAt.first())
+            assertEquals(now.plusSeconds(60), restStore.restEndsAt.first())
         }
 
     @Test
@@ -516,7 +516,7 @@ class ActiveSessionViewModelTest {
     fun `skipping the rest clears it`() =
         runTest {
             val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
-            restStore.setRestEndsAt(now.plusSeconds(90))
+            restStore.setRestEndsAt(now.plusSeconds(60))
 
             viewModel.rest.skip()
 
@@ -743,7 +743,7 @@ class ActiveSessionViewModelTest {
 
     private class FakeRestTimerStore : RestTimerStore {
         private val endsAt = MutableStateFlow<java.time.Instant?>(null)
-        private val default = MutableStateFlow(Duration.ofSeconds(90))
+        private val default = MutableStateFlow(Duration.ofSeconds(60))
         private val asked = MutableStateFlow(false)
 
         override val restEndsAt = endsAt

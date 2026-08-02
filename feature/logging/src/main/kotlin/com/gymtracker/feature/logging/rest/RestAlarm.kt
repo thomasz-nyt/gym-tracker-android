@@ -33,7 +33,7 @@ class RestAlarm
         fun schedule(endsAt: Instant) {
             if (!canNotify()) return
 
-            // Exact because a rest is 90 seconds; an inexact alarm can land minutes late,
+            // Exact because a rest is 60 seconds; an inexact alarm can land minutes late,
             // which for this purpose is the same as not firing.
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAt.toEpochMilli(), pendingIntent())
         }

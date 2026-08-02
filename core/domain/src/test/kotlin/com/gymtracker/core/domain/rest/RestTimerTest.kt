@@ -21,9 +21,9 @@ class RestTimerTest {
     private fun timer(at: Instant = now) = RestTimer(store, Clock.fixed(at, ZoneOffset.UTC))
 
     @Test
-    fun `the default rest is ninety seconds until changed`() =
+    fun `the default rest is one minute until changed`() =
         runTest {
-            assertEquals(Duration.ofSeconds(90), store.defaultRest.first())
+            assertEquals(Duration.ofSeconds(60), store.defaultRest.first())
         }
 
     @Test
@@ -31,7 +31,7 @@ class RestTimerTest {
         runTest {
             timer().start()
 
-            assertEquals(now.plusSeconds(90), store.restEndsAt.first())
+            assertEquals(now.plusSeconds(60), store.restEndsAt.first())
         }
 
     @Test
@@ -41,7 +41,7 @@ class RestTimerTest {
 
             val after30s = timer(now.plusSeconds(30)).remaining().first()
 
-            assertEquals(Duration.ofSeconds(60), after30s)
+            assertEquals(Duration.ofSeconds(30), after30s)
         }
 
     @Test
@@ -50,7 +50,7 @@ class RestTimerTest {
             // The point of storing an end time: process death is a non-event.
             timer().start()
 
-            assertNull(timer(now.plusSeconds(91)).remaining().first())
+            assertNull(timer(now.plusSeconds(61)).remaining().first())
         }
 
     @Test
@@ -88,7 +88,7 @@ class RestTimerTest {
 
             timer(now.plusSeconds(10)).start()
 
-            assertEquals(now.plusSeconds(100), store.restEndsAt.first(), "restarted from the second set")
+            assertEquals(now.plusSeconds(70), store.restEndsAt.first(), "restarted from the second set")
         }
 
     @Test
@@ -103,7 +103,7 @@ class RestTimerTest {
 
     private class FakeRestTimerStore : RestTimerStore {
         private val endsAt = MutableStateFlow<Instant?>(null)
-        private val default = MutableStateFlow(Duration.ofSeconds(90))
+        private val default = MutableStateFlow(Duration.ofSeconds(60))
         private val asked = MutableStateFlow(false)
 
         override val restEndsAt = endsAt
