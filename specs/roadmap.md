@@ -31,7 +31,7 @@ Goal: an empty app that builds, lints, and tests in CI.
 Goal: log a workout end-to-end with no account and no network. This is the
 milestone that decides whether the app is good.
 
-Stories: US-01 … US-06
+Stories: US-01 … US-06b
 
 - [x] Room schema: `sessions`, `exercises`, `session_exercises`, `sets`
 - [x] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
@@ -44,6 +44,18 @@ Stories: US-01 … US-06
 - [x] End a session, and the session history list (US-06)
 - [x] Delete a past workout, with undo (US-06a, ADR-0012)
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
+- [ ] Add several exercises without leaving the search (US-02a)
+- [ ] Newest exercise first in the active session (US-02b)
+- [ ] Remove an exercise from the session, with undo (US-02c)
+- [ ] Guided flow through one exercise (US-05a, ADR-0013)
+- [ ] Workout detail from history (US-06b)
+
+The last five were added 2026-08-02 from a real session on the gym floor, the same
+way US-06a and ADR-0011 arrived. They are ergonomics on the core loop, not new
+scope: none adds a table, and the database stays at version 5. A sixth idea from
+that session — sensor-based rep counting — is **not** here on purpose; it is
+deferred in `adr/0014-sensor-assisted-rep-counting.md` because constitution §2.4
+forbids logging an inferred value.
 
 **Exit:** two-tap set logging measured and asserted in an instrumented test. You
 personally log three real workouts on your own device without wanting to fix
