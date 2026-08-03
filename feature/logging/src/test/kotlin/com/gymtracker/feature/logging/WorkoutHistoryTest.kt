@@ -69,21 +69,29 @@ class WorkoutHistoryTest {
     )
 
     /** An active session, for the tests that finish one. */
-    private fun session(id: String) =
-        WorkoutSession(
-            id = SessionId(id),
-            userId = member,
-            gymName = null,
-            startedAt = now,
-            endedAt = null,
-            metrics = null,
-        )
+    private fun session(
+        id: String,
+        startedAt: Instant = now,
+        endedAt: Instant? = null,
+    ) = WorkoutSession(
+        id = SessionId(id),
+        userId = member,
+        gymName = null,
+        startedAt = startedAt,
+        endedAt = endedAt,
+        metrics = null,
+    )
 
     private val catalog = FakeCatalog()
 
     // The cascade runs at call time, by which point `sets` below is initialised.
-    private val sessionExercises = FakeSessionExercises(cascade = { id -> sets.cascadeDeleteExercise(id) })
-    private val sets = FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
+    // Explicit types on both: they reference each other — the cascade needs `sets`, and
+    // `sets` finds a set's session through `sessionExercises` — and Kotlin cannot infer
+    // either end of a cycle.
+    private val sessionExercises: FakeSessionExercises =
+        FakeSessionExercises(cascade = { id -> sets.cascadeDeleteExercise(id) })
+    private val sets: FakeSets =
+        FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
     private val units = FakeUnitPreference()
     private val restStore = FakeRestTimerStore()
     private val guidedStore = FakeGuidedPlanStore()
@@ -289,11 +297,6 @@ class WorkoutHistoryTest {
                 assertEquals(SessionId("s1"), state.activeSession?.id)
             }
         }
-
-    private fun finished(
-        id: String,
-        startedAt: Instant,
-    ) = session(id, startedAt = startedAt, endedAt = startedAt.plus(Duration.ofHours(1)))
 
     /** One exercise in [session], with a set for each weight given. */
     private suspend fun seedWorkout(

@@ -67,8 +67,13 @@ class GuidedFlowTest {
     private val catalog = FakeCatalog()
 
     // The cascade runs at call time, by which point `sets` below is initialised.
-    private val sessionExercises = FakeSessionExercises(cascade = { id -> sets.cascadeDeleteExercise(id) })
-    private val sets = FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
+    // Explicit types on both: they reference each other — the cascade needs `sets`, and
+    // `sets` finds a set's session through `sessionExercises` — and Kotlin cannot infer
+    // either end of a cycle.
+    private val sessionExercises: FakeSessionExercises =
+        FakeSessionExercises(cascade = { id -> sets.cascadeDeleteExercise(id) })
+    private val sets: FakeSets =
+        FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
     private val units = FakeUnitPreference()
     private val restStore = FakeRestTimerStore()
     private val guidedStore = FakeGuidedPlanStore()
