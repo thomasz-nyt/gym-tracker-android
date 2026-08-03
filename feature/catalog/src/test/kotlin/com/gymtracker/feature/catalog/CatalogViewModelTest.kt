@@ -277,9 +277,11 @@ class CatalogViewModelTest {
             viewModel.onQueryChanged("bench")
             viewModel.onEquipmentToggled(Equipment.BARBELL)
 
-            viewModel.uiState.test {
-                assertEquals(1, expectMostRecentItem().timesAdded(butterfly.id))
-            }
+            // Awaited rather than read as the most recent item: a non-empty query is debounced,
+            // so at the moment of subscribing the only state assembled is the placeholder.
+            val state = viewModel.uiState.first { !it.isLoading }
+            assertEquals(listOf("Barbell Bench Press"), state.results.map { it.name }, "narrowed")
+            assertEquals(1, state.timesAdded(butterfly.id))
         }
 
     @Test
