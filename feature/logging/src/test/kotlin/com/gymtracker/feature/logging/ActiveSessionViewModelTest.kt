@@ -3,6 +3,7 @@ package com.gymtracker.feature.logging
 import app.cash.turbine.test
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -77,17 +78,16 @@ class ActiveSessionViewModelTest {
     private var nextSet = 1
 
     /**
-     * Sessions wired to delete their children with them, as `ON DELETE CASCADE` does in Room
-     * (ADR-0012). Nothing in the domain deletes them explicitly, so nothing in the fake should.
+     * Registers an appearance of an exercise in a session and returns its id.
+     *
+     * A set reaches its session only through `session_exercises` (ADR-0004), so a set seeded
+     * against an appearance nobody declared belongs to no session at all.
      */
-    private fun sessionsOf(vararg initial: WorkoutSession) =
-        FakeSessions(initial.toList()) { id ->
-            // Sets first: this fake finds a set's session by looking its appearance up in
-            // sessionExercises, so clearing that first would leave the sets unreachable and
-            // therefore undeleted. SQLite has the real graph and does not care about order.
-            sets.cascadeDelete(id)
-            sessionExercises.cascadeDelete(id)
-        }
+    private suspend fun inSession(session: String): SessionExerciseId {
+        val id = SessionExerciseId("se-${nextSessionExercise++}")
+        sessionExercises.add(SessionExercise(id, SessionId(session), ExerciseId("bench"), 1))
+        return id
+    }
 
     private fun viewModel(repository: FakeSessions) =
         ActiveSessionViewModel(

@@ -117,16 +117,7 @@ fun LoggingRoute(
         onAddSet = viewModel.setEntry::open,
         onRemoveExercise = viewModel.removal::remove,
         onUndoRemoval = viewModel.removal::undo,
-        onStartExercise = viewModel::onStartExercise,
-        onStartNextExercise = viewModel::onStartNextExercise,
-        onGuidedWeightChanged = { viewModel.guided.changeSetup(weight = it) },
-        onGuidedSetupRepsChanged = { viewModel.guided.changeSetup(reps = it) },
-        onGuidedRepsChanged = viewModel.guided::changeReps,
-        onGuidedSetsChanged = { viewModel.guided.changeSetup(sets = it) },
-        onBeginGuided = viewModel.guided::begin,
-        onDismissGuidedSetup = viewModel.guided::dismissSetup,
-        onFinishGuidedSet = viewModel.guided::finishSet,
-        onStopGuided = viewModel.guided::stop,
+        guided = viewModel.guidedActions(),
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
         onBrowseCatalog = onBrowseCatalog,
@@ -135,16 +126,74 @@ fun LoggingRoute(
         onUndoDelete = viewModel.history::undo,
         onOpenWorkout = viewModel.history::openWorkout,
         onCloseWorkout = viewModel.history::closeWorkout,
-        onSetWeightChanged = { viewModel.setEntry.change(weight = it) },
-        onSetRepsChanged = { viewModel.setEntry.change(reps = it) },
-        onSetCountChanged = { viewModel.setEntry.change(sets = it) },
-        onSetRpeChanged = { viewModel.setEntry.change(rpe = it) },
-        onConfirmSet = viewModel.setEntry::confirm,
-        onSetEntryDismissed = viewModel.setEntry::dismiss,
+        setEntry = viewModel.setEntryActions(),
         onAddExercise = onAddExercise,
         modifier = modifier,
     )
 }
+
+/**
+ * Everything the set-entry dialog can be asked to do (US-03).
+ *
+ * Grouped for the same reason as [GuidedActions]. The two-tap path runs through
+ * [onConfirm]; nothing here changes what it does.
+ */
+data class SetEntryActions(
+    val onWeightChanged: (String) -> Unit = {},
+    val onRepsChanged: (String) -> Unit = {},
+    val onSetsChanged: (String) -> Unit = {},
+    val onRpeChanged: (String) -> Unit = {},
+    val onConfirm: () -> Unit = {},
+    val onDismiss: () -> Unit = {},
+)
+
+/** Set entry's actions, wired to the controller that serves them. */
+private fun ActiveSessionViewModel.setEntryActions() =
+    SetEntryActions(
+        onWeightChanged = { setEntry.change(weight = it) },
+        onRepsChanged = { setEntry.change(reps = it) },
+        onSetsChanged = { setEntry.change(sets = it) },
+        onRpeChanged = { setEntry.change(rpe = it) },
+        onConfirm = setEntry::confirm,
+        onDismiss = setEntry::dismiss,
+    )
+
+/** The guided flow's actions, wired to the ViewModel that serves them. */
+private fun ActiveSessionViewModel.guidedActions() =
+    GuidedActions(
+        onStartExercise = ::onStartExercise,
+        onStartNext = ::onStartNextExercise,
+        onWeightChanged = { guided.changeSetup(weight = it) },
+        onSetupRepsChanged = { guided.changeSetup(reps = it) },
+        onRepsChanged = guided::changeReps,
+        onSetsChanged = { guided.changeSetup(sets = it) },
+        onBegin = guided::begin,
+        onDismissSetup = guided::dismissSetup,
+        onFinishSet = guided::finishSet,
+        onStop = guided::stop,
+    )
+
+/**
+ * Everything guided mode can be asked to do (US-05a).
+ *
+ * One record rather than ten loose lambdas on [LoggingScreen], which had accumulated
+ * thirty-five of them. Grouped by feature, not by arity: these are the actions of one flow,
+ * and they arrive and leave together.
+ */
+data class GuidedActions(
+    val onStartExercise: (SessionExerciseRow) -> Unit = {},
+    val onStartNext: (SessionExerciseRow) -> Unit = {},
+    val onWeightChanged: (String) -> Unit = {},
+    /** The target typed in the start dialog. */
+    val onSetupRepsChanged: (String) -> Unit = {},
+    /** The count actually managed on the set about to be finished — not the same thing. */
+    val onRepsChanged: (String) -> Unit = {},
+    val onSetsChanged: (String) -> Unit = {},
+    val onBegin: () -> Unit = {},
+    val onDismissSetup: () -> Unit = {},
+    val onFinishSet: () -> Unit = {},
+    val onStop: () -> Unit = {},
+)
 
 @Composable
 internal fun LoggingScreen(
@@ -155,18 +204,7 @@ internal fun LoggingScreen(
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onRemoveExercise: (SessionExerciseId) -> Unit = {},
     onUndoRemoval: () -> Unit = {},
-    onStartExercise: (SessionExerciseRow) -> Unit = {},
-    onStartNextExercise: (SessionExerciseRow) -> Unit = {},
-    onGuidedWeightChanged: (String) -> Unit = {},
-    /** The target typed in the start dialog. */
-    onGuidedSetupRepsChanged: (String) -> Unit = {},
-    /** The count actually managed on the set about to be finished — not the same thing. */
-    onGuidedRepsChanged: (String) -> Unit = {},
-    onGuidedSetsChanged: (String) -> Unit = {},
-    onBeginGuided: () -> Unit = {},
-    onDismissGuidedSetup: () -> Unit = {},
-    onFinishGuidedSet: () -> Unit = {},
-    onStopGuided: () -> Unit = {},
+    guided: GuidedActions = GuidedActions(),
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onBrowseCatalog: () -> Unit = {},
@@ -175,12 +213,7 @@ internal fun LoggingScreen(
     onUndoDelete: () -> Unit = {},
     onOpenWorkout: (SessionId) -> Unit = {},
     onCloseWorkout: () -> Unit = {},
-    onSetWeightChanged: (String) -> Unit = {},
-    onSetRepsChanged: (String) -> Unit = {},
-    onSetCountChanged: (String) -> Unit = {},
-    onSetRpeChanged: (String) -> Unit = {},
-    onConfirmSet: () -> Unit = {},
-    onSetEntryDismissed: () -> Unit = {},
+    setEntry: SetEntryActions = SetEntryActions(),
     onAddExercise: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -194,15 +227,15 @@ internal fun LoggingScreen(
         // Guided mode takes the screen while it runs, but it is a lens over the same rows —
         // every set is already logged, so leaving it loses nothing (US-05a).
         running != null -> {
-            BackHandler(onBack = onStopGuided)
+            BackHandler(onBack = guided.onStop)
             GuidedExerciseScreen(
                 running = running,
                 unit = state.unit,
                 restRemaining = state.restRemaining,
-                onRepsChanged = onGuidedRepsChanged,
-                onFinishSet = onFinishGuidedSet,
-                onStartNext = onStartNextExercise,
-                onStop = onStopGuided,
+                onRepsChanged = guided.onRepsChanged,
+                onFinishSet = guided.onFinishSet,
+                onStartNext = guided.onStartNext,
+                onStop = guided.onStop,
                 modifier = modifier,
             )
         }
@@ -242,21 +275,11 @@ internal fun LoggingScreen(
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
                 onUndoRemoval = onUndoRemoval,
-                onStartExercise = onStartExercise,
-                onGuidedWeightChanged = onGuidedWeightChanged,
-                onGuidedSetupRepsChanged = onGuidedSetupRepsChanged,
-                onGuidedSetsChanged = onGuidedSetsChanged,
-                onBeginGuided = onBeginGuided,
-                onDismissGuidedSetup = onDismissGuidedSetup,
+                guided = guided,
                 onSkipRest = onSkipRest,
                 onOpenHistory = onOpenHistory,
                 onBrowseCatalog = onBrowseCatalog,
-                onSetWeightChanged = onSetWeightChanged,
-                onSetRepsChanged = onSetRepsChanged,
-                onSetCountChanged = onSetCountChanged,
-                onSetRpeChanged = onSetRpeChanged,
-                onConfirmSet = onConfirmSet,
-                onSetEntryDismissed = onSetEntryDismissed,
+                setEntry = setEntry,
                 onAddExercise = onAddExercise,
                 modifier = modifier,
             )
@@ -273,21 +296,11 @@ private fun SessionScreen(
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onUndoRemoval: () -> Unit,
-    onStartExercise: (SessionExerciseRow) -> Unit,
-    onGuidedWeightChanged: (String) -> Unit,
-    onGuidedSetupRepsChanged: (String) -> Unit,
-    onGuidedSetsChanged: (String) -> Unit,
-    onBeginGuided: () -> Unit,
-    onDismissGuidedSetup: () -> Unit,
+    guided: GuidedActions,
     onSkipRest: () -> Unit,
     onOpenHistory: () -> Unit,
     onBrowseCatalog: () -> Unit,
-    onSetWeightChanged: (String) -> Unit,
-    onSetRepsChanged: (String) -> Unit,
-    onSetCountChanged: (String) -> Unit,
-    onSetRpeChanged: (String) -> Unit,
-    onConfirmSet: () -> Unit,
-    onSetEntryDismissed: () -> Unit,
+    setEntry: SetEntryActions,
     onAddExercise: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -301,7 +314,7 @@ private fun SessionScreen(
             onAddSet = onAddSet,
             onRemoveExercise = onRemoveExercise,
             onUndoRemoval = onUndoRemoval,
-            onStartExercise = onStartExercise,
+            onStartExercise = guided.onStartExercise,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             modifier = Modifier.padding(padding),
@@ -310,17 +323,8 @@ private fun SessionScreen(
         SessionDialogs(
             state = state,
             onResolveStale = onResolveStale,
-            onGuidedWeightChanged = onGuidedWeightChanged,
-            onGuidedSetupRepsChanged = onGuidedSetupRepsChanged,
-            onGuidedSetsChanged = onGuidedSetsChanged,
-            onBeginGuided = onBeginGuided,
-            onDismissGuidedSetup = onDismissGuidedSetup,
-            onSetWeightChanged = onSetWeightChanged,
-            onSetRepsChanged = onSetRepsChanged,
-            onSetCountChanged = onSetCountChanged,
-            onSetRpeChanged = onSetRpeChanged,
-            onConfirmSet = onConfirmSet,
-            onSetEntryDismissed = onSetEntryDismissed,
+            guided = guided,
+            setEntry = setEntry,
         )
     }
 }
@@ -375,17 +379,8 @@ private fun SessionBody(
 private fun SessionDialogs(
     state: SessionUiState,
     onResolveStale: (StaleSessionPrompt) -> Unit,
-    onSetWeightChanged: (String) -> Unit,
-    onSetRepsChanged: (String) -> Unit,
-    onSetCountChanged: (String) -> Unit,
-    onSetRpeChanged: (String) -> Unit,
-    onConfirmSet: () -> Unit,
-    onSetEntryDismissed: () -> Unit,
-    onGuidedWeightChanged: (String) -> Unit,
-    onGuidedSetupRepsChanged: (String) -> Unit,
-    onGuidedSetsChanged: (String) -> Unit,
-    onBeginGuided: () -> Unit,
-    onDismissGuidedSetup: () -> Unit,
+    setEntry: SetEntryActions,
+    guided: GuidedActions,
 ) {
     state.stalePrompt?.let { prompt ->
         AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
@@ -395,11 +390,11 @@ private fun SessionDialogs(
         GuidedSetupDialog(
             setup = setup,
             unit = state.unit,
-            onWeightChanged = onGuidedWeightChanged,
-            onRepsChanged = onGuidedSetupRepsChanged,
-            onSetsChanged = onGuidedSetsChanged,
-            onBegin = onBeginGuided,
-            onDismiss = onDismissGuidedSetup,
+            onWeightChanged = guided.onWeightChanged,
+            onRepsChanged = guided.onSetupRepsChanged,
+            onSetsChanged = guided.onSetsChanged,
+            onBegin = guided.onBegin,
+            onDismiss = guided.onDismissSetup,
         )
     }
 
@@ -407,12 +402,12 @@ private fun SessionDialogs(
         SetEntryDialog(
             entry = entry,
             unit = state.unit,
-            onWeightChanged = onSetWeightChanged,
-            onRepsChanged = onSetRepsChanged,
-            onSetsChanged = onSetCountChanged,
-            onRpeChanged = onSetRpeChanged,
-            onConfirm = onConfirmSet,
-            onDismiss = onSetEntryDismissed,
+            onWeightChanged = setEntry.onWeightChanged,
+            onRepsChanged = setEntry.onRepsChanged,
+            onSetsChanged = setEntry.onSetsChanged,
+            onRpeChanged = setEntry.onRpeChanged,
+            onConfirm = setEntry.onConfirm,
+            onDismiss = setEntry.onDismiss,
         )
     }
 }

@@ -295,18 +295,6 @@ class WorkoutHistoryTest {
         startedAt: Instant,
     ) = session(id, startedAt = startedAt, endedAt = startedAt.plus(Duration.ofHours(1)))
 
-    /**
-     * Registers an appearance of an exercise in a session and returns its id.
-     *
-     * A set reaches its session only through `session_exercises` (ADR-0004), so a set seeded
-     * against an appearance nobody declared belongs to no session at all.
-     */
-    private suspend fun inSession(session: String): SessionExerciseId {
-        val id = SessionExerciseId("se-${nextSessionExercise++}")
-        sessionExercises.add(SessionExercise(id, SessionId(session), ExerciseId("bench"), 1))
-        return id
-    }
-
     /** One exercise in [session], with a set for each weight given. */
     private suspend fun seedWorkout(
         session: SessionId,
