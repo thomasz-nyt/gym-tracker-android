@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -588,6 +589,12 @@ private fun LoggedSets(
  *
  * A sheet rather than a centred dialog because this is the screen you use with one hand, mid
  * workout, and the bottom of the phone is where that hand already is.
+ *
+ * **"Save set" is pinned outside the scrolling area.** Three steppers, a supporting line and an
+ * RPE field are taller than the sheet on a normal phone, so with everything in one scrolling
+ * column the confirm button opened below the fold: tap, *scroll*, tap. The instrumented test
+ * still passed — it drives the semantics tree, which does not care what is on screen — so this
+ * was only visible with the app in front of me. Constitution §2 makes it a bug, not a nit.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -596,69 +603,96 @@ private fun SetEntrySheet(
     unit: WeightUnit,
     callbacks: SetEntryCallbacks,
 ) {
-    ModalBottomSheet(onDismissRequest = callbacks.onDismiss) {
-        Column(
+    ModalBottomSheet(
+        onDismissRequest = callbacks.onDismiss,
+        // Straight to full height. A sheet left at its half-open default opens showing weight
+        // and reps but not the button that saves them, which turns the two-tap path into
+        // tap–scroll–tap. Skipping the partial state is what actually keeps US-03's promise;
+        // pinning the button below only helps once the sheet is tall enough to show it.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        SetEntryFields(
+            entry = entry,
+            unit = unit,
+            callbacks = callbacks,
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
+                    .padding(horizontal = GymDimens.ScreenPadding),
+        )
+
+        // Outside the scroll, so it is on screen the moment the sheet opens. When the prefill
+        // is already right, this is the second of the two taps (US-03) and nothing may come
+        // between the thumb and it.
+        PrimaryActionButton(
+            text = "Save set",
+            onClick = callbacks.onConfirm,
+            enabled =
+                entry.reps.toIntOrNull()?.let { it >= 1 } == true &&
+                    entry.sets.toIntOrNull()?.let { it >= 1 } == true,
+            modifier =
+                Modifier
                     .padding(horizontal = GymDimens.ScreenPadding)
-                    .padding(bottom = GymDimens.ScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
-        ) {
-            Text(entry.exerciseName, style = MaterialTheme.typography.titleLarge)
+                    .padding(top = GymDimens.Gap, bottom = GymDimens.ScreenPadding),
+        )
+    }
+}
 
-            if (!entry.prefilled) {
-                Text("First time logging this one.", style = MaterialTheme.typography.bodyMedium)
-            }
+/** Everything in the sheet that scrolls: the numbers, and the optional RPE. */
+@Composable
+private fun SetEntryFields(
+    entry: SetEntry,
+    unit: WeightUnit,
+    callbacks: SetEntryCallbacks,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+        Text(entry.exerciseName, style = MaterialTheme.typography.titleLarge)
 
-            StepperField(
-                label = "Weight (${unit.name.lowercase()})",
-                value = entry.weight,
-                onValueChange = callbacks.onWeightChanged,
-                onStep = callbacks.onWeightStepped,
-                placeholder = "Bodyweight",
-                // The other unit, live, so nobody converts in their head between sets (ADR-0008).
-                supporting = entry.weight.otherUnit(unit),
-                keyboardType = KeyboardType.Decimal,
-            )
-
-            StepperField(
-                label = "Reps",
-                value = entry.reps,
-                onValueChange = callbacks.onRepsChanged,
-                onStep = callbacks.onRepsStepped,
-            )
-
-            StepperField(
-                label = "Sets",
-                value = entry.sets,
-                onValueChange = callbacks.onSetsChanged,
-                onStep = callbacks.onSetsStepped,
-                supporting = "Records this many identical sets.",
-            )
-
-            // Optional (US-03), and left as a plain field: RPE is typed occasionally and
-            // deliberately, so it does not earn a stepper. Blank means not recorded, which is
-            // not a claim that the set was easy — constitution §2, absence is not a value.
-            OutlinedTextField(
-                value = entry.rpe,
-                onValueChange = callbacks.onRpeChanged,
-                label = { Text("RPE (optional)") },
-                placeholder = { Text("—") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            PrimaryActionButton(
-                text = "Save set",
-                onClick = callbacks.onConfirm,
-                enabled =
-                    entry.reps.toIntOrNull()?.let { it >= 1 } == true &&
-                        entry.sets.toIntOrNull()?.let { it >= 1 } == true,
-            )
+        if (!entry.prefilled) {
+            Text("First time logging this one.", style = MaterialTheme.typography.bodyMedium)
         }
+
+        StepperField(
+            label = "Weight (${unit.name.lowercase()})",
+            value = entry.weight,
+            onValueChange = callbacks.onWeightChanged,
+            onStep = callbacks.onWeightStepped,
+            placeholder = "Bodyweight",
+            // The other unit, live, so nobody converts in their head between sets (ADR-0008).
+            supporting = entry.weight.otherUnit(unit),
+            keyboardType = KeyboardType.Decimal,
+        )
+
+        StepperField(
+            label = "Reps",
+            value = entry.reps,
+            onValueChange = callbacks.onRepsChanged,
+            onStep = callbacks.onRepsStepped,
+        )
+
+        StepperField(
+            label = "Sets",
+            value = entry.sets,
+            onValueChange = callbacks.onSetsChanged,
+            onStep = callbacks.onSetsStepped,
+            supporting = "Records this many identical sets.",
+        )
+
+        // Optional (US-03), and left as a plain field: RPE is typed occasionally and
+        // deliberately, so it does not earn a stepper. Blank means not recorded, which is
+        // not a claim that the set was easy — constitution §2, absence is not a value.
+        OutlinedTextField(
+            value = entry.rpe,
+            onValueChange = callbacks.onRpeChanged,
+            label = { Text("RPE (optional)") },
+            placeholder = { Text("—") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
