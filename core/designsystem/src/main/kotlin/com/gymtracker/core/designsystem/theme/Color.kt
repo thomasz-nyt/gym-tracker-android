@@ -38,6 +38,22 @@ private val OnSurfaceVariantLight = Color(0xFF4F4539)
 private val SurfaceVariantDark = Color(0xFF3A322B)
 private val OnSurfaceVariantDark = Color(0xFFD8C7B8)
 
+// The elevation ramp cards and the set-entry sheet are drawn on. Material's defaults for these
+// are tinted violet, and overriding `surface` alone leaves them that way — which shipped as a
+// lavender card on a warm-white screen and was only visible on a device. `GymColorSchemeTest`
+// now asserts every surface is neutral or warm.
+private val SurfaceContainerLowestLight = Color(0xFFFFFFFF)
+private val SurfaceContainerLowLight = Color(0xFFFBF4EC)
+private val SurfaceContainerLight = Color(0xFFF5EEE5)
+private val SurfaceContainerHighLight = Color(0xFFEFE8DF)
+private val SurfaceContainerHighestLight = Color(0xFFE9E2D9)
+
+private val SurfaceContainerLowestDark = Color(0xFF100D0A)
+private val SurfaceContainerLowDark = Color(0xFF1E1A16)
+private val SurfaceContainerDark = Color(0xFF221E19)
+private val SurfaceContainerHighDark = Color(0xFF2D2822)
+private val SurfaceContainerHighestDark = Color(0xFF38322B)
+
 private val ErrorLight = Color(0xFFBA1A1A)
 private val ErrorDark = Color(0xFFFFB4AB)
 private val OnErrorDark = Color(0xFF690005)
@@ -60,6 +76,11 @@ val GymLightColorScheme =
         onSurface = OnSurfaceLight,
         surfaceVariant = SurfaceVariantLight,
         onSurfaceVariant = OnSurfaceVariantLight,
+        surfaceContainerLowest = SurfaceContainerLowestLight,
+        surfaceContainerLow = SurfaceContainerLowLight,
+        surfaceContainer = SurfaceContainerLight,
+        surfaceContainerHigh = SurfaceContainerHighLight,
+        surfaceContainerHighest = SurfaceContainerHighestLight,
         outline = Color(0xFF6B5F52),
         error = ErrorLight,
         onError = Color.White,
@@ -83,6 +104,11 @@ val GymDarkColorScheme =
         onSurface = OnSurfaceDark,
         surfaceVariant = SurfaceVariantDark,
         onSurfaceVariant = OnSurfaceVariantDark,
+        surfaceContainerLowest = SurfaceContainerLowestDark,
+        surfaceContainerLow = SurfaceContainerLowDark,
+        surfaceContainer = SurfaceContainerDark,
+        surfaceContainerHigh = SurfaceContainerHighDark,
+        surfaceContainerHighest = SurfaceContainerHighestDark,
         outline = Color(0xFF9C8C7C),
         error = ErrorDark,
         onError = OnErrorDark,

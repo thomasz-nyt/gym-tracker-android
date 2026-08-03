@@ -26,7 +26,23 @@ class GymColorSchemeTest {
             "secondaryContainer" to (secondaryContainer to onSecondaryContainer),
             "surface" to (surface to onSurface),
             "surfaceVariant" to (surfaceVariant to onSurfaceVariant),
+            // Cards and the set-entry sheet sit on these, and they carry onSurface text.
+            "surfaceContainerLow" to (surfaceContainerLow to onSurface),
+            "surfaceContainer" to (surfaceContainer to onSurface),
+            "surfaceContainerHigh" to (surfaceContainerHigh to onSurface),
             "error" to (error to onError),
+        )
+
+    /** Every surface the app renders, paired with the name the failure message should use. */
+    private fun ColorScheme.surfaces(): Map<String, Color> =
+        mapOf(
+            "surface" to surface,
+            "surfaceContainerLowest" to surfaceContainerLowest,
+            "surfaceContainerLow" to surfaceContainerLow,
+            "surfaceContainer" to surfaceContainer,
+            "surfaceContainerHigh" to surfaceContainerHigh,
+            "surfaceContainerHighest" to surfaceContainerHighest,
+            "surfaceVariant" to surfaceVariant,
         )
 
     @Test
@@ -67,6 +83,25 @@ class GymColorSchemeTest {
     }
 
     @Test
+    fun `no surface keeps Material's purple tint`() {
+        // The bug this pins: overriding `surface` alone leaves surfaceContainer* at Material's
+        // defaults, which are tinted violet. It shipped as a lavender card on a warm-white
+        // screen, and it was only visible on a device. A surface is near-neutral, and what
+        // little tint it has leans warm like the rest of the palette — never blue or violet.
+        schemes.forEach { (name, scheme) ->
+            scheme.surfaces().forEach { (role, color) ->
+                val hue = hueDegrees(color)
+                val neutral = saturation(color) <= NEUTRAL_SATURATION
+                assertTrue(
+                    neutral || hue in WARM_BAND,
+                    "$name $role has hue $hue° at saturation ${saturation(color)} — " +
+                        "surfaces stay neutral or warm, and this one does not",
+                )
+            }
+        }
+    }
+
+    @Test
     fun `error stays red, so Delete can never dress like Save`() {
         schemes.forEach { (name, scheme) ->
             val hue = hueDegrees(scheme.error)
@@ -97,6 +132,13 @@ class GymColorSchemeTest {
         return 0.2126 * linear(color.red) + 0.7152 * linear(color.green) + 0.0722 * linear(color.blue)
     }
 
+    /** HSV saturation: 0 is a pure grey, where hue means nothing. */
+    private fun saturation(color: Color): Double {
+        val max = maxOf(color.red, color.green, color.blue).toDouble()
+        val min = minOf(color.red, color.green, color.blue).toDouble()
+        return if (max == 0.0) 0.0 else (max - min) / max
+    }
+
     /** Hue in degrees, 0..360, from sRGB. */
     private fun hueDegrees(color: Color): Double {
         val r = color.red.toDouble()
@@ -118,6 +160,12 @@ class GymColorSchemeTest {
     private companion object {
         const val WCAG_AA = 4.5
         val ORANGE_BAND = 15.0..45.0
+
+        /** Warm: reds through yellows. A violet surface lands nowhere near this. */
+        val WARM_BAND = 0.0..60.0
+
+        /** Below this a colour reads as grey and its hue is not worth arguing about. */
+        const val NEUTRAL_SATURATION = 0.10
         const val RED_BAND_START = 345.0
         const val RED_BAND_END = 15.0
         const val BRIGHT_FLOOR = 0.25
