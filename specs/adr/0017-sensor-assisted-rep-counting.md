@@ -1,4 +1,4 @@
-# ADR-0014: Sensor-assisted rep counting
+# ADR-0017: Sensor-assisted rep counting
 
 - **Status:** deferred
 - **Date:** 2026-08-02

@@ -77,7 +77,9 @@ class WorkoutDetail(
                 combine(
                     sessionExercises.observeForSessions(ids),
                     sets.observeForSessions(ids),
-                    catalog.search("", member),
+                    // The whole catalog, to put names to ids. Narrowing would be pointless
+                    // here and `observeRanked` is the member it is really asking for.
+                    catalog.observeRanked(member),
                 ) { appearances, performed, allExercises ->
                     val byId = allExercises.associateBy(Exercise::id)
                     SessionDetail(

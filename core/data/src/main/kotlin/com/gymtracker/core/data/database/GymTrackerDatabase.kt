@@ -21,7 +21,7 @@ import com.gymtracker.core.data.set.SetEntity
  */
 @Database(
     entities = [SessionEntity::class, ExerciseEntity::class, SessionExerciseEntity::class, SetEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -43,6 +43,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V3_SESSION_EXERCISES = 3
         private const val V4_SETS = 4
         private const val V5_STARTER_EXERCISES = 5
+        private const val V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT = 6
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -147,6 +148,24 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE `exercises` ADD COLUMN `is_starter` INTEGER NOT NULL DEFAULT 0")
                     db.execSQL("ALTER TABLE `exercises` ADD COLUMN `image_asset` TEXT")
                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_exercises_is_starter` ON `exercises` (`is_starter`)")
+                    db.execSQL("DELETE FROM `exercises`")
+                }
+            }
+
+        /**
+         * Re-seeds the catalog for M3 (ADR-0015): equipment the source never recorded becomes
+         * `UNSPECIFIED` instead of `OTHER`, and 18 exercises gain the aliases US-12 searches.
+         *
+         * No column changes — both fields already exist. This wipes and re-inserts for the
+         * same reason `MIGRATION_4_5` does: the catalog is derived data with no member content
+         * in it, so re-seeding from the bundled asset cannot leave half-updated rows.
+         * `session_exercises.exercise_id` still resolves afterwards, because catalog ids are
+         * UUIDv5 over the source slug and the slugs did not change — verified against the
+         * regenerated asset, which added and removed zero ids.
+         */
+        val MIGRATION_5_6 =
+            object : Migration(V5_STARTER_EXERCISES, V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT) {
+                override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("DELETE FROM `exercises`")
                 }
             }

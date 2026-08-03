@@ -32,13 +32,11 @@ import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -65,11 +63,6 @@ data class SessionUiState(
     val activeSession: WorkoutSession? = null,
     val stalePrompt: StaleSessionPrompt? = null,
     val exercises: List<SessionExerciseRow> = emptyList(),
-    val isSearching: Boolean = false,
-    val query: String = "",
-    val results: List<Exercise> = emptyList(),
-    /** Appearances added since the search was opened, so it can say what it did (US-02a). */
-    val addedThisVisit: List<ExerciseId> = emptyList(),
     val unit: WeightUnit = WeightUnit.LB,
     val setEntry: SetEntry? = null,
     /** Time left in the current rest, or null when none is running (US-05). */
@@ -83,24 +76,24 @@ data class SessionUiState(
 )
 
 /**
- * The search's slice of [SessionUiState], grouped only because `combine` takes a fixed number
+ * What the session screen itself renders, grouped only because `combine` takes a fixed number
  * of flows. Not a concept — do not let it become one.
- */
-private data class SearchState(
-    val isSearching: Boolean,
-    val query: String,
-    val results: List<Exercise>,
-    val addedThisVisit: List<ExerciseId>,
-)
-
-/**
- * The tail of [SessionUiState], grouped only because `combine` takes a fixed number of flows.
- * Not a concept — do not let it become one.
  */
 private data class ScreenExtras(
     val unit: WeightUnit,
     val entry: SetEntry?,
     val rest: Duration?,
+)
+
+/**
+ * The screens reached *from* the session — history, the undo of a removal, the guided flow.
+ * Grouped for the same reason, and just as much not a concept.
+ *
+ * Two grouping records on one screen is the signal ADR-0016 named: this ViewModel now drives
+ * the session, history, the workout detail, set entry, removal and the guided flow. The next
+ * thing added here should split it rather than add a third.
+ */
+private data class SideTrips(
     val history: HistoryState,
     val canUndoRemoval: Boolean,
     val guided: GuidedState,
@@ -167,11 +160,6 @@ class ActiveSessionViewModel
             )
 
         private val stalePrompt = MutableStateFlow<StaleSessionPrompt?>(null)
-        private val searching = MutableStateFlow(false)
-        private val query = MutableStateFlow("")
-
-        /** Reset each time search opens, so the count means "this visit" (US-02a). */
-        private val addedThisVisit = MutableStateFlow(emptyList<ExerciseId>())
 
         private val member: Flow<UserId> = flow { emit(currentMember.id()) }
 
@@ -188,7 +176,7 @@ class ActiveSessionViewModel
                     } else {
                         combine(
                             sessionExercises.observeForSession(session.id),
-                            catalog.search("", memberId),
+                            catalog.observeRanked(memberId),
                         ) { inSession, allExercises ->
                             val byId = allExercises.associateBy(Exercise::id)
                             inSession.map { SessionExerciseRow(it, byId[it.exerciseId]) }
@@ -236,52 +224,29 @@ class ActiveSessionViewModel
                 scope = viewModelScope,
             )
 
-        @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-        private val results: Flow<List<Exercise>> =
-            combine(
-                // No delay on the empty query, so opening search shows the catalog at once;
-                // the debounce is only there to stop re-querying on every keystroke.
-                query.debounce { text -> if (text.isEmpty()) 0L else SEARCH_DEBOUNCE_MILLIS },
-                member,
-            ) { text, memberId -> text to memberId }
-                .flatMapLatest { (text, memberId) -> catalog.search(text, memberId) }
-
         val uiState: StateFlow<SessionUiState> =
             combine(
                 activeSession,
                 stalePrompt,
                 exercises,
-                combine(searching, query, results, addedThisVisit) { isSearching, text, found, added ->
-                    SearchState(isSearching, text, found, added)
+                combine(unitPreference.observe(), setEntry.entry, rest.remaining()) { unit, entry, left ->
+                    ScreenExtras(unit, entry, left)
                 },
-                // Nested one level deeper than the rest: `combine` tops out at five flows and
-                // this group now holds six. The inner Triple is plumbing, not a concept.
-                combine(
-                    combine(unitPreference.observe(), setEntry.entry, rest.remaining()) { unit, entry, left ->
-                        Triple(unit, entry, left)
-                    },
-                    history.state,
-                    removal.canUndo,
-                    guided.state,
-                ) { (unit, entry, left), past, canUndoRemoval, guidedState ->
-                    ScreenExtras(unit, entry, left, past, canUndoRemoval, guidedState)
+                combine(history.state, removal.canUndo, guided.state) { past, canUndoRemoval, guidedState ->
+                    SideTrips(past, canUndoRemoval, guidedState)
                 },
-            ) { session, prompt, inSession, search, extras ->
+            ) { session, prompt, inSession, extras, sideTrips ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
                     stalePrompt = prompt,
                     exercises = inSession,
-                    isSearching = search.isSearching,
-                    query = search.query,
-                    results = search.results,
-                    addedThisVisit = search.addedThisVisit,
                     unit = extras.unit,
                     setEntry = extras.entry,
                     restRemaining = extras.rest,
-                    history = extras.history,
-                    canUndoRemoval = extras.canUndoRemoval,
-                    guided = extras.guided,
+                    history = sideTrips.history,
+                    canUndoRemoval = sideTrips.canUndoRemoval,
+                    guided = sideTrips.guided,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
@@ -308,28 +273,13 @@ class ActiveSessionViewModel
             }
         }
 
-        /** Opens the catalog search (US-02). */
-        fun onAddExerciseClicked() {
-            query.value = ""
-            addedThisVisit.value = emptyList()
-            searching.value = true
-        }
-
-        fun onSearchDismissed() {
-            searching.value = false
-        }
-
-        fun onQueryChanged(text: String) {
-            query.value = text
-        }
-
         /**
-         * Appends the chosen exercise to the active session, leaving the search open (US-02a).
+         * Appends an exercise the member picked on the browse screen (US-02, US-12).
          *
-         * It used to close on every pick, which made setting up a three-exercise workout three
-         * trips through the search field. Staying open is also what keeps US-02's "the same
-         * exercise may appear twice" reachable — tap it twice — where a multi-select checkbox
-         * could not express it. Each appearance is its own row.
+         * Browse is a navigation destination of its own now, so it hands an id back rather
+         * than this screen owning a search overlay. Adding the same exercise twice is allowed
+         * — US-02 says so, and each appearance is its own row, which is also what lets one
+         * visit to browse add the same movement more than once (US-02a).
          */
         fun onExerciseChosen(exerciseId: ExerciseId) {
             viewModelScope.launch {
@@ -338,7 +288,6 @@ class ActiveSessionViewModel
                 // is not currently collecting. The database is the source of truth (§2).
                 val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
                 addExerciseToSession(session.id, exerciseId)
-                addedThisVisit.value = addedThisVisit.value + exerciseId
             }
         }
 
@@ -400,9 +349,5 @@ class ActiveSessionViewModel
 
         private companion object {
             const val STOP_TIMEOUT_MILLIS = 5_000L
-            const val TICK_MILLIS = 1_000L
-
-            /** Enough to stop re-querying 873 rows on every keystroke, short enough to feel instant. */
-            const val SEARCH_DEBOUNCE_MILLIS = 150L
         }
     }

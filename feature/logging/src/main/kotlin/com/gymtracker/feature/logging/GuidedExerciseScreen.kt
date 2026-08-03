@@ -33,7 +33,7 @@ import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Duration
 
 /**
- * Walking through one exercise, set by set (US-05a, ADR-0013).
+ * Walking through one exercise, set by set (US-05a, ADR-0016).
  *
  * Everything on screen is one of three things: what you are lifting, which set you are on, and
  * the one button that ends it. The rep count is a field rather than a label because the target
@@ -169,7 +169,7 @@ private fun ExerciseSummary(
  * The dialog that starts the flow (US-05a).
  *
  * Separate from [SetEntryDialog] on purpose: "Add set" and "Save set" keep their exact
- * behaviour, so the two-tap path of US-03 cannot be changed from here (ADR-0013).
+ * behaviour, so the two-tap path of US-03 cannot be changed from here (ADR-0016).
  */
 @Composable
 internal fun GuidedSetupDialog(

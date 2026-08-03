@@ -256,73 +256,17 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
-    fun `opening search shows the catalog`() =
+    fun `an exercise picked on the browse screen is appended to the session`() =
         runTest {
+            // Choosing which exercise moved to :feature:catalog at M3 (US-12), so this screen
+            // no longer owns a search — it is handed an id and appends it (US-02).
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
-
-            viewModel.onAddExerciseClicked()
-
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(true, state.isSearching)
-                assertEquals(listOf("Bench Press", "Squat"), state.results.map { it.name })
-            }
-        }
-
-    @Test
-    fun `choosing an exercise appends it and leaves the search open`() =
-        runTest {
-            // US-02a. It used to close on every pick, so a three-exercise workout was three
-            // trips through the search field.
-            val repository = FakeSessions(listOf(session("s1")))
-            val viewModel = viewModel(repository)
-            viewModel.onAddExerciseClicked()
 
             viewModel.onExerciseChosen(ExerciseId("bench"))
 
             viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(true, state.isSearching)
-                assertEquals(listOf("Bench Press"), state.exercises.map { it.exercise?.name })
-                assertEquals(listOf(ExerciseId("bench")), state.addedThisVisit)
-            }
-        }
-
-    @Test
-    fun `several exercises can be added in one visit to the search`() =
-        runTest {
-            // US-02a, and the reason the FAB can report a count.
-            val repository = FakeSessions(listOf(session("s1")))
-            val viewModel = viewModel(repository)
-            viewModel.onAddExerciseClicked()
-
-            viewModel.onExerciseChosen(ExerciseId("bench"))
-            viewModel.onExerciseChosen(ExerciseId("squat"))
-
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(true, state.isSearching)
-                assertEquals(2, state.addedThisVisit.size)
-                assertEquals(2, state.exercises.size)
-            }
-        }
-
-    @Test
-    fun `the added count is per visit, not for all time`() =
-        runTest {
-            val repository = FakeSessions(listOf(session("s1")))
-            val viewModel = viewModel(repository)
-            viewModel.onAddExerciseClicked()
-            viewModel.onExerciseChosen(ExerciseId("bench"))
-            viewModel.onSearchDismissed()
-
-            viewModel.onAddExerciseClicked()
-
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(emptyList(), state.addedThisVisit)
-                assertEquals(1, state.exercises.size, "the exercise itself is still in the session")
+                assertEquals(listOf("Bench Press"), expectMostRecentItem().exercises.map { it.exercise?.name })
             }
         }
 
@@ -806,7 +750,7 @@ class ActiveSessionViewModelTest {
     @Test
     fun `finishing a set writes exactly one, with its own timestamp`() =
         runTest {
-            // The point of ADR-0013 over ADR-0009: N-at-once shares one performed_at, "the
+            // The point of ADR-0016 over ADR-0009: N-at-once shares one performed_at, "the
             // time they were recorded, not a guess at when each was performed". Here each set
             // is logged as it happens.
             val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
@@ -1264,10 +1208,10 @@ class ActiveSessionViewModelTest {
 
         private val all = listOf(exercise("bench", "Bench Press"), exercise("squat", "Squat"))
 
-        override fun search(
-            query: String,
-            forMember: UserId,
-        ): Flow<List<Exercise>> = MutableStateFlow(all.filter { it.name.contains(query, ignoreCase = true) })
+        // Ranking is all this has to supply now; narrowing is CatalogQuery's, and the
+        // interface's search() runs it for us. The fake no longer reimplements matching,
+        // so it cannot drift from the real thing.
+        override fun observeRanked(forMember: UserId): Flow<List<Exercise>> = MutableStateFlow(all)
     }
 
     private class FakeSessionExercises(

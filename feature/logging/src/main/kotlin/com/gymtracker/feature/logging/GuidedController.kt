@@ -22,7 +22,7 @@ import java.time.Duration
  *
  * Its own form rather than a mode on [SetEntry]. Keeping them separate is what guarantees the
  * two-tap path of US-03 is untouched — "Add set" and "Save set" cannot acquire a branch they
- * did not have (constitution §2.1, ADR-0013).
+ * did not have (constitution §2.1, ADR-0016).
  */
 data class GuidedSetup(
     val row: SessionExerciseRow,
@@ -66,7 +66,7 @@ data class GuidedState(
 )
 
 /**
- * Walking through one exercise, set by set (US-05a, ADR-0013).
+ * Walking through one exercise, set by set (US-05a, ADR-0016).
  *
  * Opt-in and additive: this is a lens over the same rows the session screen shows, never a
  * separate place the data lives. Backing out leaves every set logged so far exactly where it

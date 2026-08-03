@@ -16,7 +16,7 @@ import java.time.Instant
 import javax.inject.Inject
 
 /**
- * [GuidedPlanStore] over DataStore (ADR-0005, ADR-0013).
+ * [GuidedPlanStore] over DataStore (ADR-0005, ADR-0016).
  *
  * Stored field by field rather than as serialised JSON: there are five of them, they are all
  * primitives, and a schema this small does not need a format that can go stale.

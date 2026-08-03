@@ -15,11 +15,8 @@ class RoomExerciseCatalog
         private val dao: ExerciseDao,
         private val json: Json,
     ) : ExerciseCatalog {
-        override fun search(
-            query: String,
-            forMember: UserId,
-        ): Flow<List<Exercise>> =
-            dao.search(query.trim(), forMember.value).map { rows ->
+        override fun observeRanked(forMember: UserId): Flow<List<Exercise>> =
+            dao.observeRanked(forMember.value).map { rows ->
                 rows.map { row -> row.toDomain(::decode) }
             }
 

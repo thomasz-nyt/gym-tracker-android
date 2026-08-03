@@ -5,12 +5,12 @@ import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
 /**
- * The exercise being walked through right now (US-05a, ADR-0013).
+ * The exercise being walked through right now (US-05a, ADR-0016).
  *
  * Deliberately *not* a domain entity. It is the sets-by-reps the member typed when they
  * started, kept for the length of the exercise and discarded when it ends — no prescription
  * table, no template, nothing that outlives the workout. ADR-0009 rejected the entity version
- * of this and ADR-0013 explains why the difference matters.
+ * of this and ADR-0016 explains why the difference matters.
  *
  * @property targetSets and [targetReps] are a prefill for each set, never a promise about what
  *   was performed. The rep count is editable before every set, because writing 12 when 9 were

@@ -5,28 +5,21 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -42,8 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -53,9 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
-import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -77,20 +66,42 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The core-loop screen. US-01 only: start a session, come back to it, resolve one that was
- * left running. Exercises and sets arrive in US-02 and US-03.
+ * The core-loop screen: start a session, come back to it, resolve one that was left running
+ * (US-01), add exercises (US-02), log sets (US-03).
  *
- * There is deliberately no navigation graph yet. Which screen you see is derived from the
- * database, not from a back stack, which is what makes "reopen and you are back in your
- * session" true even after the process is killed.
+ * **Which of home and session you see is still derived from the database, not from a back
+ * stack** — that is what makes "reopen and you are back in your session" true even after the
+ * process is killed. M3 put a navigation graph above this route (ADR-0013), and the graph's
+ * start destination is this screen precisely so that property survives; navigation decides
+ * where *back* goes, not what you resume into.
+ *
+ * Picking an exercise is a destination now (US-12): "Add exercise" navigates to the shared
+ * browse screen, which hands an id back through [pickedExerciseId]. History is the last
+ * screen still selected by state within this route — the remainder of ADR-0013.
+ *
+ * @param pickedExerciseId an exercise chosen on the browse screen, appended to the session
+ *   once and then cleared through [onPickHandled].
  */
 @Composable
 fun LoggingRoute(
+    onBrowseCatalog: () -> Unit = {},
+    onAddExercise: () -> Unit = {},
+    pickedExerciseId: String? = null,
+    onPickHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RestNotifications(viewModel)
+
+    // Browse is a destination of its own, so it hands an exercise back through the nav
+    // result rather than this screen owning a search overlay (US-12, ADR-0013).
+    LaunchedEffect(pickedExerciseId) {
+        pickedExerciseId?.let { id ->
+            viewModel.onExerciseChosen(ExerciseId(id))
+            onPickHandled()
+        }
+    }
 
     LoggingScreen(
         state = state,
@@ -112,6 +123,7 @@ fun LoggingRoute(
         onStopGuided = viewModel.guided::stop,
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
+        onBrowseCatalog = onBrowseCatalog,
         onCloseHistory = viewModel.history::close,
         onDeleteWorkout = viewModel.history::delete,
         onUndoDelete = viewModel.history::undo,
@@ -123,10 +135,7 @@ fun LoggingRoute(
         onSetRpeChanged = { viewModel.setEntry.change(rpe = it) },
         onConfirmSet = viewModel.setEntry::confirm,
         onSetEntryDismissed = viewModel.setEntry::dismiss,
-        onAddExercise = viewModel::onAddExerciseClicked,
-        onQueryChanged = viewModel::onQueryChanged,
-        onExerciseChosen = viewModel::onExerciseChosen,
-        onSearchDismissed = viewModel::onSearchDismissed,
+        onAddExercise = onAddExercise,
         modifier = modifier,
     )
 }
@@ -154,6 +163,7 @@ internal fun LoggingScreen(
     onStopGuided: () -> Unit = {},
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
+    onBrowseCatalog: () -> Unit = {},
     onCloseHistory: () -> Unit = {},
     onDeleteWorkout: (SessionId) -> Unit = {},
     onUndoDelete: () -> Unit = {},
@@ -166,29 +176,10 @@ internal fun LoggingScreen(
     onConfirmSet: () -> Unit = {},
     onSetEntryDismissed: () -> Unit = {},
     onAddExercise: () -> Unit = {},
-    onQueryChanged: (String) -> Unit = {},
-    onExerciseChosen: (ExerciseId) -> Unit = {},
-    onSearchDismissed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (state.isSearching) {
-        // Back closes the search rather than the app. Its absence was a real bug: history had
-        // a handler and this did not, so hardware back from the catalog left the app entirely.
-        BackHandler(onBack = onSearchDismissed)
-        ExerciseSearch(
-            query = state.query,
-            results = state.results,
-            addedThisVisit = state.addedThisVisit,
-            onQueryChanged = onQueryChanged,
-            onExerciseChosen = onExerciseChosen,
-            onDismiss = onSearchDismissed,
-            modifier = modifier,
-        )
-        return
-    }
-
     // Guided mode takes the screen while it runs, but it is a lens over the same rows — every
-    // set is already logged, so leaving it loses nothing (US-05a, ADR-0013).
+    // set is already logged, so leaving it loses nothing (US-05a, ADR-0016).
     state.guided.running?.let { running ->
         BackHandler(onBack = onStopGuided)
         GuidedExerciseScreen(
@@ -237,6 +228,7 @@ internal fun LoggingScreen(
             state = state,
             onStartWorkout = onStartWorkout,
             onOpenHistory = onOpenHistory,
+            onBrowseCatalog = onBrowseCatalog,
             onAddExercise = onAddExercise,
             onAddSet = onAddSet,
             onRemoveExercise = onRemoveExercise,
@@ -274,6 +266,7 @@ private fun SessionBody(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onOpenHistory: () -> Unit,
+    onBrowseCatalog: () -> Unit,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
@@ -304,7 +297,7 @@ private fun SessionBody(
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )
-            else -> NoSession(onStartWorkout, onOpenHistory)
+            else -> NoSession(onStartWorkout, onOpenHistory, onBrowseCatalog)
         }
     }
 }
@@ -360,6 +353,7 @@ private fun SessionDialogs(
 private fun NoSession(
     onStartWorkout: () -> Unit,
     onOpenHistory: () -> Unit,
+    onBrowseCatalog: () -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -384,6 +378,14 @@ private fun NoSession(
             modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
         ) {
             Text("Past workouts")
+        }
+        // Looking a machine up without starting a workout (US-12). Below the two actions
+        // that are about training, because that is what this screen is for.
+        TextButton(
+            onClick = onBrowseCatalog,
+            modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+        ) {
+            Text("Browse exercises")
         }
     }
 }
@@ -494,7 +496,7 @@ private fun SessionExercises(
                         LoggedSets(row.sets, unit)
                         // A secondary line rather than more trailing buttons: "Add set" must
                         // keep its place and its label, because the two-tap path of US-03
-                        // runs through it (constitution §2.1, ADR-0013).
+                        // runs through it (constitution §2.1, ADR-0016).
                         Row {
                             TextButton(
                                 onClick = { onStartExercise(row) },
@@ -543,103 +545,6 @@ private fun RemovalUndoBar(onUndo: () -> Unit) {
                 modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
             ) {
                 Text("Undo")
-            }
-        }
-    }
-}
-
-/**
- * Catalog search (US-02). Results are ranked by how recently the member used each exercise,
- * then alphabetically — the ordering comes from the query, not from this list.
- */
-@Composable
-private fun ExerciseSearch(
-    query: String,
-    results: List<Exercise>,
-    addedThisVisit: List<ExerciseId>,
-    onQueryChanged: (String) -> Unit,
-    onExerciseChosen: (ExerciseId) -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            // US-02a. Choosing an exercise adds it and leaves the list up, so this is the way
-            // back rather than a second way to add — the count is what makes that legible.
-            ExtendedFloatingActionButton(
-                onClick = onDismiss,
-                modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
-            ) {
-                Text(
-                    if (addedThisVisit.isEmpty()) {
-                        "Done"
-                    } else {
-                        "Done  ·  ${addedThisVisit.size} added"
-                    },
-                )
-            }
-        },
-    ) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = SCREEN_PADDING),
-            verticalArrangement = Arrangement.spacedBy(GAP),
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChanged,
-                label = { Text("Search exercises") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            if (results.isEmpty()) {
-                Text(
-                    text = if (query.isBlank()) "Loading the catalog…" else "Nothing matches \"$query\".",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                // The FAB floats over the list, so the last result would sit under it and be
-                // unreachable without this.
-                contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
-            ) {
-                items(results, key = { it.id.value }) { exercise ->
-                    // Counted, not just flagged: US-02 allows the same exercise twice, so
-                    // tapping it again is a real action and the row should say "Added 2×".
-                    val added = addedThisVisit.count { it == exercise.id }
-                    ListItem(
-                        headlineContent = { Text(exercise.name) },
-                        supportingContent = {
-                            Text(
-                                exercise.equipment.name
-                                    .lowercase()
-                                    .replaceFirstChar { it.uppercase() },
-                            )
-                        },
-                        leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
-                        trailingContent = {
-                            if (added > 0) {
-                                Text(
-                                    text = if (added == 1) "Added" else "Added $added×",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                        },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .sizeIn(minHeight = MIN_TOUCH_TARGET)
-                                .clickable { onExerciseChosen(exercise.id) },
-                    )
-                    HorizontalDivider()
-                }
             }
         }
     }
@@ -856,33 +761,6 @@ private fun WeightField(
     }
 }
 
-/**
- * A bundled photo of the movement, for the starter exercises that ship one (ADR-0007).
- *
- * When no image is bundled the space is left empty rather than filled with a generic icon:
- * an image that says nothing is worse than no image, and constitution §2 says absent is
- * shown as absent. The rest of the catalog gets media at M3.
- */
-@Composable
-private fun ExerciseThumbnail(imageAsset: String?) {
-    if (imageAsset == null) {
-        Box(modifier = Modifier.size(THUMBNAIL))
-        return
-    }
-
-    AsyncImage(
-        model = "file:///android_asset/exercise_images/$imageAsset",
-        // The name is right beside it, so repeating it would only add noise for TalkBack.
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier =
-            Modifier
-                .size(THUMBNAIL)
-                .clip(RoundedCornerShape(THUMBNAIL_CORNER))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-    )
-}
-
 private fun StaleSessionPrompt.explanation(): String =
     when (this) {
         is StaleSessionPrompt.Finish ->
@@ -906,11 +784,7 @@ private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault
 private val SCREEN_PADDING = 24.dp
 private val GAP = 12.dp
 private val MIN_TOUCH_TARGET = 48.dp
-private val THUMBNAIL = 56.dp
-private val THUMBNAIL_CORNER = 8.dp
 
-/** Enough for the extended FAB plus its margin, so the last search result clears it. */
-private val FAB_CLEARANCE = 88.dp
 
 @Preview
 @Composable

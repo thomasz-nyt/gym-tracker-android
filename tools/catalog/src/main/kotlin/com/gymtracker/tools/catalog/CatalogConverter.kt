@@ -64,6 +64,14 @@ object CatalogConverter {
                 "Starter slugs missing from the source catalog: $absent. " +
                     "The catalog was refreshed and STARTER_EXERCISE_SLUGS needs updating."
             }
+
+            // Same reasoning for aliases (ADR-0015): an alias pointing at an exercise that no
+            // longer exists is a search term that silently stops finding anything.
+            val orphaned = EXERCISE_ALIASES.keys - slugs
+            require(orphaned.isEmpty()) {
+                "Alias slugs missing from the source catalog: $orphaned. " +
+                    "The catalog was refreshed and EXERCISE_ALIASES needs updating."
+            }
         }
 
         source
@@ -80,6 +88,9 @@ object CatalogConverter {
                 CatalogExercise(
                     id = uuid5(NAMESPACE, exercise.id).toString(),
                     name = exercise.name,
+                    // What the household calls it, where the source's name is not that
+                    // (ADR-0015). Empty for most of the catalog.
+                    aliases = EXERCISE_ALIASES[exercise.id].orEmpty(),
                     primaryMuscles = exercise.primaryMuscles.map(ExerciseTaxonomy::bodyPart),
                     secondaryMuscles = exercise.secondaryMuscles.map(ExerciseTaxonomy::bodyPart),
                     equipment = ExerciseTaxonomy.equipment(exercise.equipment),

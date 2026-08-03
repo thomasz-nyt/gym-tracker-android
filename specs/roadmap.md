@@ -4,8 +4,9 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M1** — M0's boxes are all ticked and its exit criterion (green CI on a
-PR) was met at PR #4.
+Current milestone: **M3**, taken out of order — see that section. M0 and M1 are complete;
+M2 is deliberately postponed so the offline core can be finished before accounts and sync
+arrive.
 
 ---
 
@@ -44,18 +45,23 @@ Stories: US-01 … US-06b
 - [x] End a session, and the session history list (US-06)
 - [x] Delete a past workout, with undo (US-06a, ADR-0012)
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
-- [x] Add several exercises without leaving the search (US-02a)
+- [ ] Add several exercises in one visit to the catalog (US-02a)
 - [x] Newest exercise first in the active session (US-02b)
 - [x] Remove an exercise from the session, with undo (US-02c)
-- [x] Guided flow through one exercise (US-05a, ADR-0013)
+- [x] Guided flow through one exercise (US-05a, ADR-0016)
 - [x] Workout detail from history (US-06b)
 
 The last five were added 2026-08-02 from a real session on the gym floor, the same
 way US-06a and ADR-0011 arrived. They are ergonomics on the core loop, not new
-scope: none adds a table, and the database stays at version 5. A sixth idea from
-that session — sensor-based rep counting — is **not** here on purpose; it is
-deferred in `adr/0014-sensor-assisted-rep-counting.md` because constitution §2.4
-forbids logging an inferred value.
+scope: none of them adds a table or a migration. A sixth idea from that session —
+sensor-based rep counting — is **not** here on purpose; it is deferred in
+`adr/0017-sensor-assisted-rep-counting.md` because constitution §2.4 forbids
+logging an inferred value.
+
+US-02a was written against the in-session search and had to be rebuilt when M3
+made browsing a destination of its own (ADR-0013). The complaint it answers
+outlived its first implementation: picking three exercises should not be three
+round trips, whether the picker is an overlay or a screen.
 
 **Exit:** two-tap set logging measured and asserted in an instrumented test. You
 personally log three real workouts on your own device without wanting to fix
@@ -65,7 +71,10 @@ anything mid-set.
 
 ## M2 — Accounts, household, sync
 
-Stories: US-07 … US-11
+Stories: US-07 … US-11, plus US-15 which moved here from M3.
+
+**Postponed until after M3** (2026-08-01). Nothing in M1 or M3 needs it, and the household
+does not need accounts to start using the app.
 
 - [ ] Supabase project, migrations in `supabase/migrations/`
 - [ ] Auth: sign up, sign in, sign out
@@ -75,25 +84,48 @@ Stories: US-07 … US-11
       `updated_at`, conflict cases documented
 - [ ] Offline queue survives app kill
 - [ ] Data export (JSON) and account deletion
+- [ ] Stock exercise media mirrored into Supabase Storage, never hotlinked (ADR-0014)
+- [ ] Family-recorded clips for a household (US-15, moved from M3)
 
 **Exit:** two devices, two family members, same household, log offline, reconnect,
 converge. A pgTAP suite proves isolation.
 
 ---
 
-## M3 — Exercise catalog and media
+## M3 — Exercise catalog
 
-Stories: US-12 … US-15
+Stories: US-12 … US-14. US-15 moved to M2.
 
-- [ ] Catalog browse and search by name, body part, equipment
-- [ ] Body-part tags rendered on the exercise detail screen
-- [ ] GIF playback via Coil; mirrored into Supabase Storage, never hotlinked
-- [ ] Optional YouTube link-out (external browser, no embedded SDK)
-- [ ] Family-recorded clips: record/upload a clip for a specific machine at your gym
-- [ ] Step-by-step text instructions, readable offline
+**Taken before M2** (maintainer decision, 2026-08-01), to keep the offline core moving
+without an account. Everything in this milestone works with no network and no backend,
+which is what makes the reordering possible at all.
 
-**Exit:** every exercise in the catalog has either a GIF, a clip, or text; the
-detail screen is fully usable in airplane mode for anything already cached.
+Renamed from "Exercise catalog and media". The media half assumed GIFs the seed data
+does not contain and a Storage bucket M2 has not built — see ADR-0014.
+
+- [x] Catalog browse and filter by body part and equipment, combined
+- [x] Search matches name and hand-authored aliases (ADR-0015)
+- [x] Exercise detail: body-part tags, numbered instructions, bundled photo where one exists
+- [x] YouTube **search** link-out, labelled as a search (external browser, no SDK, no account)
+- [x] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
+- [ ] Navigation Compose replaces state-derived routing (ADR-0013). **Partly done:** the
+      graph covers home/session, browse and detail, and the exercise search is a destination
+      rather than an overlay. History is the one screen still selected by state inside the
+      logging route.
+
+**Exit:** in airplane mode, standing at an unfamiliar machine, you can narrow the catalog
+by body part and equipment and confirm the machine from its photo or its numbered steps.
+Every detail screen renders honestly — the five exercises the catalog has no instructions
+for say so, rather than showing an empty panel.
+
+*(The previous exit criterion — "every exercise has either a GIF, a clip, or text" — was
+already satisfied by M1's seed data, since 868 of 873 ship instructions. It tested the
+catalog, not this milestone.)*
+
+Deferred to M2, where the backend they need exists:
+
+- Stock media mirrored into Supabase Storage, and any GIF or video playback (ADR-0014)
+- US-15, family-recorded clips for a household
 
 ---
 

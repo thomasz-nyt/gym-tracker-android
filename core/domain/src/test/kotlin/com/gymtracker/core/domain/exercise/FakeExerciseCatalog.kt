@@ -4,25 +4,21 @@ import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.UserId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 
 /**
  * Hand-written fake, per `specs/testing-strategy.md`.
  *
- * Matching is a name substring, as `RoomExerciseCatalog`'s `LIKE` is. Ranking by recent use is
- * the DAO's job and deliberately not reproduced here — a test that cares about ordering wants
- * the real query, not this.
+ * Only [observeRanked] is implemented, because it is the only abstract member — `browse` and
+ * `search` are defaults over it, so a fake that overrode them would be testing itself rather
+ * than the narrowing in [CatalogQuery].
+ *
+ * The order is whatever the test supplied. Real ranking joins against the member's sessions
+ * and belongs to the DAO; a test that cares about it wants the Room test, not this.
  */
 class FakeExerciseCatalog(
     initial: List<Exercise> = emptyList(),
 ) : ExerciseCatalog {
     private val state = MutableStateFlow(initial)
 
-    override fun search(
-        query: String,
-        forMember: UserId,
-    ): Flow<List<Exercise>> =
-        state.map { all ->
-            if (query.isEmpty()) all else all.filter { it.name.contains(query, ignoreCase = true) }
-        }
+    override fun observeRanked(forMember: UserId): Flow<List<Exercise>> = state
 }
