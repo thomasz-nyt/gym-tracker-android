@@ -30,9 +30,19 @@ data class CatalogUiState(
     val query: String = "",
     val filter: CatalogFilter = CatalogFilter(),
     val results: List<Exercise> = emptyList(),
+    /**
+     * What this visit has added to the workout, in the order it was added (US-02a).
+     *
+     * A list rather than a set, and counted rather than flagged, because US-02 allows the same
+     * exercise twice — tapping it again is a real action, not a no-op.
+     */
+    val addedThisVisit: List<ExerciseId> = emptyList(),
 ) {
     /** Whether anything is narrowing the catalog, so the screen can offer to clear it. */
     val isNarrowed: Boolean get() = query.isNotBlank() || !filter.isEmpty
+
+    /** How many times this visit added [id], for the marker on its row. */
+    fun timesAdded(id: ExerciseId): Int = addedThisVisit.count { it == id }
 }
 
 /**
@@ -51,6 +61,13 @@ class CatalogViewModel
         private val query = MutableStateFlow("")
         private val filter = MutableStateFlow(CatalogFilter())
 
+        /**
+         * US-02a. No reset method: this ViewModel is scoped to the browse destination, so it
+         * is built on the way in and cleared on the way out. "This visit" is the scope, not a
+         * flag anyone has to remember to lower.
+         */
+        private val addedThisVisit = MutableStateFlow(emptyList<ExerciseId>())
+
         private val member = flow { emit(currentMember.id()) }
 
         @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
@@ -65,8 +82,14 @@ class CatalogViewModel
                 .flatMapLatest { (text, chips, memberId) -> catalog.browse(text, chips, memberId) }
 
         val uiState: StateFlow<CatalogUiState> =
-            combine(query, filter, results) { text, chips, found ->
-                CatalogUiState(isLoading = false, query = text, filter = chips, results = found)
+            combine(query, filter, results, addedThisVisit) { text, chips, found, added ->
+                CatalogUiState(
+                    isLoading = false,
+                    query = text,
+                    filter = chips,
+                    results = found,
+                    addedThisVisit = added,
+                )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), CatalogUiState())
 
         /** One exercise, for the detail screen (US-13). Null while the catalog is loading. */
@@ -78,6 +101,17 @@ class CatalogViewModel
 
         fun onQueryChanged(text: String) {
             query.value = text
+        }
+
+        /**
+         * Records that this visit added an exercise to the workout (US-02a).
+         *
+         * Only the count is kept here. The exercise itself is appended by the session, which
+         * owns that write — this screen does not know what a session is, and US-12 depends on
+         * it staying that way so the same screen serves both entry points.
+         */
+        fun onAddedToSession(id: ExerciseId) {
+            addedThisVisit.value = addedThisVisit.value + id
         }
 
         /** Chips toggle: tapping a lit one turns it off, which is how a member clears one. */

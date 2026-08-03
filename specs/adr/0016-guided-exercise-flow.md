@@ -100,6 +100,16 @@ exercise from a "Start exercise" button, and it introduces no new persisted doma
   record on this screen and it is the signal, not the fix.** `ActiveSessionViewModel` now drives
   the session, the search, history, the workout detail, set entry, removal and this; the next
   thing added should split the ViewModel rather than add a third tuple.
+- **It stays outside the navigation graph, and that is a decision rather than an oversight.**
+  This ADR was written before M3 added one (ADR-0013), so the question was re-asked once it
+  existed. ADR-0013's condition for adopting navigation at all is that the start destination
+  is still derived from the database, because that is what makes "reopen and you are back in
+  your session" survive the process being killed. The guided flow needs exactly the same
+  property one level down: the plan is in DataStore and the sets are in Room, so reopening
+  mid-exercise should land back mid-exercise. A destination on the back stack would not do
+  that — a killed process restores to the graph's start, and the stored plan would be left
+  describing an exercise the member is no longer looking at. **Revisit** if the back stack
+  ever becomes restorable, at which point the argument reverses.
 - **What this does not become.** No workout templates, no programmes, no cross-session plans,
   no "planned vs actual" reporting. Each of those is a new story and would need to answer §1
   again, from a worse position than this one — because each of them is the abstraction, where

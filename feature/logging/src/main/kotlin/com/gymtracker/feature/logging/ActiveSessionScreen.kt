@@ -76,31 +76,35 @@ import java.util.Locale
  * where *back* goes, not what you resume into.
  *
  * Picking an exercise is a destination now (US-12): "Add exercise" navigates to the shared
- * browse screen, which hands an id back through [pickedExerciseId]. History is the last
+ * browse screen, which hands its picks back through [pickedExerciseIds]. History is the last
  * screen still selected by state within this route — the remainder of ADR-0013.
  *
- * @param pickedExerciseId an exercise chosen on the browse screen, appended to the session
- *   once and then cleared through [onPickHandled].
+ * @param pickedExerciseIds the exercises chosen on the browse screen, in the order they were
+ *   picked, appended to the session once and then cleared through [onPicksHandled]. A list
+ *   because one visit may add several (US-02a), including the same exercise twice (US-02).
  */
 @Composable
 fun LoggingRoute(
     onBrowseCatalog: () -> Unit = {},
     onAddExercise: () -> Unit = {},
-    pickedExerciseId: String? = null,
-    onPickHandled: () -> Unit = {},
+    pickedExerciseIds: List<String> = emptyList(),
+    onPicksHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RestNotifications(viewModel)
 
-    // Browse is a destination of its own, so it hands an exercise back through the nav
-    // result rather than this screen owning a search overlay (US-12, ADR-0013).
-    LaunchedEffect(pickedExerciseId) {
-        pickedExerciseId?.let { id ->
-            viewModel.onExerciseChosen(ExerciseId(id))
-            onPickHandled()
-        }
+    // Browse is a destination of its own, so it hands exercises back through the nav result
+    // rather than this screen owning a search overlay (US-12, ADR-0013).
+    //
+    // Appended in pick order, so a workout set up in one visit reads in the order it was
+    // chosen — `position` is what US-02b then displays newest-first.
+    LaunchedEffect(pickedExerciseIds) {
+        if (pickedExerciseIds.isEmpty()) return@LaunchedEffect
+
+        viewModel.onExercisesChosen(pickedExerciseIds.map(::ExerciseId))
+        onPicksHandled()
     }
 
     LoggingScreen(

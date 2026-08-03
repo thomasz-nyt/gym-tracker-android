@@ -281,13 +281,25 @@ class ActiveSessionViewModel
          * — US-02 says so, and each appearance is its own row, which is also what lets one
          * visit to browse add the same movement more than once (US-02a).
          */
-        fun onExerciseChosen(exerciseId: ExerciseId) {
+        fun onExerciseChosen(exerciseId: ExerciseId) = onExercisesChosen(listOf(exerciseId))
+
+        /**
+         * Appends everything one visit to the browse screen picked, in pick order (US-02a).
+         *
+         * **One coroutine, appended in sequence**, which matters more than it looks:
+         * `AddExerciseToSession` takes its position from `MAX(position) + 1`, so appending
+         * concurrently would let two exercises read the same maximum and land on the same
+         * position. Looping over [onExerciseChosen] instead of this would do exactly that.
+         */
+        fun onExercisesChosen(exerciseIds: List<ExerciseId>) {
+            if (exerciseIds.isEmpty()) return
+
             viewModelScope.launch {
                 // Read the session from the repository rather than uiState: uiState is shared
                 // WhileSubscribed, so its value is the initial placeholder whenever the screen
                 // is not currently collecting. The database is the source of truth (§2).
                 val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
-                addExerciseToSession(session.id, exerciseId)
+                exerciseIds.forEach { addExerciseToSession(session.id, it) }
             }
         }
 

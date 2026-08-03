@@ -271,6 +271,52 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
+    fun `a whole visit to the browse screen is appended in pick order`() =
+        runTest {
+            // US-02a: one visit, several exercises. They arrive as a list because the browse
+            // screen stays up across picks.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onExercisesChosen(listOf(ExerciseId("squat"), ExerciseId("bench")))
+
+            viewModel.uiState.test {
+                val rows = expectMostRecentItem().exercises
+                // Newest first on screen (US-02b), so the pick order reads bottom-up.
+                assertEquals(listOf("Bench Press", "Squat"), rows.map { it.exercise?.name })
+            }
+        }
+
+    @Test
+    fun `every exercise in one visit gets its own position`() =
+        runTest {
+            // The reason onExercisesChosen appends in one coroutine: AddExerciseToSession
+            // takes MAX(position) + 1, so appending concurrently would hand two of them the
+            // same position and the session would render in an arbitrary order.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onExercisesChosen(
+                listOf(ExerciseId("bench"), ExerciseId("squat"), ExerciseId("bench")),
+            )
+
+            val positions = sessionExercises.all.map { it.position }
+            assertEquals(listOf(1, 2, 3), positions.sorted())
+            assertEquals(3, positions.toSet().size, "no two exercises share a position")
+        }
+
+    @Test
+    fun `an empty visit adds nothing and does not touch the session`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.onExercisesChosen(emptyList())
+
+            assertEquals(emptyList(), sessionExercises.all)
+        }
+
+    @Test
     fun `the same exercise can be added twice`() =
         runTest {
             val repository = FakeSessions(listOf(session("s1")))

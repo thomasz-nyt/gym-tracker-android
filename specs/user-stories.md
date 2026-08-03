@@ -35,17 +35,24 @@ As a member, I start a gym session so my sets are grouped.
   no image rather than a placeholder; the rest of the catalog gets media at M3.
 - The same exercise may appear twice in one session.
 
-### US-02a — Add several exercises without leaving the search
-Added 2026-08-02. Choosing an exercise closed the search, so setting up a
-three-exercise workout meant three trips through the search field.
-- Given the exercise search, when I choose an exercise it is added to the session
-  and **the search stays open**, with my query intact.
-- Each exercise I have added in this visit is marked as added in the results list.
+### US-02a — Add several exercises in one visit to the catalog
+Added 2026-08-02 against the in-session search; rewritten 2026-08-03 against the
+browse screen, which replaced that search at M3 (US-12, ADR-0013). Picking one
+exercise used to end the visit, so a three-exercise workout was three round trips
+— first through a search field, then through a navigation stack.
+- Given I reached the catalog from an active session, when I choose an exercise it
+  is added to the workout and **the catalog stays up**, with my query and filters
+  intact.
+- Each exercise I have added in this visit is marked on its row, with a count, so
+  the second tap on one is visible.
 - Choosing the same exercise twice in one visit adds it twice, per US-02.
-- A button on the search screen returns me to the session and reports how many I
-  added in this visit.
-- Hardware back closes the search and returns me to the session. It does not leave
-  the app.
+- A button on the catalog returns me to the session and reports how many I added.
+- Hardware back returns me to the session with everything I picked, not just the
+  last one.
+- The exercises arrive in the order I picked them, each with its own `position`,
+  however many I chose.
+- Reaching the catalog from home is unchanged: a tap opens the exercise's detail
+  screen (US-13), and nothing is added to anything.
 
 ### US-02b — The newest exercise is first
 Added 2026-08-02. The exercise I just added was the one furthest from my thumb, at

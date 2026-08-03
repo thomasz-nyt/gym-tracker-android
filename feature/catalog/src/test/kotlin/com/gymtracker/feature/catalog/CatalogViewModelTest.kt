@@ -221,6 +221,83 @@ class CatalogViewModelTest {
             assertNull(viewModel().exercise(ExerciseId("never-existed")).first())
         }
 
+    // ---- US-02a: several exercises in one visit --------------------------------------------
+
+    @Test
+    fun `nothing is marked as added before anything has been`() =
+        runTest {
+            viewModel().uiState.test {
+                assertEquals(emptyList(), expectMostRecentItem().addedThisVisit)
+            }
+        }
+
+    @Test
+    fun `adding to the session records what this visit added, in order`() =
+        runTest {
+            // The screen stays put across picks (US-02a), so it has to be able to say what it
+            // has already done — otherwise the same row looks untouched on the second look.
+            val viewModel = viewModel()
+
+            viewModel.onAddedToSession(butterfly.id)
+            viewModel.onAddedToSession(benchPress.id)
+
+            viewModel.uiState.test {
+                assertEquals(
+                    listOf(butterfly.id, benchPress.id),
+                    expectMostRecentItem().addedThisVisit,
+                )
+            }
+        }
+
+    @Test
+    fun `the same exercise added twice is counted twice, not deduplicated`() =
+        runTest {
+            // US-02 allows an exercise to appear twice in a session, so the second tap is a
+            // real action and the row says "Added 2×" rather than staying at "Added".
+            val viewModel = viewModel()
+
+            viewModel.onAddedToSession(butterfly.id)
+            viewModel.onAddedToSession(butterfly.id)
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(2, state.addedThisVisit.size)
+                assertEquals(2, state.timesAdded(butterfly.id))
+                assertEquals(0, state.timesAdded(benchPress.id))
+            }
+        }
+
+    @Test
+    fun `narrowing the catalog does not forget what was added`() =
+        runTest {
+            // Searching for the next exercise must not clear the markers on the previous ones.
+            val viewModel = viewModel()
+            viewModel.onAddedToSession(butterfly.id)
+
+            viewModel.onQueryChanged("bench")
+            viewModel.onEquipmentToggled(Equipment.BARBELL)
+
+            viewModel.uiState.test {
+                assertEquals(1, expectMostRecentItem().timesAdded(butterfly.id))
+            }
+        }
+
+    @Test
+    fun `clearing the filters does not forget what was added either`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.onAddedToSession(butterfly.id)
+            viewModel.onQueryChanged("bench")
+
+            viewModel.onFiltersCleared()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals("", state.query)
+                assertEquals(1, state.timesAdded(butterfly.id))
+            }
+        }
+
     private class FakeCurrentMember(
         private val id: UserId,
     ) : CurrentMember {

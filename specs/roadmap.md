@@ -45,7 +45,7 @@ Stories: US-01 … US-06b
 - [x] End a session, and the session history list (US-06)
 - [x] Delete a past workout, with undo (US-06a, ADR-0012)
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
-- [ ] Add several exercises in one visit to the catalog (US-02a)
+- [x] Add several exercises in one visit to the catalog (US-02a)
 - [x] Newest exercise first in the active session (US-02b)
 - [x] Remove an exercise from the session, with undo (US-02c)
 - [x] Guided flow through one exercise (US-05a, ADR-0016)
@@ -110,8 +110,10 @@ does not contain and a Storage bucket M2 has not built — see ADR-0014.
 - [x] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
 - [ ] Navigation Compose replaces state-derived routing (ADR-0013). **Partly done:** the
       graph covers home/session, browse and detail, and the exercise search is a destination
-      rather than an overlay. History is the one screen still selected by state inside the
-      logging route.
+      rather than an overlay. Three screens are still selected by state inside the logging
+      route: history, the workout detail reached from it (US-06b), and the guided flow
+      (US-05a). The guided one is deliberate and is not a candidate for the graph — see
+      ADR-0016; the other two are the remaining work here.
 
 **Exit:** in airplane mode, standing at an unfamiliar machine, you can narrow the catalog
 by body part and equipment and confirm the machine from its photo or its numbered steps.
