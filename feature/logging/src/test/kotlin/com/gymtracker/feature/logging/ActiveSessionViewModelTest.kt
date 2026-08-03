@@ -624,5 +624,4 @@ class ActiveSessionViewModelTest {
 
             assertNull(restStore.restEndsAt.first())
         }
-
 }
