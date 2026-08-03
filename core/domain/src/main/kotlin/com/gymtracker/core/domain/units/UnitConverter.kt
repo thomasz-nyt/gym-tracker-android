@@ -10,6 +10,26 @@ enum class WeightUnit {
 }
 
 /**
+ * How much one press of a weight stepper moves, in this unit (ADR-0016).
+ *
+ * The smallest change most gyms can actually load: a 1.25 kg pair on the bar, or a 2.5 lb
+ * pair. Expressed in the member's own unit rather than converted from a single canonical
+ * step, because a stepper that moved by 2.27 kg — 5 lb rounded — would be arithmetically
+ * tidy and useless at a rack.
+ */
+fun WeightUnit.weightIncrement(): Double =
+    when (this) {
+        WeightUnit.KG -> KILOGRAM_STEP
+        WeightUnit.LB -> POUND_STEP
+    }
+
+/** A 1.25 kg pair on the bar. */
+private const val KILOGRAM_STEP = 2.5
+
+/** A 2.5 lb pair on the bar. */
+private const val POUND_STEP = 5.0
+
+/**
  * The single place a weight changes units (`data-model.md` § Units, ADR-0006).
  *
  * Members type in their own unit to one decimal place; kilograms are stored to two, which

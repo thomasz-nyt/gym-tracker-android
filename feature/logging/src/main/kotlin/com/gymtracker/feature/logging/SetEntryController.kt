@@ -6,10 +6,13 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.SetInput
+import com.gymtracker.core.domain.units.weightIncrement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /** The set-entry sheet for one exercise in the session (US-03). */
 data class SetEntry(
@@ -93,6 +96,45 @@ class SetEntryController(
             }
     }
 
+    /**
+     * Nudges the weight by one increment of the member's own unit (ADR-0016): 2.5 kg or 5 lb,
+     * the smallest change most gyms can actually load.
+     *
+     * The result is snapped onto the increment rather than offset from wherever the field
+     * happened to be, so a prefill of 61.23 kg — which is 135 lb, entered by someone reading
+     * pounds — steps to 62.5 rather than to 63.73.
+     *
+     * Stepping down past the bottom lands on blank, not on zero: a set with no recorded load
+     * is a bodyweight set, and zero would claim the bar weighed nothing (constitution §2).
+     */
+    fun stepWeight(direction: Int) {
+        scope.launch {
+            val increment = unitPreference.current().weightIncrement()
+            state.value =
+                state.value?.let { current ->
+                    val from = current.weight.trim().toDoubleOrNull() ?: 0.0
+                    val stepped = snap(from, increment, direction)
+                    current.copy(weight = if (stepped <= 0.0) "" else trimNumber(stepped))
+                }
+        }
+    }
+
+    /** Reps by one, never below the 1 that US-03 requires. */
+    fun stepReps(direction: Int) {
+        state.value =
+            state.value?.let { current ->
+                current.copy(reps = current.reps.stepWholeNumber(direction))
+            }
+    }
+
+    /** Sets by one, never below the 1 that keeps the two-tap path a single confirm (ADR-0009). */
+    fun stepSets(direction: Int) {
+        state.value =
+            state.value?.let { current ->
+                current.copy(sets = current.sets.stepWholeNumber(direction))
+            }
+    }
+
     fun dismiss() {
         state.value = null
     }
@@ -157,13 +199,33 @@ class SetEntryController(
             ConfirmedSet(this, parsedWeight, parsedReps, parsedSets, parsedRpe)
         }
     }
-
-    private fun trimNumber(value: Double): String =
-        if (value % 1.0 ==
-            0.0
-        ) {
-            value.toLong().toString()
-        } else {
-            value.toString()
-        }
 }
+
+// The stepper arithmetic below is deliberately outside the controller: none of it touches the
+// controller's state, and it is easier to check when it reads as plain functions.
+
+/** US-03 for reps, ADR-0009 for sets: neither is meaningful below one. */
+private const val WHOLE_NUMBER_FLOOR = 1
+
+private fun String.stepWholeNumber(direction: Int): String {
+    val from = trim().toIntOrNull() ?: 0
+    return (from + direction).coerceAtLeast(WHOLE_NUMBER_FLOOR).toString()
+}
+
+/**
+ * The next multiple of [increment] in [direction], starting from [from].
+ *
+ * Rounding towards the direction of travel is what makes an off-grid value tidy itself up on
+ * the first press instead of carrying its remainder forever.
+ */
+private fun snap(
+    from: Double,
+    increment: Double,
+    direction: Int,
+): Double {
+    val steps = from / increment
+    val next = if (direction >= 0) floor(steps) + 1 else ceil(steps) - 1
+    return next * increment
+}
+
+private fun trimNumber(value: Double): String = if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
