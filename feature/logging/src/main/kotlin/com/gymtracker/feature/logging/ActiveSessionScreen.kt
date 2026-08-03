@@ -76,8 +76,10 @@ import java.util.Locale
  * where *back* goes, not what you resume into.
  *
  * Picking an exercise is a destination now (US-12): "Add exercise" navigates to the shared
- * browse screen, which hands its picks back through [pickedExerciseIds]. History is the last
- * screen still selected by state within this route — the remainder of ADR-0013.
+ * browse screen, which hands its picks back through [pickedExerciseIds]. Three screens are
+ * still selected by state inside this route — history, the workout opened from it (US-06b),
+ * and the guided flow (US-05a). The first two are the remainder of ADR-0013; the third stays
+ * here on purpose, for the reason ADR-0016 gives.
  *
  * @param pickedExerciseIds the exercises chosen on the browse screen, in the order they were
  *   picked, appended to the session once and then cleared through [onPicksHandled]. A list
@@ -182,51 +184,113 @@ internal fun LoggingScreen(
     onAddExercise: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // Guided mode takes the screen while it runs, but it is a lens over the same rows — every
-    // set is already logged, so leaving it loses nothing (US-05a, ADR-0016).
-    state.guided.running?.let { running ->
-        BackHandler(onBack = onStopGuided)
-        GuidedExerciseScreen(
-            running = running,
-            unit = state.unit,
-            restRemaining = state.restRemaining,
-            onRepsChanged = onGuidedRepsChanged,
-            onFinishSet = onFinishGuidedSet,
-            onStartNext = onStartNextExercise,
-            onStop = onStopGuided,
-            modifier = modifier,
-        )
-        return
-    }
+    val running = state.guided.running
+    val openWorkout = state.history.detail
 
-    // Checked before the list, because a workout is only ever open while history is (US-06b).
-    state.history.detail?.let { detail ->
-        BackHandler(onBack = onCloseWorkout)
-        WorkoutDetailScreen(
-            detail = detail,
-            unit = state.unit,
-            onBack = onCloseWorkout,
-            modifier = modifier,
-        )
-        return
-    }
+    // Which full-screen thing is showing. A `when` rather than a chain of early returns: the
+    // branches are exclusive and reading them as one list is the point (ADR-0013 keeps these
+    // out of the navigation graph deliberately — see ADR-0016 for the guided one).
+    when {
+        // Guided mode takes the screen while it runs, but it is a lens over the same rows —
+        // every set is already logged, so leaving it loses nothing (US-05a).
+        running != null -> {
+            BackHandler(onBack = onStopGuided)
+            GuidedExerciseScreen(
+                running = running,
+                unit = state.unit,
+                restRemaining = state.restRemaining,
+                onRepsChanged = onGuidedRepsChanged,
+                onFinishSet = onFinishGuidedSet,
+                onStartNext = onStartNextExercise,
+                onStop = onStopGuided,
+                modifier = modifier,
+            )
+        }
 
-    if (state.history.isOpen) {
-        // Back leaves history rather than the app — it is a side trip from the session
-        // screen, not a second entry point.
-        BackHandler(onBack = onCloseHistory)
-        HistoryScreen(
-            state = state.history,
-            unit = state.unit,
-            onDelete = onDeleteWorkout,
-            onUndo = onUndoDelete,
-            onDone = onCloseHistory,
-            onOpenWorkout = onOpenWorkout,
-            modifier = modifier,
-        )
-        return
-    }
+        // Before the list, because a workout is only ever open while history is (US-06b).
+        openWorkout != null -> {
+            BackHandler(onBack = onCloseWorkout)
+            WorkoutDetailScreen(
+                detail = openWorkout,
+                unit = state.unit,
+                onBack = onCloseWorkout,
+                modifier = modifier,
+            )
+        }
 
+        state.history.isOpen -> {
+            // Back leaves history rather than the app — it is a side trip from the session
+            // screen, not a second entry point.
+            BackHandler(onBack = onCloseHistory)
+            HistoryScreen(
+                state = state.history,
+                unit = state.unit,
+                onDelete = onDeleteWorkout,
+                onUndo = onUndoDelete,
+                onDone = onCloseHistory,
+                onOpenWorkout = onOpenWorkout,
+                modifier = modifier,
+            )
+        }
+
+        else ->
+            SessionScreen(
+                state = state,
+                onStartWorkout = onStartWorkout,
+                onResolveStale = onResolveStale,
+                onFinishWorkout = onFinishWorkout,
+                onAddSet = onAddSet,
+                onRemoveExercise = onRemoveExercise,
+                onUndoRemoval = onUndoRemoval,
+                onStartExercise = onStartExercise,
+                onGuidedWeightChanged = onGuidedWeightChanged,
+                onGuidedSetupRepsChanged = onGuidedSetupRepsChanged,
+                onGuidedSetsChanged = onGuidedSetsChanged,
+                onBeginGuided = onBeginGuided,
+                onDismissGuidedSetup = onDismissGuidedSetup,
+                onSkipRest = onSkipRest,
+                onOpenHistory = onOpenHistory,
+                onBrowseCatalog = onBrowseCatalog,
+                onSetWeightChanged = onSetWeightChanged,
+                onSetRepsChanged = onSetRepsChanged,
+                onSetCountChanged = onSetCountChanged,
+                onSetRpeChanged = onSetRpeChanged,
+                onConfirmSet = onConfirmSet,
+                onSetEntryDismissed = onSetEntryDismissed,
+                onAddExercise = onAddExercise,
+                modifier = modifier,
+            )
+    }
+}
+
+/** The session itself: the body, and the two dialogs that can sit over it. */
+@Composable
+private fun SessionScreen(
+    state: SessionUiState,
+    onStartWorkout: () -> Unit,
+    onResolveStale: (StaleSessionPrompt) -> Unit,
+    onFinishWorkout: () -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onUndoRemoval: () -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
+    onGuidedWeightChanged: (String) -> Unit,
+    onGuidedSetupRepsChanged: (String) -> Unit,
+    onGuidedSetsChanged: (String) -> Unit,
+    onBeginGuided: () -> Unit,
+    onDismissGuidedSetup: () -> Unit,
+    onSkipRest: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onBrowseCatalog: () -> Unit,
+    onSetWeightChanged: (String) -> Unit,
+    onSetRepsChanged: (String) -> Unit,
+    onSetCountChanged: (String) -> Unit,
+    onSetRpeChanged: (String) -> Unit,
+    onConfirmSet: () -> Unit,
+    onSetEntryDismissed: () -> Unit,
+    onAddExercise: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
         SessionBody(
             state = state,

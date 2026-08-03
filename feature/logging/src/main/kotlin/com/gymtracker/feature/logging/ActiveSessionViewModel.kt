@@ -215,11 +215,15 @@ class ActiveSessionViewModel
          */
         val guided =
             GuidedController(
-                logSets = logSets,
+                performSet = { sessionExerciseId, input ->
+                    // Write first, rest second, and only if the write returned — the same
+                    // ordering SetEntryController holds to for the manual path (US-05).
+                    logSets(sessionExerciseId = sessionExerciseId, input = input, sets = 1)
+                    rest.startAfterSet()
+                },
                 unitPreference = unitPreference,
                 planStore = guidedPlanStore,
                 exercises = exercisesInOrder,
-                onSetLogged = rest::startAfterSet,
                 clock = clock,
                 scope = viewModelScope,
             )

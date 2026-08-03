@@ -3,6 +3,7 @@ package com.gymtracker.feature.logging
 import com.gymtracker.core.domain.guided.GuidedPlan
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.UnitPreference
+import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.SetInput
 import com.gymtracker.core.domain.set.SetPrefill
@@ -77,12 +78,17 @@ data class GuidedState(
  * Here each set is logged as it finishes, so each carries a real one.
  */
 class GuidedController(
-    private val logSets: LogSets,
+    /**
+     * Writes one set and then starts the rest that follows it.
+     *
+     * One parameter rather than [LogSets] plus a separate callback, because the **order** is
+     * the guarantee: a write that failed must not leave a timer counting down for a set that
+     * does not exist. Two parameters would let a caller wire them the other way round.
+     */
+    private val performSet: suspend (SessionExerciseId, SetInput) -> Unit,
     private val unitPreference: UnitPreference,
     private val planStore: GuidedPlanStore,
     private val exercises: Flow<List<SessionExerciseRow>>,
-    /** Runs once the set is on disk — US-05's rest starts from here, exactly as it does manually. */
-    private val onSetLogged: suspend () -> Unit,
     private val clock: Clock,
     private val scope: CoroutineScope,
 ) {
@@ -137,8 +143,9 @@ class GuidedController(
     /** Begins the exercise. Nothing is written yet — the first set is written when it is done. */
     fun begin() {
         val pending = setup.value ?: return
-        val targetReps = pending.reps.toIntOrNull()?.takeIf { it >= 1 } ?: return
-        val targetSets = pending.sets.toIntOrNull()?.takeIf { it >= 1 } ?: return
+        val targetReps = pending.reps.toIntOrNull()?.takeIf { it >= 1 }
+        val targetSets = pending.sets.toIntOrNull()?.takeIf { it >= 1 }
+        if (targetReps == null || targetSets == null) return
 
         scope.launch {
             val unit = unitPreference.current()
@@ -179,21 +186,18 @@ class GuidedController(
             val typed = typedReps.value ?: plan.targetReps.toString()
             val reps = typed.toIntOrNull()?.takeIf { it >= 1 } ?: return@launch
 
-            logSets(
-                sessionExerciseId = plan.sessionExerciseId,
-                input =
-                    SetInput(
-                        // Already canonical kilograms; the plan stored it converted, so it is
-                        // handed back in KG rather than round-tripped through the member's unit.
-                        weight = plan.weightKg,
-                        unit = WeightUnit.KG,
-                        reps = reps,
-                        rpe = null,
-                    ),
-                sets = 1,
+            performSet(
+                plan.sessionExerciseId,
+                SetInput(
+                    // Already canonical kilograms; the plan stored it converted, so it is
+                    // handed back in KG rather than round-tripped through the member's unit.
+                    weight = plan.weightKg,
+                    unit = WeightUnit.KG,
+                    reps = reps,
+                    rpe = null,
+                ),
             )
             typedReps.value = null
-            onSetLogged()
         }
     }
 

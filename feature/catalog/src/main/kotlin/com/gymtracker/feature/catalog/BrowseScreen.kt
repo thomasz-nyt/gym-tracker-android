@@ -103,20 +103,7 @@ internal fun BrowseScreen(
         floatingActionButton = {
             // Only when picking. Browsing from home has no workout to be done adding to, and
             // a floating "Done" there would be a button with nothing to finish (US-02a).
-            if (pickForSession) {
-                ExtendedFloatingActionButton(
-                    onClick = onBack,
-                    modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
-                ) {
-                    Text(
-                        if (state.addedThisVisit.isEmpty()) {
-                            "Done"
-                        } else {
-                            "Done  ·  ${state.addedThisVisit.size} added"
-                        },
-                    )
-                }
-            }
+            if (pickForSession) DoneAdding(state.addedThisVisit.size, onBack)
         },
     ) { padding ->
         Column(
@@ -167,6 +154,25 @@ internal fun BrowseScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * The way back to the workout, reporting what this visit added (US-02a).
+ *
+ * Floating rather than in the column, because the list scrolls and this should not: after
+ * three picks the member wants to leave from wherever they happen to be.
+ */
+@Composable
+private fun DoneAdding(
+    added: Int,
+    onDone: () -> Unit,
+) {
+    ExtendedFloatingActionButton(
+        onClick = onDone,
+        modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+    ) {
+        Text(if (added == 0) "Done" else "Done  ·  $added added")
     }
 }
 
