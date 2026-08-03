@@ -35,6 +35,21 @@ naming:
 style:
   MagicNumber:
     ignoreAnnotated: ['Composable', 'Preview']
+    # A palette is nothing but numbers. `Color(0xFFF26200)` bound to a named private val is
+    # already the "well named constant" this rule asks for — there is no further name to give
+    # the literal inside it. The values are gated by GymColorSchemeTest, which asserts contrast,
+    # hue and brightness (ADR-0016); that is a stronger check than a naming convention.
+    #
+    # The test globs repeat detekt's own defaults: a rule's `excludes` replaces the default
+    # list rather than adding to it, so omitting them here would start failing every test file
+    # that types a number.
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/*.Test.kt'
+      - '**/*.Spec.kt'
+      - '**/*.Spek.kt'
+      - '**/designsystem/theme/Color.kt'
   UnusedPrivateMember:
     # @Preview composables are entry points for the IDE, never called from code.
     ignoreAnnotated: ['Preview']
