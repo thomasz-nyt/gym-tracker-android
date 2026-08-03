@@ -78,8 +78,17 @@ class CatalogConverterTest {
     }
 
     @Test
-    fun `missing equipment becomes OTHER`() {
+    fun `missing equipment becomes UNSPECIFIED, not OTHER`() {
+        // ADR-0015: "the catalog does not say" is a different answer from "miscellaneous
+        // equipment", and it was 77 of the 873 rows hiding inside OTHER.
         val converted = CatalogConverter.convert(listOf(source(equipment = null))).single()
+
+        assertEquals(Equipment.UNSPECIFIED, converted.equipment)
+    }
+
+    @Test
+    fun `equipment that is genuinely miscellaneous is still OTHER`() {
+        val converted = CatalogConverter.convert(listOf(source(equipment = "medicine ball"))).single()
 
         assertEquals(Equipment.OTHER, converted.equipment)
     }
@@ -161,6 +170,47 @@ class CatalogConverterTest {
     @Test
     fun `the starter list has no duplicates`() {
         assertEquals(STARTER_EXERCISE_SLUGS.size, STARTER_EXERCISE_SLUGS.toSet().size)
+    }
+
+    @Test
+    fun `aliases are attached to the exercise they name`() {
+        // ADR-0015. "pec deck" is what the household calls the Butterfly machine.
+        val converted = CatalogConverter.convert(listOf(source(id = "Butterfly", name = "Butterfly"))).single()
+
+        assertEquals(EXERCISE_ALIASES.getValue("Butterfly"), converted.aliases)
+    }
+
+    @Test
+    fun `an exercise nobody has nicknamed carries no aliases`() {
+        val converted = CatalogConverter.convert(listOf(source(id = "obscure", name = "Obscure"))).single()
+
+        assertEquals(emptyList(), converted.aliases)
+    }
+
+    @Test
+    fun `no alias merely repeats a word already in the exercise's own name`() {
+        // Such an alias is dead data: the name search already matches it. Keeping the table
+        // honest is what stops it growing into a synonym dictionary nobody maintains.
+        val named =
+            EXERCISE_ALIASES.keys.associateWith { slug -> slug.replace('_', ' ') }
+
+        EXERCISE_ALIASES.forEach { (slug, aliases) ->
+            val name = named.getValue(slug)
+            aliases.forEach { alias ->
+                assertTrue(
+                    !name.contains(alias, ignoreCase = true),
+                    "'$alias' is already inside '$name', so the name search finds it",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `no alias is claimed by two different exercises`() {
+        // A duplicate would make one of the two unreachable by that term, silently.
+        val all = EXERCISE_ALIASES.values.flatten()
+
+        assertEquals(all.size, all.toSet().size, "duplicate alias across exercises: $all")
     }
 
     @Test

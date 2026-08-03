@@ -26,8 +26,11 @@ a watch exists.
 enum class BodyPart { CHEST, BACK, SHOULDERS, BICEPS, TRICEPS, FOREARMS,
                       QUADS, HAMSTRINGS, GLUTES, CALVES, CORE, FULL_BODY }
 
+// UNSPECIFIED means the catalog recorded no equipment; OTHER means equipment that
+// exists and is miscellaneous. Keeping them apart is what stops the M3 filter from
+// claiming knowledge it does not have — constitution §2, ADR-0015.
 enum class Equipment { MACHINE, CABLE, BARBELL, DUMBBELL, SMITH,
-                       BODYWEIGHT, KETTLEBELL, BAND, OTHER }
+                       BODYWEIGHT, KETTLEBELL, BAND, OTHER, UNSPECIFIED }
 
 data class Exercise(
     val id: ExerciseId,

@@ -16,7 +16,14 @@ enum class BodyPart {
     FULL_BODY,
 }
 
-/** What the exercise is performed on (`data-model.md`). */
+/**
+ * What the exercise is performed on (`data-model.md`).
+ *
+ * [OTHER] and [UNSPECIFIED] are different answers and must stay that way (ADR-0015): the
+ * first says the equipment is real and miscellaneous — an exercise ball, a foam roller — and
+ * the second says the catalog never recorded any. Collapsing them made 27% of the catalog
+ * claim to be "other", which is a metric shown as present when it is absent (constitution §2).
+ */
 enum class Equipment {
     MACHINE,
     CABLE,
@@ -27,6 +34,7 @@ enum class Equipment {
     KETTLEBELL,
     BAND,
     OTHER,
+    UNSPECIFIED,
 }
 
 /** Demo media kind. `NONE` is a real answer, not a missing one (constitution §2). */

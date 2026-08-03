@@ -92,7 +92,7 @@
       "GLUTES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie on your back with your feet raised towards the ceiling.",
       "Have your partner hold your feet or ankles. Abduct your legs as far as you can. This will be your starting position.",
@@ -225,7 +225,7 @@
       "GLUTES",
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Assume a comfortable stance with one foot slightly in front of the other.",
       "Begin by pushing off with the front leg, driving the opposite knee forward and as high as possible before landing. Attempt to cover as much distance to each side with each bound.",
@@ -374,7 +374,7 @@
       "CALVES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Use a sturdy object like a squat rack to hold yourself.",
       "Lift the right leg in the air (just around 2 inches from the floor) and perform a circular motion with the big toe. Pretend that you are drawing a big circle with it. Tip: One circle equals 1 repetition. Breathe normally as you perform the movement.",
@@ -389,7 +389,7 @@
       "GLUTES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "From a lying position, bend your knees and keep your feet on the floor.",
       "Place your ankle of one foot on your opposite knee.",
@@ -440,7 +440,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand up and extend your arms straight out by the sides. The arms should be parallel to the floor and perpendicular (90-degree angle) to your torso. This will be your starting position.",
       "Slowly start to make circles of about 1 foot in diameter with each outstretched arm. Breathe normally as you perform the movement.",
@@ -822,6 +822,10 @@
   {
     "id": "0ad54402-8863-5726-add5-96c70b411380",
     "name": "Barbell Curl",
+    "aliases": [
+      "bicep curl",
+      "biceps curl"
+    ],
     "primaryMuscles": [
       "BICEPS"
     ],
@@ -1106,6 +1110,11 @@
   {
     "id": "2b044833-36bd-5d8a-895c-d10b3eecc002",
     "name": "Barbell Shoulder Press",
+    "aliases": [
+      "ohp",
+      "overhead press",
+      "military press"
+    ],
     "primaryMuscles": [
       "SHOULDERS"
     ],
@@ -1201,6 +1210,9 @@
   {
     "id": "40f26f0e-3286-5c3c-84b8-10381bc3c3b4",
     "name": "Barbell Squat",
+    "aliases": [
+      "back squat"
+    ],
     "primaryMuscles": [
       "QUADS"
     ],
@@ -1853,7 +1865,7 @@
       "GLUTES",
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Begin standing with your feet shoulder width apart and your hands on your hips.",
       "Step forward with one leg, flexing the knees to drop your hips. Descend until your rear knee nearly touches the ground. Your posture should remain upright, and your front knee should stay above the front foot.",
@@ -2100,6 +2112,11 @@
   {
     "id": "54e2658a-973d-509d-a5c5-81e12ca23440",
     "name": "Butterfly",
+    "aliases": [
+      "pec deck",
+      "pec fly",
+      "chest fly"
+    ],
     "primaryMuscles": [
       "CHEST"
     ],
@@ -2136,6 +2153,9 @@
   {
     "id": "349bde73-4d8a-5e13-b979-971b63cd5fdb",
     "name": "Cable Crossover",
+    "aliases": [
+      "cable fly"
+    ],
     "primaryMuscles": [
       "CHEST"
     ],
@@ -2628,7 +2648,7 @@
       "CALVES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand facing a wall from a couple feet away.",
       "Lean against the wall, placing your weight on your forearms.",
@@ -2643,7 +2663,7 @@
       "CALVES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand facing a wall from several feet away. Stagger your stance, placing one foot forward.",
       "Lean forward and rest your hands on the wall, keeping your heel, hip and head in a straight line.",
@@ -2735,7 +2755,7 @@
       "HAMSTRINGS",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Begin with your feet a few inches apart and your left arm up in a relaxed, athletic position.",
       "With your right foot, quick step behind and pull the knee up.",
@@ -2753,7 +2773,7 @@
       "BACK",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Position yourself on the floor on your hands and knees.",
       "Pull your belly in and round your spine, lower back, shoulders, and neck, letting your head drop.",
@@ -2840,7 +2860,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit upright on a chair.",
       "Bend to one side with your arm over your head. You can hold onto the chair with your free hand.",
@@ -3006,7 +3026,7 @@
       "GLUTES",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Get on your hands and knees, walk your hands in front of you.",
       "Lower your buttocks down to sit on your heels. Let your arms drag along the floor as you sit back to stretch your entire spine.",
@@ -3023,7 +3043,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Get into a seated position on the floor.",
       "Place both hands at the rear of your head, fingers interlocked, thumbs pointing down and elbows pointing straight ahead. Slowly pull your head down to your chest. Hold for 20-30 seconds."
@@ -3545,7 +3565,7 @@
       "HAMSTRINGS",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with your feet shoulder width apart. This will be your starting position.",
       "Perform a rear lunge by stepping back with one foot and flexing the hips and front knee. As you do so, rotate your torso across the front leg.",
@@ -3654,7 +3674,7 @@
       "GLUTES",
       "GLUTES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit up on the floor.",
       "Cross your right leg over your left, keeping the knee bent. Your left leg is straight and down on the floor.",
@@ -3888,7 +3908,7 @@
       "SHOULDERS",
       "TRICEPS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie on the floor face down and place your hands about 36 inches apart while holding your torso up at arms length. Move your feet up to a box or bench. This will be your starting position.",
       "Next, lower yourself downward until your chest almost touches the floor as you inhale.",
@@ -4361,6 +4381,9 @@
   {
     "id": "b1e2611d-7049-5041-a222-4d98e466db7a",
     "name": "Dumbbell Flyes",
+    "aliases": [
+      "dumbell fly"
+    ],
     "primaryMuscles": [
       "CHEST"
     ],
@@ -4821,7 +4844,7 @@
       "BACK"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with your feet shoulder width apart. This will be your starting position.",
       "Keeping your arms straight, swing them straight up in front of you 5-10 times, increasing the range of motion each time until your arms are above your head."
@@ -4837,7 +4860,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with your hands together, arms extended directly in front of you. This will be your starting position.",
       "Keeping your arms straight, quickly move your arms back as far as possible and back in again, similar to an exaggerated clapping motion. Repeat 5-10 times, increasing speed as you do so."
@@ -4888,7 +4911,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit or stand with your feet slightly apart.",
       "Place your hands on your shoulders with your elbows at shoulder level and pointing out.",
@@ -4920,7 +4943,7 @@
     "secondaryMuscles": [
       "SHOULDERS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand up straight.",
       "Place both hands on your lower back, fingers pointing downward and elbows out.",
@@ -5092,6 +5115,9 @@
   {
     "id": "e90c712b-1864-530e-86d1-ebf98316e0e0",
     "name": "Face Pull",
+    "aliases": [
+      "rear delt pull"
+    ],
     "primaryMuscles": [
       "SHOULDERS"
     ],
@@ -5245,7 +5271,7 @@
       "CALVES",
       "GLUTES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "You can use a partner for this exercise or brace your feet under something stable.",
       "Begin on your knees with your upper legs and torso upright. If using a partner, they will firmly hold your feet to keep you in position. This will be your starting position.",
@@ -5399,7 +5425,7 @@
       "GLUTES",
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with your hands behind your head, and squat down keeping your torso upright and your head up. This will be your starting position.",
       "Jump forward several feet, avoiding jumping unnecessarily high. As your feet contact the ground, absorb the impact through your legs, and jump again. Repeat this action 5-10 times."
@@ -5830,7 +5856,7 @@
       "GLUTES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit on the floor with your knees bent and feet together.",
       "Interlock your fingers behind your head. This will be your starting position.",
@@ -5924,7 +5950,7 @@
       "HAMSTRINGS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie on your back with one leg extended above you, with the hip at ninety degrees. Keep the other leg flat on the floor.",
       "Loop a belt, band, or rope over the ball of your foot. This will be your starting position.",
@@ -6272,7 +6298,7 @@
     "secondaryMuscles": [
       "GLUTES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie down on your back and pull both knees up to your chest.",
       "Hold your arms under the knees, not over (that would put to much pressure on your knee joints).",
@@ -6775,7 +6801,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Position a bar in a rack to about waist height. You can also use a smith machine.",
       "Take a wider than shoulder width grip on the bar and position yourself hanging underneath the bar. Your body should be straight with your heels on the ground with your arms fully extended. This will be your starting position.",
@@ -6829,7 +6855,7 @@
       "QUADS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie face down on the floor, with your arms extended out to your side, palms pressed to the floor. This will be your starting position.",
       "To begin, flex one knee and bring that leg across the back of your body, attempting to touch it to the ground near the opposite hand.",
@@ -7389,7 +7415,7 @@
       "GLUTES",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie down on the floor with your right leg straight. Bend your left leg and lower it across your body, holding the knee down toward the floor with your right hand. (The knee doesn't need to touch the floor if you're tight.)",
       "Place your left arm comfortably beside you and turn your head to the left. Imagine you have a weight tied to your tailbone. let your tailbone fall back toward the floor as your chest reaches in the opposite direction to stretch your lower back. Switch sides."
@@ -7461,7 +7487,7 @@
     "secondaryMuscles": [
       "CORE"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "This drill helps increase arm efficiency during the run. Begin kneeling, left foot in front, right knee down. Apply pressure through the front heel to keep your glutes and hamstrings activated.",
       "Begin by blocking the arms in long, pendulum like swings. Close the arm angle, blocking with the arms as you would when jogging, progressing to a run and finally a sprint.",
@@ -7517,7 +7543,7 @@
       "FOREARMS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Start by kneeling on a mat with your palms flat and your fingers pointing back toward your knees.",
       "Slowly lean back keeping your palms flat on the floor until you feel a stretch in your wrists and forearms. Hold for 20-30 seconds."
@@ -7551,7 +7577,7 @@
     "secondaryMuscles": [
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Kneel on a mat and bring your right knee up so the bottom of your foot is on the floor and extend your left leg out behind you so the top of your foot is on the floor.",
       "Shift your weight forward until you feel a stretch in your hip. Hold for 15 seconds, then repeat for your other side."
@@ -7799,6 +7825,9 @@
   {
     "id": "492fa83f-3134-5d16-8b03-386dada93dad",
     "name": "Leg Press",
+    "aliases": [
+      "sled press"
+    ],
     "primaryMuscles": [
       "QUADS"
     ],
@@ -7860,7 +7889,7 @@
       "HAMSTRINGS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie flat on your back, bend one knee, and put that foot flat on the floor to stabilize your spine.",
       "Extend the other leg in the air. If you're tight, you wont be able to straighten it. That's okay. Extend the knee so that the sole of the lifted foot faces the ceiling (or as close as you can get it).",
@@ -8024,7 +8053,7 @@
       "CALVES",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "This drill helps you accelerate as quickly as possible into a sprint from a dead stop. It helps to use a line to start from. Begin with two feet on the line. Place your left foot with the toe next to your right ankle. Place your right foot 4-6 inches behind the left.",
       "Place your right hand onto the line, and thing bring your nose close to your left knee.",
@@ -8044,7 +8073,7 @@
       "GLUTES",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lean at around 45 degrees against a wall. Your feet should be together, glutes contracted.",
       "Begin by lifting your right knee quickly, pausing, and then driving it straight down into the ground.",
@@ -8125,7 +8154,7 @@
       "QUADS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Kneel on the floor, holding your heels with both hands.",
       "Lift your buttocks up and forward while bringing your head back to look up at the ceiling, to give an arch in your back."
@@ -8613,6 +8642,10 @@
   {
     "id": "9defbaf0-8363-5d02-b56a-9b9071088eee",
     "name": "Lying Triceps Press",
+    "aliases": [
+      "skull crusher",
+      "skullcrusher"
+    ],
     "primaryMuscles": [
       "TRICEPS"
     ],
@@ -8630,6 +8663,9 @@
   {
     "id": "24dbca72-e440-59df-abb0-f6f222d6aa5e",
     "name": "Machine Bench Press",
+    "aliases": [
+      "chest machine"
+    ],
     "primaryMuscles": [
       "CHEST"
     ],
@@ -8803,7 +8839,7 @@
       "BACK",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand so your feet are shoulder width apart and your hands are on your hips.",
       "Twist at your waist until you feel a stretch. Hold for 10 to 15 seconds, then twist to the other side."
@@ -8856,7 +8892,7 @@
       "HAMSTRINGS",
       "SHOULDERS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Begin in a pushup position, with your weight supported by your hands and toes. Flexing the knee and hip, bring one leg until the knee is approximately under the hip. This will be your starting position.",
       "Explosively reverse the positions of your legs, extending the bent leg until the leg is straight and supported by the toe, and bringing the other foot up with the hip and knee flexed. Repeat in an alternating fashion for 20-30 seconds."
@@ -8873,7 +8909,7 @@
       "CALVES",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "This move helps prepare your running form to help you excel at sprinting. As you run, be sure to flex the knee, aiming to kick your glutes as the hip extends.",
       "Reload the quad as the leg moves back forward, attacking the ground on the next step.",
@@ -9109,7 +9145,7 @@
       "QUADS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Start off by lying on your right side, with your right knee bent at a 90-degree angle resting on the floor in front of you (this stabilizes the torso).",
       "Bend your left knee behind you and hold your left foot with your left hand. To stretch your hip flexor, press your left hip forward as you push your left foot back into your hand. Switch sides."
@@ -9139,7 +9175,7 @@
       "BACK"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "From a standing position, place a bent arm against a wall or doorway.",
       "Slowly lean toward your arm until you feel a stretch in your lats."
@@ -9297,7 +9333,7 @@
       "BICEPS",
       "CHEST"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie facedown on the floor.",
       "Put your left hand under your left hipbone to pad your hip and pubic bone.",
@@ -9331,7 +9367,7 @@
       "HAMSTRINGS",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Start off by lying on the floor.",
       "Extend one leg straight and pull the other knee to your chest. Hold under the knee joint to protect the kneecap.",
@@ -9938,7 +9974,7 @@
       "BACK",
       "TRICEPS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Standing straight up, lace your fingers together and open your palms to the ceiling. Keep your shoulders down as you extend your arms up.",
       "To create a full torso stretch, pull your tailbone down and stabilize your torso as you do this. Stretch the muscles on both the front and the back of the torso."
@@ -10111,7 +10147,7 @@
       "BACK"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie down with your feet on the floor, heels directly under your knees.",
       "Lift only your tailbone to the ceiling to stretch your lower back. (Don't lift the entire spine yet.) Pull in your stomach.",
@@ -10588,7 +10624,7 @@
       "HAMSTRINGS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "You will need a partner for this exercise. Lay face down with your legs straight. Your assistant will place their hand on your heel.",
       "To begin, flex the knee to curl your leg up. Your partner should provide resistance, starting light and increasing the pressure as the movement is completed. Communicate with your partner to monitor appropriate resistance levels.",
@@ -10637,6 +10673,11 @@
   {
     "id": "39191856-57de-54b3-859e-e35be480ef80",
     "name": "Pullups",
+    "aliases": [
+      "pull up",
+      "pull-up",
+      "chin up"
+    ],
     "primaryMuscles": [
       "BACK"
     ],
@@ -10792,6 +10833,10 @@
   {
     "id": "1c8fb431-2e7a-5cb4-9171-d55dabd458ca",
     "name": "Pushups",
+    "aliases": [
+      "push up",
+      "push-up"
+    ],
     "primaryMuscles": [
       "CHEST"
     ],
@@ -11485,6 +11530,9 @@
   {
     "id": "9dc83ac1-001a-5927-802a-96cb1a79f31f",
     "name": "Romanian Deadlift",
+    "aliases": [
+      "rdl"
+    ],
     "primaryMuscles": [
       "HAMSTRINGS"
     ],
@@ -11646,7 +11694,7 @@
     "secondaryMuscles": [
       "CALVES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "It's easiest to get into this stretch if you start standing up, put one leg behind you, and slowly lower your torso down to the floor.",
       "Keep the front heel on the floor (if it lifts up, scoot your other leg further back).",
@@ -11728,7 +11776,7 @@
       "BACK",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Take a pronated grip on a pull-up bar.",
       "From a hanging position, raise yourself a few inches without using your arms. Do this by depressing your shoulder girdle in a reverse shrugging motion.",
@@ -11901,6 +11949,9 @@
   {
     "id": "c5db7545-f496-5bc0-b69e-ed1bf36d2aed",
     "name": "Seated Cable Rows",
+    "aliases": [
+      "seated row"
+    ],
     "primaryMuscles": [
       "BACK"
     ],
@@ -11967,7 +12018,7 @@
       "HAMSTRINGS",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit up straight on an exercise mat.",
       "Bend one knee and put that foot on the floor to stabilize the torso.",
@@ -12111,7 +12162,7 @@
     "secondaryMuscles": [
       "CALVES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit on a mat with your right leg extended in front of you and your left leg bent with your foot against your right inner thigh.",
       "Lean forward from your hips and reach for your ankle until you feel a stretch in your hamstring. Hold for 15 seconds, then repeat for your other side."
@@ -12179,7 +12230,7 @@
     "secondaryMuscles": [
       "CALVES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "In a seated position with your legs extended, have your partner stand behind you. Now, lean forward as your partner braces your shoulders with their hands. This will be your starting position.",
       "Attempt to push your torso back for 10-20 seconds, as your partner prevents any actual movement of your torso.",
@@ -12321,7 +12372,7 @@
       "CORE"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit up straight on an exercise mat.",
       "Touch the soles of your feet together with your feet six to eight inches in front of your hips.",
@@ -12465,7 +12516,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "With shoulders relaxed and arms resting loosely at your sides (or in your lap if you're seated), gently roll your shoulders forward, up, back, and down.",
       "Reverse direction. You can do this exercise alternating shoulders or both at the same time."
@@ -12498,7 +12549,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Relax your arms to your sides and raise your shoulders up toward your ears, then back down."
     ],
@@ -12511,7 +12562,7 @@
       "SHOULDERS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Reach your left arm across your body and hold it straight."
     ],
@@ -12564,6 +12615,11 @@
   {
     "id": "49cda798-a769-5696-93aa-b6e167329182",
     "name": "Side Lateral Raise",
+    "aliases": [
+      "lat raise",
+      "delt raise",
+      "shoulder fly"
+    ],
     "primaryMuscles": [
       "SHOULDERS"
     ],
@@ -12623,7 +12679,7 @@
     "secondaryMuscles": [
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Start off by lying on your right side and bend your right knee in front of you to stabilize the torso.",
       "Rest your head on your right hand or shoulder. Lift your left leg upward and hold it by the back of the knee (easier) or the foot (harder).",
@@ -12638,7 +12694,7 @@
       "SHOULDERS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Start with your shoulders relaxed, gently tilt your head towards your shoulder.",
       "Assist stretch with a gentle pull on the side of the head."
@@ -12656,7 +12712,7 @@
       "GLUTES",
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Begin standing with your feet hip width apart in an athletic stance. Your head and chest should be up, knees and hips slightly bent. This will be your starting position.",
       "Leaning to your right, extend through your hips, knees, and ankles to jump into the air. Block with the arms to lead the movement, jumping as far to your right as you can.",
@@ -12698,7 +12754,7 @@
       "FOREARMS",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "This stretch works best standing. Cross your left arm over the midline of your body and hold the left wrist in your right hand down at the level of your hips. Start the stretch with a bent left arm.",
       "Slowly straighten, pull, and lift it up to shoulder height, as pictured. Feel this stretch originate in your back, not your shoulders, and don't pull too hard on the shoulders joint. Switch sides."
@@ -12732,7 +12788,7 @@
       "BACK"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "First lie on your left side, bending your left knee in front of you to stabilize your torso (use your abdominal muscles as well to hold you upright).",
       "Straighten your right leg and rest the right foot on the floor behind your left. Straighten your right arm over your head and gently pull on your right wrist to stretch the entire right side of the body. Switch sides."
@@ -12993,7 +13049,7 @@
       "GLUTES",
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with your feet shoulder width apart. This will be your starting position.",
       "Begin the movement by flexing your knees and hips, sitting back with your hips.",
@@ -13817,7 +13873,7 @@
       "SHOULDERS",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Sit in a chair so your back is straight and your feet planted on the floor.",
       "Interlace your fingers behind your head, elbows out and your chin down.",
@@ -13952,7 +14008,7 @@
       "GLUTES",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Being in a standing position. Jump into a split leg position, with one leg forward and one leg back, flexing the knees and lowering your hips slightly as you do so.",
       "As you descend, immediately reverse direction, standing back up and jumping, reversing the position of your legs. Repeat 5-10 times on each leg."
@@ -14302,6 +14358,9 @@
   {
     "id": "277dbbae-0f92-5558-b107-ae25385844b2",
     "name": "Standing Calf Raises",
+    "aliases": [
+      "calf machine"
+    ],
     "primaryMuscles": [
       "CALVES"
     ],
@@ -14481,7 +14540,7 @@
     "secondaryMuscles": [
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Place your right heel on a step with your knee extended and lean forward to grab your right toe with your right hand. Your left knee should be slightly bent and your back should be straight.",
       "Support your weight on your left leg and place your left hand on your left thigh.",
@@ -14529,7 +14588,7 @@
       "QUADS"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand up straight with the spine vertical, the left foot slightly in front of the right.",
       "Bend both knees and lift the back heel off the floor as you press the right hip forward. You can't get a thorough, deep stretch in this position, however, because it's hard to relax the hip flexor and stand on it at the same time. Switch sides."
@@ -14562,7 +14621,7 @@
       "CORE"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Take a slightly wider than hip distance stance with your knees slightly bent.",
       "Place your right hand on your right hip to support the spine.",
@@ -14828,7 +14887,7 @@
     "secondaryMuscles": [
       "GLUTES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Start off with your feet hip-distance apart.",
       "Bend your knees slightly to keep them soft and springy.",
@@ -14859,7 +14918,7 @@
       "CALVES"
     ],
     "secondaryMuscles": [],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with your feet hip-distance apart, one foot slightly in front of the other.",
       "Bend both knees, keeping your back heel on the floor. Switch sides."
@@ -14875,7 +14934,7 @@
     "secondaryMuscles": [
       "CALVES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Stand with some space in front and behind you.",
       "Bend at the waist, keeping your legs straight, until you can relax and let your upper body hang down in front of you. Let your arms and hands hang down naturally. Hold for 10 to 20 seconds."
@@ -15464,7 +15523,7 @@
       "GLUTES",
       "CALVES"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Begin in a seated, upright position. Start by extending your legs in front of you in a V.",
       "With your hands on the floor, lean forward as far as possible. Hold for 10 to 20 seconds."
@@ -15576,7 +15635,7 @@
       "GLUTES",
       "HAMSTRINGS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Running or hiking on trails will get the blood pumping and heart beating almost immediately. Make sure you have good shoes. While you use the muscles in your calves and buttocks to pull yourself up a hill, the knees, joints and ankles absorb the bulk of the pounding coming back down. Take smaller steps as you walk downhill, keep your knees bent to reduce the impact and slow down to avoid falling.",
       "A 150 lb person can burn over 200 calories for 30 minutes walking uphill, compared to 175 on a flat surface. If running the trail, a 150 lb person can burn well over 500 calories in 30 minutes."
@@ -15627,7 +15686,7 @@
     "secondaryMuscles": [
       "SHOULDERS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Bring right arm across your body and over your left shoulder, holding your elbow with your left hand, until you feel a stretch in your tricep. Then repeat for your other arm."
     ],
@@ -15652,6 +15711,10 @@
   {
     "id": "1935eecf-1359-559c-a186-89fb1942c021",
     "name": "Triceps Pushdown",
+    "aliases": [
+      "tricep pushdown",
+      "rope pushdown"
+    ],
     "primaryMuscles": [
       "TRICEPS"
     ],
@@ -15711,7 +15774,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Reach your hand behind your head, grasp your elbow and gently pull. Hold for 10 to 20 seconds, then switch sides."
     ],
@@ -15853,7 +15916,7 @@
     "secondaryMuscles": [
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Clasp fingers together with your thumbs pointing down, round your shoulders as you reach your hands forward."
     ],
@@ -15869,7 +15932,7 @@
       "BACK",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "While seated, bend forward to hug your thighs from underneath with both arms.",
       "Keep your knees together and your legs extended out as you bring your chest down to your knees. You can also stretch your middle back by pulling your back away from your knees as your hugging them."
@@ -15940,7 +16003,7 @@
       "CHEST",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Extend both hands straight above your head, palms touching.",
       "Slowly push your hands up and back, keeping your back straight."
@@ -16304,6 +16367,9 @@
   {
     "id": "16eb68ba-df84-5d85-bc08-4ae204616974",
     "name": "Wide-Grip Lat Pulldown",
+    "aliases": [
+      "lat pull down"
+    ],
     "primaryMuscles": [
       "BACK"
     ],
@@ -16412,7 +16478,7 @@
       "HAMSTRINGS",
       "BACK"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "Lie on your back with your arms extended out to the sides and your legs straight. This will be your starting position.",
       "Lift one leg and quickly cross it over your body, attempting to touch the ground near the opposite hand.",
@@ -16431,7 +16497,7 @@
       "GLUTES",
       "QUADS"
     ],
-    "equipment": "OTHER",
+    "equipment": "UNSPECIFIED",
     "instructions": [
       "This is a three-part stretch. Begin by lunging forward, with your front foot flat on the ground and on the toes of your back foot. With your knees bent, squat down until your knee is almost touching the ground. Keep your torso erect, and hold this position for 10-20 seconds.",
       "Now, place the arm on the same side as your front leg on the ground, with the elbow next to the foot. Your other hand should be placed on the ground, parallel to your lead leg, to help support you during this portion of the stretch.",

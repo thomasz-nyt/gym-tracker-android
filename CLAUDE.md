@@ -38,6 +38,11 @@ and say that you are doing so.
   renumbering versions across branches, which risks a real migration bug for a
   cosmetic gain. Prefer one story per branch; when work is genuinely coupled, keep it
   together and say so in the PR description.
+- **Open pull requests ready for review, never as drafts.** Added 2026-08-01.
+  CI only runs on `pull_request` (see `.github/workflows/ci.yml`), so a branch with no PR
+  open gets no build, no tests and no APK — which makes the PR the only way to get a
+  build onto a phone. Open it anyway when the work is unfinished; say in the description
+  where it stops.
 - **Never commit secrets.** No API keys in the app, in tests, or in `gradle.properties`
   that is tracked. See `specs/constitution.md` §4.
 - **Do not modify `specs/constitution.md`.** Propose changes to the human instead.

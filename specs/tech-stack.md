@@ -22,8 +22,8 @@ hard part and are native on both sides anyway).
 | Backend | Supabase (Postgres, Auth, Storage, Edge Functions) | |
 | Supabase client | `supabase-kt` (jan-tennert) | Kotlin Multiplatform-ready, which helps the iOS port |
 | Charts | Vico | Compose-native, no `AndroidView` wrapper |
-| Images / GIF | Coil 3 with `coil-gif` | GIF is the primary exercise-demo format |
-| Video | Media3 / ExoPlayer | Only pulled in at M3; do not add earlier |
+| Images | Coil 3 | Loads the bundled exercise photos. **Corrected 2026-08-01:** this row read "Coil 3 with `coil-gif`, GIF is the primary exercise-demo format". The seed data contains no GIFs — free-exercise-db ships static JPGs (ADR-0014). `coil-gif` is not a dependency and is not needed until there is media that is actually animated |
+| Video | Media3 / ExoPlayer | Deferred to M2 with the media it would play (ADR-0014); do not add earlier |
 | Health | `androidx.health.connect:connect-client` | Optional module — see below |
 | Nav | Navigation Compose, type-safe routes | |
 | Serialization | kotlinx.serialization | |

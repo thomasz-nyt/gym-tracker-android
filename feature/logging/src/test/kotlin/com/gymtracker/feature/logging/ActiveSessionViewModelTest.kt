@@ -244,33 +244,17 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
-    fun `opening search shows the catalog`() =
+    fun `an exercise picked on the browse screen is appended to the session`() =
         runTest {
+            // Choosing which exercise moved to :feature:catalog at M3 (US-12), so this screen
+            // no longer owns a search — it is handed an id and appends it (US-02).
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
-
-            viewModel.onAddExerciseClicked()
-
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(true, state.isSearching)
-                assertEquals(listOf("Bench Press", "Squat"), state.results.map { it.name })
-            }
-        }
-
-    @Test
-    fun `choosing an exercise appends it to the session and closes search`() =
-        runTest {
-            val repository = FakeSessions(listOf(session("s1")))
-            val viewModel = viewModel(repository)
-            viewModel.onAddExerciseClicked()
 
             viewModel.onExerciseChosen(ExerciseId("bench"))
 
             viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(false, state.isSearching)
-                assertEquals(listOf("Bench Press"), state.exercises.map { it.exercise?.name })
+                assertEquals(listOf("Bench Press"), expectMostRecentItem().exercises.map { it.exercise?.name })
             }
         }
 
@@ -838,10 +822,10 @@ class ActiveSessionViewModelTest {
 
         private val all = listOf(exercise("bench", "Bench Press"), exercise("squat", "Squat"))
 
-        override fun search(
-            query: String,
-            forMember: UserId,
-        ): Flow<List<Exercise>> = MutableStateFlow(all.filter { it.name.contains(query, ignoreCase = true) })
+        // Ranking is all this has to supply now; narrowing is CatalogQuery's, and the
+        // interface's search() runs it for us. The fake no longer reimplements matching,
+        // so it cannot drift from the real thing.
+        override fun observeRanked(forMember: UserId): Flow<List<Exercise>> = MutableStateFlow(all)
     }
 
     private class FakeSessionExercises : SessionExerciseRepository {
