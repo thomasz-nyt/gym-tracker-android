@@ -16,9 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,6 +33,8 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.gymtracker.core.designsystem.component.SecondaryActionButton
+import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.YouTubeSearch
 import com.gymtracker.core.domain.model.BodyPart
@@ -110,20 +112,19 @@ internal fun ExerciseDetailScreen(
 
             // US-14: a search, and it says so. Nobody has vetted the result (ADR-0015).
             YouTubeSearch.forExercise(exercise.name)?.let { url ->
-                TextButton(
+                OutlinedButton(
                     onClick = { onWatchSearch(url) },
-                    modifier = Modifier.sizeIn(minHeight = MIN_TARGET),
+                    modifier = Modifier.fillMaxWidth().sizeIn(minHeight = MIN_TARGET),
                 ) {
                     Text("Search YouTube for this exercise")
                 }
             }
 
-            TextButton(
+            SecondaryActionButton(
+                text = "Done",
                 onClick = onBack,
-                modifier = Modifier.sizeIn(minHeight = MIN_TARGET).padding(bottom = DETAIL_PADDING),
-            ) {
-                Text("Done")
-            }
+                modifier = Modifier.padding(bottom = DETAIL_PADDING),
+            )
         }
     }
 }
@@ -193,10 +194,10 @@ private fun Instructions(steps: List<String>) {
     }
 }
 
-private val DETAIL_PADDING = 24.dp
-private val DETAIL_GAP = 12.dp
-private val TAG_GAP = 8.dp
-private val MIN_TARGET = 48.dp
+private val DETAIL_PADDING = GymDimens.ScreenPadding
+private val DETAIL_GAP = GymDimens.Gap
+private val TAG_GAP = GymDimens.TightGap
+private val MIN_TARGET = GymDimens.MinTouchTarget
 private val PHOTO_HEIGHT = 220.dp
 private val PHOTO_CORNER = 12.dp
 

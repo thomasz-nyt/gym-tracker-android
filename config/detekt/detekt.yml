@@ -51,5 +51,7 @@ style:
       - '**/*.Spek.kt'
       - '**/designsystem/theme/Color.kt'
   UnusedPrivateMember:
-    # @Preview composables are entry points for the IDE, never called from code.
-    ignoreAnnotated: ['Preview']
+    # @Preview composables are entry points for the IDE, never called from code. GymPreviews is
+    # our multipreview wrapper around it (ADR-0016) — detekt matches the annotation written on
+    # the function, not what that annotation is itself annotated with, so it needs naming too.
+    ignoreAnnotated: ['Preview', 'GymPreviews']

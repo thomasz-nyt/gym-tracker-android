@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.gymtracker.core.designsystem.component.SecondaryActionButton
+import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.CatalogFilter
 import com.gymtracker.core.domain.model.BodyPart
@@ -120,9 +122,11 @@ internal fun BrowseScreen(
                 Results(state.results, onChosen, Modifier.fillMaxWidth().weight(1f))
             }
 
-            TextButton(onClick = onBack, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
-                Text("Done")
-            }
+            SecondaryActionButton(
+                text = "Done",
+                onClick = onBack,
+                modifier = Modifier.padding(bottom = GAP),
+            )
         }
     }
 }
@@ -200,13 +204,15 @@ private fun Results(
     LazyColumn(modifier = modifier) {
         items(results, key = { it.id.value }) { exercise ->
             ListItem(
-                headlineContent = { Text(exercise.name, style = MaterialTheme.typography.titleSmall) },
+                headlineContent = { Text(exercise.name, style = MaterialTheme.typography.titleMedium) },
                 supportingContent = { Text(exercise.equipment.label()) },
                 leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
+                // A whole row is the target, and it is a comfortable one: this list is scrolled
+                // and tapped one-handed, standing in front of a machine (ADR-0016).
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .sizeIn(minHeight = MIN_TOUCH_TARGET)
+                        .sizeIn(minHeight = ROW_HEIGHT)
                         .clickable { onChosen(exercise.id) },
             )
             HorizontalDivider()
@@ -249,11 +255,12 @@ internal fun Equipment.label(): String =
         name.lowercase().replaceFirstChar { it.uppercase() }
     }
 
-private val SCREEN_PADDING = 24.dp
-private val GAP = 12.dp
-private val CHIP_GAP = 8.dp
-private val MIN_TOUCH_TARGET = 48.dp
-private val THUMBNAIL = 56.dp
+private val SCREEN_PADDING = GymDimens.ScreenPadding
+private val GAP = GymDimens.Gap
+private val CHIP_GAP = GymDimens.TightGap
+private val MIN_TOUCH_TARGET = GymDimens.MinTouchTarget
+private val THUMBNAIL = GymDimens.Thumbnail
+private val ROW_HEIGHT = 88.dp
 private val THUMBNAIL_CORNER = 8.dp
 
 @Preview
