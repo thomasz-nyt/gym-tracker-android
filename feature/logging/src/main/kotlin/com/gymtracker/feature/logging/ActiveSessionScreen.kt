@@ -789,7 +789,6 @@ private val SCREEN_PADDING = 24.dp
 private val GAP = 12.dp
 private val MIN_TOUCH_TARGET = 48.dp
 
-
 @Preview
 @Composable
 private fun NoSessionPreview() {
