@@ -47,8 +47,15 @@ class DataStoreGuidedPlanStore
         override suspend fun setPlan(plan: GuidedPlan?) {
             preferences.edit { current ->
                 if (plan == null) {
-                    listOf(SESSION_EXERCISE_ID, TARGET_SETS, TARGET_REPS, WEIGHT_KG, SETS_AT_START, STARTED_AT)
-                        .forEach(current::remove)
+                    // One call per key rather than a list: the keys have different value types,
+                    // and `remove` is generic in that type, so a heterogeneous list has no
+                    // single `Preferences.Key<T>` to satisfy it.
+                    current.remove(SESSION_EXERCISE_ID)
+                    current.remove(TARGET_SETS)
+                    current.remove(TARGET_REPS)
+                    current.remove(WEIGHT_KG)
+                    current.remove(SETS_AT_START)
+                    current.remove(STARTED_AT)
                     return@edit
                 }
 

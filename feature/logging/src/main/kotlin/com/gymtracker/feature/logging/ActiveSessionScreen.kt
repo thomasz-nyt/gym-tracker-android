@@ -300,6 +300,7 @@ private fun SessionBody(
                     onRemoveExercise = onRemoveExercise,
                     canUndoRemoval = state.canUndoRemoval,
                     onUndoRemoval = onUndoRemoval,
+                    onStartExercise = onStartExercise,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )

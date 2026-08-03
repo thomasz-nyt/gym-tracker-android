@@ -142,7 +142,8 @@ class GuidedController(
 
         scope.launch {
             val unit = unitPreference.current()
-            val typedWeight = pending.weight.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+            val typed = pending.weight.trim()
+            val typedWeight = typed.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
 
             planStore.setPlan(
                 GuidedPlan(

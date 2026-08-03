@@ -917,7 +917,8 @@ class ActiveSessionViewModelTest {
             viewModel.uiState.test {
                 val state = expectMostRecentItem()
                 assertNull(state.guided.running)
-                assertEquals(1, state.exercises.single().sets.size)
+                val only = state.exercises.single()
+                assertEquals(1, only.sets.size)
             }
         }
 
