@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.gymtracker.core.designsystem.component.SecondaryActionButton
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -87,12 +89,13 @@ internal fun HistoryScreen(
                 UndoBar(onUndo)
             }
 
-            TextButton(
+            // Full width and bottom-anchored like every other way out of a screen (ADR-0016),
+            // but tonal rather than accented: leaving history is not what you came here to do.
+            SecondaryActionButton(
+                text = "Done",
                 onClick = onDone,
-                modifier = Modifier.sizeIn(minHeight = MIN_HISTORY_TARGET),
-            ) {
-                Text("Done")
-            }
+                modifier = Modifier.padding(bottom = HISTORY_GAP),
+            )
         }
     }
 }
@@ -118,8 +121,11 @@ private fun WorkoutList(
                     Text(summary.describe(unit), style = MaterialTheme.typography.bodyMedium)
                 },
                 trailingContent = {
+                    // Red, and the only red on the screen: ADR-0016 reserves the error colour
+                    // for destructive actions so this can never be mistaken for the accent.
                     TextButton(
                         onClick = { onDelete(summary.session.id) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.sizeIn(minHeight = MIN_HISTORY_TARGET),
                     ) {
                         Text("Delete")
