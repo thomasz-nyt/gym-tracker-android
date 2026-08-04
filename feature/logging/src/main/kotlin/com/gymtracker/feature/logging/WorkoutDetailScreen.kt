@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,14 +16,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.gymtracker.core.designsystem.component.SecondaryActionButton
+import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.BodyPart
 import com.gymtracker.core.domain.model.Equipment
@@ -70,8 +70,8 @@ internal fun WorkoutDetailScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = DETAIL_PADDING),
-            verticalArrangement = Arrangement.spacedBy(DETAIL_GAP),
+                    .padding(horizontal = GymDimens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         ) {
             WorkoutHeader(detail.summary, unit)
 
@@ -84,7 +84,7 @@ internal fun WorkoutDetailScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(DETAIL_GAP),
+                    verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
                 ) {
                     items(detail.exercises, key = { it.sessionExercise.id.value }) { performed ->
                         PerformedExerciseCard(performed, unit)
@@ -93,12 +93,14 @@ internal fun WorkoutDetailScreen(
                 }
             }
 
-            TextButton(
+            // Full width and bottom-anchored like every other way out of a screen (ADR-0016),
+            // but tonal rather than accented: leaving a past workout is not what you came here
+            // to do.
+            SecondaryActionButton(
+                text = "Back",
                 onClick = onBack,
-                modifier = Modifier.sizeIn(minHeight = MIN_DETAIL_TARGET),
-            ) {
-                Text("Back")
-            }
+                modifier = Modifier.padding(bottom = GymDimens.Gap),
+            )
         }
     }
 }
@@ -110,8 +112,8 @@ private fun WorkoutHeader(
     unit: WeightUnit,
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(DETAIL_GAP),
-        modifier = Modifier.padding(top = DETAIL_PADDING),
+        verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
+        modifier = Modifier.padding(top = GymDimens.ScreenPadding),
     ) {
         Text(
             text = summary.session.startedAt.asDetailDate(),
@@ -144,7 +146,7 @@ private fun PerformedExerciseCard(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DETAIL_GAP),
+        horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap),
     ) {
         DetailThumbnail(performed.exercise?.imageAsset)
 
@@ -220,7 +222,7 @@ private fun PerformedExercise.describeTotals(unit: WeightUnit): String =
 @Composable
 private fun DetailThumbnail(imageAsset: String?) {
     if (imageAsset == null) {
-        Box(modifier = Modifier.size(DETAIL_THUMBNAIL))
+        Box(modifier = Modifier.size(GymDimens.Thumbnail))
         return
     }
 
@@ -230,7 +232,7 @@ private fun DetailThumbnail(imageAsset: String?) {
         contentScale = ContentScale.Crop,
         modifier =
             Modifier
-                .size(DETAIL_THUMBNAIL)
+                .size(GymDimens.Thumbnail)
                 .clip(RoundedCornerShape(DETAIL_THUMBNAIL_CORNER))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
     )
@@ -255,13 +257,9 @@ private fun Instant.asDetailDate(): String = DETAIL_DATE.format(atZone(ZoneId.sy
 private val DETAIL_DATE = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())
 
 private const val MINUTES_IN_HOUR = 60L
-private val DETAIL_PADDING = 24.dp
-private val DETAIL_GAP = 12.dp
-private val MIN_DETAIL_TARGET = 48.dp
-private val DETAIL_THUMBNAIL = 56.dp
 private val DETAIL_THUMBNAIL_CORNER = 8.dp
 
-@Preview
+@GymPreviews
 @Composable
 private fun WorkoutDetailPreview() {
     val started = Instant.parse("2026-08-01T17:10:00Z")

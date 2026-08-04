@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -20,8 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import com.gymtracker.core.designsystem.component.PrimaryActionButton
+import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExercise
@@ -57,9 +57,9 @@ internal fun GuidedExerciseScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(GUIDED_PADDING),
+                    .padding(GymDimens.ScreenPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(GUIDED_GAP),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         ) {
             Text(
                 text = running.exerciseName,
@@ -94,11 +94,13 @@ private fun SetInProgress(
         style = MaterialTheme.typography.titleLarge,
     )
 
-    // The countdown gates nothing: "Finish set" stays live throughout, which is US-05's
-    // "it never blocks logging the next set" held to structurally.
+    // Display-size, at the size you can read from where you are actually standing (ADR-0016) —
+    // the same treatment the session screen's rest banner gets. The countdown gates nothing:
+    // "Finish set" stays live throughout, which is US-05's "it never blocks logging the next
+    // set" held to structurally.
     Text(
         text = restRemaining?.let { "Rest ${it.asMinutesSeconds()}" } ?: "Go",
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.displayMedium,
     )
 
     OutlinedTextField(
@@ -115,15 +117,14 @@ private fun SetInProgress(
         textAlign = TextAlign.Center,
     )
 
-    Button(
+    // The one primary action this screen state exists for (ADR-0016).
+    PrimaryActionButton(
+        text = "Finish set",
         onClick = onFinishSet,
         enabled = running.reps.toIntOrNull()?.let { it >= 1 } == true,
-        modifier = Modifier.fillMaxWidth().sizeIn(minHeight = MIN_GUIDED_TARGET),
-    ) {
-        Text("Finish set")
-    }
+    )
 
-    TextButton(onClick = onStop, modifier = Modifier.sizeIn(minHeight = MIN_GUIDED_TARGET)) {
+    TextButton(onClick = onStop, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
         Text("Stop")
     }
 }
@@ -152,15 +153,13 @@ private fun ExerciseSummary(
 
     val next = running.nextUp
     if (next != null) {
-        Button(
+        PrimaryActionButton(
+            text = "Next: ${next.exercise?.name ?: next.sessionExercise.exerciseId.value}",
             onClick = { onStartNext(next) },
-            modifier = Modifier.fillMaxWidth().sizeIn(minHeight = MIN_GUIDED_TARGET),
-        ) {
-            Text("Next: ${next.exercise?.name ?: next.sessionExercise.exerciseId.value}")
-        }
+        )
     }
 
-    TextButton(onClick = onStop, modifier = Modifier.sizeIn(minHeight = MIN_GUIDED_TARGET)) {
+    TextButton(onClick = onStop, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
         Text(if (next == null) "Back to workout" else "Stop here")
     }
 }
@@ -185,7 +184,7 @@ internal fun GuidedSetupDialog(
         onDismissRequest = onDismiss,
         title = { Text("Start ${setup.exerciseName}") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(GUIDED_GAP)) {
+            Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
                 OutlinedTextField(
                     value = setup.weight,
                     onValueChange = onWeightChanged,
@@ -200,7 +199,7 @@ internal fun GuidedSetupDialog(
                     ?.let { typed -> WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary }
                     ?.let { other -> Text(other, style = MaterialTheme.typography.bodySmall) }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(GUIDED_GAP)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
                     OutlinedTextField(
                         value = setup.sets,
                         onValueChange = onSetsChanged,
@@ -226,7 +225,7 @@ internal fun GuidedSetupDialog(
                 enabled =
                     setup.reps.toIntOrNull()?.let { it >= 1 } == true &&
                         setup.sets.toIntOrNull()?.let { it >= 1 } == true,
-                modifier = Modifier.sizeIn(minHeight = MIN_GUIDED_TARGET),
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
             ) {
                 Text("Start")
             }
@@ -256,11 +255,8 @@ private fun Duration.asMinutesSeconds(): String =
 private fun String.orPlural(count: Int): String = if (count == 1) this else "${this}s"
 
 private const val SECONDS_IN_MINUTE = 60
-private val GUIDED_PADDING = 24.dp
-private val GUIDED_GAP = 12.dp
-private val MIN_GUIDED_TARGET = 48.dp
 
-@Preview
+@GymPreviews
 @Composable
 private fun GuidedRunningPreview() {
     val row =
