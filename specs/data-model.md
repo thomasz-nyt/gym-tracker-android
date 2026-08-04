@@ -69,6 +69,8 @@ data class SessionExercise(
     val sessionId: SessionId,
     val exerciseId: ExerciseId,
     val position: Int,            // 1-based order within the session
+    val finishedAt: Instant?,     // when the member marked it done; null = in progress
+                                  // (US-02d, ADR-0019). Cleared by any set logged after it.
 )
 
 data class ExerciseSet(
@@ -111,7 +113,7 @@ sessions(id PK, user_id, gym_name, started_at, ended_at,
          updated_at, sync_state)
 
 session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
-                  exercise_id FK→exercises, position,
+                  exercise_id FK→exercises, position, finished_at NULL,
                   updated_at, sync_state)
 
 sets(id PK, session_exercise_id FK→session_exercises ON DELETE CASCADE,
