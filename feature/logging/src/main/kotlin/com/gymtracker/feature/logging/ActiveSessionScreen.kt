@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -128,6 +131,7 @@ fun LoggingRoute(
         onAddSet = viewModel.setEntry::open,
         onRemoveExercise = viewModel.removal::remove,
         onUndoRemoval = viewModel.removal::undo,
+        onToggleFinished = viewModel::onToggleFinished,
         guided = viewModel.guidedActions(),
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
@@ -203,6 +207,7 @@ internal fun LoggingScreen(
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onRemoveExercise: (SessionExerciseId) -> Unit = {},
     onUndoRemoval: () -> Unit = {},
+    onToggleFinished: (SessionExerciseRow) -> Unit = {},
     guided: GuidedActions = GuidedActions(),
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
@@ -274,6 +279,7 @@ internal fun LoggingScreen(
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
                 onUndoRemoval = onUndoRemoval,
+                onToggleFinished = onToggleFinished,
                 guided = guided,
                 onSkipRest = onSkipRest,
                 onOpenHistory = onOpenHistory,
@@ -295,6 +301,7 @@ private fun SessionScreen(
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onUndoRemoval: () -> Unit,
+    onToggleFinished: (SessionExerciseRow) -> Unit,
     guided: GuidedActions,
     onSkipRest: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -313,6 +320,7 @@ private fun SessionScreen(
             onAddSet = onAddSet,
             onRemoveExercise = onRemoveExercise,
             onUndoRemoval = onUndoRemoval,
+            onToggleFinished = onToggleFinished,
             onStartExercise = guided.onStartExercise,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
@@ -342,6 +350,7 @@ private fun SessionBody(
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onUndoRemoval: () -> Unit,
+    onToggleFinished: (SessionExerciseRow) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
@@ -364,6 +373,7 @@ private fun SessionBody(
                     onRemoveExercise = onRemoveExercise,
                     canUndoRemoval = state.canUndoRemoval,
                     onUndoRemoval = onUndoRemoval,
+                    onToggleFinished = onToggleFinished,
                     onStartExercise = onStartExercise,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
@@ -445,6 +455,7 @@ private fun ActiveSession(
     onRemoveExercise: (SessionExerciseId) -> Unit,
     canUndoRemoval: Boolean,
     onUndoRemoval: () -> Unit,
+    onToggleFinished: (SessionExerciseRow) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
@@ -470,6 +481,7 @@ private fun ActiveSession(
                 unit = unit,
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
+                onToggleFinished = onToggleFinished,
                 onStartExercise = onStartExercise,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
@@ -613,6 +625,10 @@ private fun FinishWorkoutDialog(
  * small text button on the row's right edge — the most-tapped control in the app rendered as
  * the smallest thing on screen. "Start exercise" (US-05a) and "Remove" (US-02c) sit above it as
  * a lighter-weight row: "Add set" stays the one filled action per card.
+ *
+ * A card marked done (US-02d) goes quiet instead of going away: muted text, "Add set" demoted
+ * to the tonal register, "Start exercise" withdrawn. It keeps a real button because machines
+ * free up and drop sets happen — and the set that follows takes the mark back (ADR-0019).
  */
 @Composable
 private fun SessionExercises(
@@ -620,56 +636,151 @@ private fun SessionExercises(
     unit: WeightUnit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
+    onToggleFinished: (SessionExerciseRow) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The place added, not the place shown (US-02b): display order no longer encodes it —
+    // the list is newest-first and the done group sits below in-progress (US-02d) — so the
+    // number is ranked over `position`, and removing one leaves a gap on purpose.
+    val placeAdded =
+        exercises
+            .sortedBy { it.sessionExercise.position }
+            .withIndex()
+            .associate { (index, row) -> row.sessionExercise.id to index + 1 }
+
     LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-        itemsIndexed(exercises, key = { _, row -> row.sessionExercise.id.value }) { index, row ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(GymDimens.Gap),
-                    verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+        items(exercises, key = { row -> row.sessionExercise.id.value }) { row ->
+            ExerciseCard(
+                row = row,
+                placeAdded = placeAdded.getValue(row.sessionExercise.id),
+                unit = unit,
+                onAddSet = onAddSet,
+                onRemoveExercise = onRemoveExercise,
+                onToggleFinished = onToggleFinished,
+                onStartExercise = onStartExercise,
+                modifier = Modifier.fillMaxWidth().animateItem(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExerciseCard(
+    row: SessionExerciseRow,
+    placeAdded: Int,
+    unit: WeightUnit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onToggleFinished: (SessionExerciseRow) -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val finished = row.sessionExercise.finishedAt != null
+    // The catalog entry is only absent if the row outlived its exercise, which the schema
+    // forbids; show the id rather than a blank line.
+    val name = row.exercise?.name ?: row.sessionExercise.exerciseId.value
+
+    Card(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(GymDimens.Gap),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        ) {
+            ExerciseCardHeader(
+                name = name,
+                placeAdded = placeAdded,
+                finished = finished,
+                onToggleFinished = { onToggleFinished(row) },
+            )
+            // The whole body takes the muted foreground when done, so the card reads as one
+            // quiet block rather than a loud card with a quiet title.
+            CompositionLocalProvider(
+                LocalContentColor provides
+                    if (finished) MaterialTheme.colorScheme.onSurfaceVariant else LocalContentColor.current,
+            ) {
+                LoggedSets(row.sets, unit)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+                // Withdrawn on a done card: walking through a finished exercise contradicts
+                // the mark. Unmarking it — one tap — brings this back (US-02d).
+                if (!finished) {
+                    TextButton(
+                        onClick = { onStartExercise(row) },
+                        modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
                     ) {
-                        // The catalog entry is only absent if the row outlived its exercise,
-                        // which the schema forbids; show the id rather than a blank line.
-                        Text(
-                            text = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        // The place added, not the place shown (US-02b): the list itself is
-                        // newest-first, but this number counts up in the order you added them,
-                        // so removing one leaves a gap on purpose rather than renumbering.
-                        Text(
-                            text = "${exercises.size - index}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Text("Start exercise")
                     }
-                    LoggedSets(row.sets, unit)
-                    Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-                        TextButton(
-                            onClick = { onStartExercise(row) },
-                            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                        ) {
-                            Text("Start exercise")
-                        }
-                        // Red, and the only red on the card: ADR-0016 reserves the error colour
-                        // for destructive actions, matching history's "Delete" (US-02c).
-                        TextButton(
-                            onClick = { onRemoveExercise(row.sessionExercise.id) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                        ) {
-                            Text("Remove")
-                        }
-                    }
-                    PrimaryActionButton(text = "Add set", onClick = { onAddSet(row) })
+                }
+                // Red, and the only red on the card: ADR-0016 reserves the error colour
+                // for destructive actions, matching history's "Delete" (US-02c).
+                TextButton(
+                    onClick = { onRemoveExercise(row.sessionExercise.id) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                ) {
+                    Text("Remove")
                 }
             }
+            // Demoted, never removed: the tonal register says "probably done", the intact
+            // 48dp target says "drop sets happen" (US-02d). Logging one un-finishes the
+            // exercise by ADR-0019's rule, so the orange button comes back with the work.
+            if (finished) {
+                SecondaryActionButton(text = "Add set", onClick = { onAddSet(row) })
+            } else {
+                PrimaryActionButton(text = "Add set", onClick = { onAddSet(row) })
+            }
+        }
+    }
+}
+
+/**
+ * The card's title line: the name, the place it was added, and the done toggle (US-02d).
+ *
+ * Completion lives at the card's top edge, as "Finish workout" does at the screen's
+ * (ADR-0016): tapped once per exercise, and kept out of the zone the thumb works between
+ * sets. It toggles, so a mis-tap costs exactly one more tap.
+ */
+@Composable
+private fun ExerciseCardHeader(
+    name: String,
+    placeAdded: Int,
+    finished: Boolean,
+    onToggleFinished: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The mark reads on the left edge, where names are scanned. Muted rather than struck
+        // through: the sets underneath are still records.
+        Text(
+            text = if (finished) "✓ $name" else name,
+            style = MaterialTheme.typography.titleMedium,
+            color = if (finished) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "$placeAdded",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
+            onClick = onToggleFinished,
+            colors =
+                if (finished) {
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    ButtonDefaults.textButtonColors()
+                },
+            modifier =
+                Modifier
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .semantics {
+                        contentDescription = if (finished) "Mark $name not done" else "Mark $name done"
+                    },
+        ) {
+            Text(if (finished) "✓ Done" else "Done")
         }
     }
 }

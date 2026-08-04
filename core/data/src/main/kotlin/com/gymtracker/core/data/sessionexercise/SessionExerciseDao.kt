@@ -27,4 +27,12 @@ interface SessionExerciseDao {
     /** US-02c. The row's sets go with it via `ON DELETE CASCADE` on `sets`. */
     @Query("DELETE FROM session_exercises WHERE id = :id")
     suspend fun delete(id: String)
+
+    /** US-02d. Null puts the appearance back in progress; `updated_at` moves so M2's sync sees it. */
+    @Query("UPDATE session_exercises SET finished_at = :finishedAt, updated_at = :updatedAt WHERE id = :id")
+    suspend fun setFinishedAt(
+        id: String,
+        finishedAt: Long?,
+        updatedAt: Long,
+    )
 }

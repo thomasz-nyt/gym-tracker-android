@@ -48,7 +48,7 @@ Stories: US-01 … US-06b
 - [x] Add several exercises in one visit to the catalog (US-02a)
 - [x] Newest exercise first in the active session (US-02b)
 - [x] Remove an exercise from the session, with undo (US-02c)
-- [ ] Mark an exercise done in the active session (US-02d, ADR-0019)
+- [x] Mark an exercise done in the active session (US-02d, ADR-0019)
 - [x] Guided flow through one exercise (US-05a, ADR-0017)
 - [x] Workout detail from history (US-06b)
 

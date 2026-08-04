@@ -186,6 +186,13 @@ internal class FakeSessionExercises(
         cascade(id)
     }
 
+    override suspend fun setFinishedAt(
+        id: SessionExerciseId,
+        finishedAt: Instant?,
+    ) {
+        state.value = state.value.map { if (it.id == id) it.copy(finishedAt = finishedAt) else it }
+    }
+
     // MAX(position) + 1, as the DAO does it. A count would reuse a position after a
     // removal from the middle of a session (US-02c).
     override suspend fun nextPosition(sessionId: SessionId): Int =

@@ -36,6 +36,7 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.FinishExercise
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
@@ -72,6 +73,7 @@ object DataModule {
                 GymTrackerDatabase.MIGRATION_3_4,
                 GymTrackerDatabase.MIGRATION_4_5,
                 GymTrackerDatabase.MIGRATION_5_6,
+                GymTrackerDatabase.MIGRATION_6_7,
             ).build()
 
     @Provides
@@ -89,8 +91,9 @@ object DataModule {
     @Provides
     fun logSet(
         sets: SetRepository,
+        sessionExercises: SessionExerciseRepository,
         clock: Clock,
-    ): LogSet = LogSet(sets, clock) { UUID.randomUUID().toString() }
+    ): LogSet = LogSet(sets, sessionExercises, clock) { UUID.randomUUID().toString() }
 
     @Provides
     fun logSets(logSet: LogSet): LogSets = LogSets(logSet)
@@ -186,6 +189,12 @@ object DataModule {
         sets: SetRepository,
         catalog: ExerciseCatalog,
     ): WorkoutDetail = WorkoutDetail(sessions, sessionExercises, sets, catalog)
+
+    @Provides
+    fun finishExercise(
+        sessionExercises: SessionExerciseRepository,
+        clock: Clock,
+    ): FinishExercise = FinishExercise(sessionExercises, clock)
 
     @Provides
     fun removeExerciseFromSession(

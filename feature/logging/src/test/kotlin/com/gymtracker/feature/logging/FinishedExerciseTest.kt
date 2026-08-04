@@ -171,7 +171,8 @@ class FinishedExerciseTest {
 
                 viewModel.onToggleFinished(marked)
 
-                assertNull(expectMostRecentItem().exercises.single().sessionExercise.finishedAt)
+                val unmarked = expectMostRecentItem().exercises.single()
+                assertNull(unmarked.sessionExercise.finishedAt)
             }
         }
 
@@ -191,11 +192,11 @@ class FinishedExerciseTest {
                 viewModel.setEntry.confirm()
 
                 val after = expectMostRecentItem().exercises
-                assertNull(after.first().sessionExercise.finishedAt)
+                assertNull(after.single { it.exercise() == "bench" }.sessionExercise.finishedAt)
                 assertEquals(
-                    listOf("bench", "squat"),
+                    listOf("squat", "bench"),
                     after.ids(),
-                    "back in the in-progress group, on top: it holds the newest set",
+                    "back in the in-progress group, in its US-02b place — squat is still the newest added",
                 )
             }
         }

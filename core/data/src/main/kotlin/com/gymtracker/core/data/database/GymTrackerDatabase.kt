@@ -21,7 +21,7 @@ import com.gymtracker.core.data.set.SetEntity
  */
 @Database(
     entities = [SessionEntity::class, ExerciseEntity::class, SessionExerciseEntity::class, SetEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -44,6 +44,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V4_SETS = 4
         private const val V5_STARTER_EXERCISES = 5
         private const val V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT = 6
+        private const val V7_FINISHED_EXERCISES = 7
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -167,6 +168,18 @@ abstract class GymTrackerDatabase : RoomDatabase() {
             object : Migration(V5_STARTER_EXERCISES, V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("DELETE FROM `exercises`")
+                }
+            }
+
+        /**
+         * Adds `finished_at` to `session_exercises` (US-02d, ADR-0019). Additive and nullable:
+         * every appearance a device already holds reads as in progress, which is the only
+         * honest answer for a mark the member has not made.
+         */
+        val MIGRATION_6_7 =
+            object : Migration(V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT, V7_FINISHED_EXERCISES) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `finished_at` INTEGER")
                 }
             }
     }

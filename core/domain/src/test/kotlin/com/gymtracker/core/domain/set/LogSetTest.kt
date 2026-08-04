@@ -5,6 +5,7 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
+import com.gymtracker.core.domain.sessionexercise.FakeSessionExerciseRepository
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,7 @@ class LogSetTest {
     private val sets = FakeSets()
     private var nextId = 1
 
-    private fun logSet() = LogSet(sets, clock) { "set-${nextId++}" }
+    private fun logSet() = LogSet(sets, FakeSessionExerciseRepository(), clock) { "set-${nextId++}" }
 
     private fun prefill() = PrefillFromLastSet(sets)
 

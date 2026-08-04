@@ -62,7 +62,8 @@ class SetRepositoryTest {
     @After
     fun tearDown() = database.close()
 
-    private fun logSet(at: Instant) = LogSet(sets, Clock.fixed(at, ZoneOffset.UTC)) { "set-${nextId++}" }
+    private fun logSet(at: Instant) =
+        LogSet(sets, sessionExercises, Clock.fixed(at, ZoneOffset.UTC)) { "set-${nextId++}" }
 
     private suspend fun appearance(
         sessionId: String,
