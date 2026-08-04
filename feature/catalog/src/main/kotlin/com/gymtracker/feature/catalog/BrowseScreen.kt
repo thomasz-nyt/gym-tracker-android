@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -53,12 +55,17 @@ import com.gymtracker.core.domain.model.ExerciseId
  *
  * @param onChosen what a tap means here. The caller decides, which is the distinction the
  *   old state-derived routing could not express.
+ * @param pickForSession true when tapping adds to the workout in progress. The screen then
+ *   stays put and counts what it added, so picking three exercises is one visit rather than
+ *   three (US-02a). False is the look-something-up path, where a tap opens a detail screen
+ *   and leaving is what should happen.
  */
 @Composable
 fun BrowseRoute(
     onChosen: (ExerciseId) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    pickForSession: Boolean = false,
     viewModel: CatalogViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -69,8 +76,14 @@ fun BrowseRoute(
         onBodyPartToggled = viewModel::onBodyPartToggled,
         onEquipmentToggled = viewModel::onEquipmentToggled,
         onClearFilters = viewModel::onFiltersCleared,
-        onChosen = onChosen,
+        onChosen = { id ->
+            // Counted here and appended by the session. Recording before handing it on keeps
+            // the marker and the workout describing the same tap.
+            if (pickForSession) viewModel.onAddedToSession(id)
+            onChosen(id)
+        },
         onBack = onBack,
+        pickForSession = pickForSession,
         modifier = modifier,
     )
 }
@@ -85,8 +98,16 @@ internal fun BrowseScreen(
     onChosen: (ExerciseId) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    pickForSession: Boolean = false,
 ) {
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        floatingActionButton = {
+            // Only when picking. Browsing from home has no workout to be done adding to, and
+            // a floating "Done" there would be a button with nothing to finish (US-02a).
+            if (pickForSession) DoneAdding(state.addedThisVisit.size, onBack)
+        },
+    ) { padding ->
         Column(
             modifier =
                 Modifier
@@ -119,15 +140,43 @@ internal fun BrowseScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             } else {
-                Results(state.results, onChosen, Modifier.fillMaxWidth().weight(1f))
+                Results(
+                    results = state.results,
+                    timesAdded = state::timesAdded,
+                    onChosen = onChosen,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
             }
 
-            SecondaryActionButton(
-                text = "Done",
-                onClick = onBack,
-                modifier = Modifier.padding(bottom = GAP),
-            )
+            // When picking, the floating button above is the way back and this would be a
+            // second one saying the same thing.
+            if (!pickForSession) {
+                SecondaryActionButton(
+                    text = "Done",
+                    onClick = onBack,
+                    modifier = Modifier.padding(bottom = GAP),
+                )
+            }
         }
+    }
+}
+
+/**
+ * The way back to the workout, reporting what this visit added (US-02a).
+ *
+ * Floating rather than in the column, because the list scrolls and this should not: after
+ * three picks the member wants to leave from wherever they happen to be.
+ */
+@Composable
+private fun DoneAdding(
+    added: Int,
+    onDone: () -> Unit,
+) {
+    ExtendedFloatingActionButton(
+        onClick = onDone,
+        modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
+    ) {
+        Text(if (added == 0) "Done" else "Done  ·  $added added")
     }
 }
 
@@ -198,15 +247,32 @@ private fun FilterChips(
 @Composable
 private fun Results(
     results: List<Exercise>,
+    timesAdded: (ExerciseId) -> Int,
     onChosen: (ExerciseId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier) {
+    LazyColumn(
+        modifier = modifier,
+        // The floating button sits over the list, so the last result would be unreachable
+        // underneath it without this.
+        contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
+    ) {
         items(results, key = { it.id.value }) { exercise ->
+            val added = timesAdded(exercise.id)
             ListItem(
                 headlineContent = { Text(exercise.name, style = MaterialTheme.typography.titleMedium) },
                 supportingContent = { Text(exercise.equipment.label()) },
                 leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
+                trailingContent = {
+                    // Counted, not just flagged: US-02 allows the same exercise twice, so
+                    // tapping it again is a real action and the row should say so.
+                    if (added > 0) {
+                        Text(
+                            text = if (added == 1) "Added" else "Added $added×",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                },
                 // A whole row is the target, and it is a comfortable one: this list is scrolled
                 // and tapped one-handed, standing in front of a machine (ADR-0016).
                 modifier =
@@ -262,6 +328,9 @@ private val MIN_TOUCH_TARGET = GymDimens.MinTouchTarget
 private val THUMBNAIL = GymDimens.Thumbnail
 private val ROW_HEIGHT = 88.dp
 private val THUMBNAIL_CORNER = 8.dp
+
+/** Enough for the extended FAB plus its margin, so the last result clears it. */
+private val FAB_CLEARANCE = 88.dp
 
 @Preview
 @Composable

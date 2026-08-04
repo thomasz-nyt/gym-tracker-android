@@ -5,8 +5,10 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.DeletedSession
 import com.gymtracker.core.domain.session.RestoreSession
+import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionSummary
+import com.gymtracker.core.domain.session.WorkoutDetail
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -20,13 +22,15 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-/** The history screen's slice of [SessionUiState] (US-06, US-06a). */
+/** The history screen's slice of [SessionUiState] (US-06, US-06a, US-06b). */
 data class HistoryState(
     val isOpen: Boolean = false,
     /** Finished workouts, newest first. The session in progress is never among them. */
     val sessions: List<SessionSummary> = emptyList(),
     /** Whether the last delete can still be taken back — true for five seconds after it. */
     val canUndo: Boolean = false,
+    /** The workout opened from the list, or null while the list itself is on screen (US-06b). */
+    val detail: SessionDetail? = null,
 )
 
 /**
@@ -42,12 +46,14 @@ data class HistoryState(
  */
 class HistoryController(
     private val history: SessionHistory,
+    private val workoutDetail: WorkoutDetail,
     private val deleteSession: DeleteSession,
     private val restoreSession: RestoreSession,
     private val currentMember: CurrentMember,
     private val scope: CoroutineScope,
 ) {
     private val open = MutableStateFlow(false)
+    private val opened = MutableStateFlow<SessionId?>(null)
     private val undoable = MutableStateFlow<DeletedSession?>(null)
     private var expiry: Job? = null
 
@@ -61,9 +67,25 @@ class HistoryController(
             }
         }
 
+    /** Nothing is read until a workout is actually opened; the list should not pay for it. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val detail: Flow<SessionDetail?> =
+        opened.flatMapLatest { id ->
+            if (id == null) {
+                flowOf(null)
+            } else {
+                flow { emit(currentMember.id()) }.flatMapLatest { member -> workoutDetail(id, member) }
+            }
+        }
+
     val state: Flow<HistoryState> =
-        combine(open, entries, undoable) { isOpen, sessions, undo ->
-            HistoryState(isOpen = isOpen, sessions = sessions, canUndo = undo != null)
+        combine(open, entries, undoable, detail) { isOpen, sessions, undo, opened ->
+            HistoryState(
+                isOpen = isOpen,
+                sessions = sessions,
+                canUndo = undo != null,
+                detail = opened,
+            )
         }
 
     fun open() {
@@ -73,7 +95,18 @@ class HistoryController(
     /** Leaves history. Any undo still on offer expires with the screen it belonged to. */
     fun close() {
         open.value = false
+        opened.value = null
         forget()
+    }
+
+    /** Opens one past workout in full (US-06b). */
+    fun openWorkout(id: SessionId) {
+        opened.value = id
+    }
+
+    /** Back to the list. */
+    fun closeWorkout() {
+        opened.value = null
     }
 
     /**

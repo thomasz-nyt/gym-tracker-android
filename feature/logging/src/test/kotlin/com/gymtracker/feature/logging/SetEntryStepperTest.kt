@@ -11,7 +11,10 @@ import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.RestoreSession
 import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
+import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
@@ -88,8 +91,12 @@ class SetEntryStepperTest {
                     AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
                 endSession = EndSession(repository, sets, clock),
                 sessionHistory = SessionHistory(repository, sessionExercises, sets),
+                workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
                 deleteSession = DeleteSession(repository, sessionExercises, sets),
                 restoreSession = RestoreSession(repository, sessionExercises, sets),
+                removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
+                restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+                guidedPlanStore = FakeGuidedPlanStore(),
                 clock = clock,
             )
         }

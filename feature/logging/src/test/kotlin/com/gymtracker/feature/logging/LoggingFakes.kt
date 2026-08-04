@@ -1,6 +1,8 @@
 package com.gymtracker.feature.logging
 
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.guided.GuidedPlan
+import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Equipment
@@ -28,13 +30,28 @@ import java.time.Instant
  * repositories, never MockK — a mock proves a method was called, a fake proves the behaviour
  * was right).
  *
- * They lived inside `ActiveSessionViewModelTest` until the set-entry steppers arrived with
- * their own test class and needed the same doubles. Shared here rather than copied, so two
- * suites cannot drift into disagreeing about what a repository does.
+ * Lifted out of `ActiveSessionViewModelTest` when that class outgrew detekt's size limit: the
+ * set-entry steppers arrived with their own test class, and the guided-flow tests moved to
+ * [GuidedFlowTest], and both needed the same doubles. Shared here rather than copied, so no two
+ * suites can drift into disagreeing about what a repository does. They emulate SQL semantics —
+ * the cascades especially — because that is what makes a fake worth having over a mock.
  */
+
+internal class FakeGuidedPlanStore : GuidedPlanStore {
+    private val state = MutableStateFlow<GuidedPlan?>(null)
+
+    override val plan: Flow<GuidedPlan?> = state
+
+    override suspend fun setPlan(plan: GuidedPlan?) {
+        state.value = plan
+    }
+}
+
 internal class FakeRestTimerStore : RestTimerStore {
     private val endsAt = MutableStateFlow<java.time.Instant?>(null)
-    private val default = MutableStateFlow(Duration.ofSeconds(90))
+
+    // Matches DataStoreRestTimerStore.DEFAULT_REST_SECONDS_VALUE (US-05, amended 90s -> 60s).
+    private val default = MutableStateFlow(Duration.ofSeconds(60))
     private val asked = MutableStateFlow(false)
 
     override val restEndsAt = endsAt
@@ -87,6 +104,11 @@ internal class FakeSets(
         state.value = state.value.filterNot { sessionOf(it.sessionExerciseId) == sessionId }
     }
 
+    /** Stands in for the `ON DELETE CASCADE` from one `session_exercises` row (US-02c). */
+    fun cascadeDeleteExercise(sessionExerciseId: SessionExerciseId) {
+        state.value = state.value.filterNot { it.sessionExerciseId == sessionExerciseId }
+    }
+
     override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
         state.map { rows -> rows.filter { it.sessionExerciseId == sessionExerciseId }.sortedBy { it.setIndex } }
 
@@ -135,7 +157,9 @@ internal class FakeCatalog : ExerciseCatalog {
     override fun observeRanked(forMember: UserId): Flow<List<Exercise>> = MutableStateFlow(all)
 }
 
-internal class FakeSessionExercises : SessionExerciseRepository {
+internal class FakeSessionExercises(
+    private val cascade: (SessionExerciseId) -> Unit = {},
+) : SessionExerciseRepository {
     private val state = MutableStateFlow(emptyList<SessionExercise>())
 
     val all: List<SessionExercise> get() = state.value
@@ -151,11 +175,21 @@ internal class FakeSessionExercises : SessionExerciseRepository {
     override fun observeForSessions(sessionIds: List<SessionId>): Flow<List<SessionExercise>> =
         state.map { rows -> rows.filter { it.sessionId in sessionIds }.sortedBy { it.position } }
 
+    override suspend fun find(id: SessionExerciseId): SessionExercise? = state.value.firstOrNull { it.id == id }
+
     override suspend fun add(sessionExercise: SessionExercise) {
         state.value = state.value + sessionExercise
     }
 
-    override suspend fun nextPosition(sessionId: SessionId): Int = state.value.count { it.sessionId == sessionId } + 1
+    override suspend fun remove(id: SessionExerciseId) {
+        state.value = state.value.filterNot { it.id == id }
+        cascade(id)
+    }
+
+    // MAX(position) + 1, as the DAO does it. A count would reuse a position after a
+    // removal from the middle of a session (US-02c).
+    override suspend fun nextPosition(sessionId: SessionId): Int =
+        (state.value.filter { it.sessionId == sessionId }.maxOfOrNull { it.position } ?: 0) + 1
 }
 
 internal class FakeCurrentMember(

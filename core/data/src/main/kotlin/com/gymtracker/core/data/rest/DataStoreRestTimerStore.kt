@@ -50,7 +50,7 @@ class DataStoreRestTimerStore
             val DEFAULT_REST_SECONDS = longPreferencesKey("default_rest_seconds")
             val PERMISSION_ASKED = booleanPreferencesKey("notification_permission_asked")
 
-            /** US-05: "90 seconds until changed in settings". */
-            const val DEFAULT_REST_SECONDS_VALUE = 90L
+            /** US-05: "60 seconds until changed in settings". */
+            const val DEFAULT_REST_SECONDS_VALUE = 60L
         }
     }

@@ -15,12 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -86,31 +87,37 @@ import java.util.Locale
  * where *back* goes, not what you resume into.
  *
  * Picking an exercise is a destination now (US-12): "Add exercise" navigates to the shared
- * browse screen, which hands an id back through [pickedExerciseId]. History is the last
- * screen still selected by state within this route — the remainder of ADR-0013.
+ * browse screen, which hands its picks back through [pickedExerciseIds]. Three screens are
+ * still selected by state inside this route — history, the workout opened from it (US-06b),
+ * and the guided flow (US-05a). The first two are the remainder of ADR-0013; the third stays
+ * here on purpose, for the reason ADR-0017 gives.
  *
- * @param pickedExerciseId an exercise chosen on the browse screen, appended to the session
- *   once and then cleared through [onPickHandled].
+ * @param pickedExerciseIds the exercises chosen on the browse screen, in the order they were
+ *   picked, appended to the session once and then cleared through [onPicksHandled]. A list
+ *   because one visit may add several (US-02a), including the same exercise twice (US-02).
  */
 @Composable
 fun LoggingRoute(
     onBrowseCatalog: () -> Unit = {},
     onAddExercise: () -> Unit = {},
-    pickedExerciseId: String? = null,
-    onPickHandled: () -> Unit = {},
+    pickedExerciseIds: List<String> = emptyList(),
+    onPicksHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RestNotifications(viewModel)
 
-    // Browse is a destination of its own, so it hands an exercise back through the nav
-    // result rather than this screen owning a search overlay (US-12, ADR-0013).
-    LaunchedEffect(pickedExerciseId) {
-        pickedExerciseId?.let { id ->
-            viewModel.onExerciseChosen(ExerciseId(id))
-            onPickHandled()
-        }
+    // Browse is a destination of its own, so it hands exercises back through the nav result
+    // rather than this screen owning a search overlay (US-12, ADR-0013).
+    //
+    // Appended in pick order, so a workout set up in one visit reads in the order it was
+    // chosen — `position` is what US-02b then displays newest-first.
+    LaunchedEffect(pickedExerciseIds) {
+        if (pickedExerciseIds.isEmpty()) return@LaunchedEffect
+
+        viewModel.onExercisesChosen(pickedExerciseIds.map(::ExerciseId))
+        onPicksHandled()
     }
 
     LoggingScreen(
@@ -119,28 +126,73 @@ fun LoggingRoute(
         onFinishWorkout = viewModel::onFinishWorkout,
         onResolveStale = viewModel::onResolveStale,
         onAddSet = viewModel.setEntry::open,
+        onRemoveExercise = viewModel.removal::remove,
+        onUndoRemoval = viewModel.removal::undo,
+        guided = viewModel.guidedActions(),
         onSkipRest = viewModel.rest::skip,
         onOpenHistory = viewModel.history::open,
         onBrowseCatalog = onBrowseCatalog,
         onCloseHistory = viewModel.history::close,
         onDeleteWorkout = viewModel.history::delete,
         onUndoDelete = viewModel.history::undo,
-        setEntry =
-            SetEntryCallbacks(
-                onWeightChanged = { viewModel.setEntry.change(weight = it) },
-                onWeightStepped = viewModel.setEntry::stepWeight,
-                onRepsChanged = { viewModel.setEntry.change(reps = it) },
-                onRepsStepped = viewModel.setEntry::stepReps,
-                onSetsChanged = { viewModel.setEntry.change(sets = it) },
-                onSetsStepped = viewModel.setEntry::stepSets,
-                onRpeChanged = { viewModel.setEntry.change(rpe = it) },
-                onConfirm = viewModel.setEntry::confirm,
-                onDismiss = viewModel.setEntry::dismiss,
-            ),
+        onOpenWorkout = viewModel.history::openWorkout,
+        onCloseWorkout = viewModel.history::closeWorkout,
+        setEntry = viewModel.setEntryCallbacks(),
         onAddExercise = onAddExercise,
         modifier = modifier,
     )
 }
+
+/** Set entry's actions, wired to the controller that serves them (ADR-0016's stepper sheet). */
+private fun ActiveSessionViewModel.setEntryCallbacks() =
+    SetEntryCallbacks(
+        onWeightChanged = { setEntry.change(weight = it) },
+        onWeightStepped = setEntry::stepWeight,
+        onRepsChanged = { setEntry.change(reps = it) },
+        onRepsStepped = setEntry::stepReps,
+        onSetsChanged = { setEntry.change(sets = it) },
+        onSetsStepped = setEntry::stepSets,
+        onRpeChanged = { setEntry.change(rpe = it) },
+        onConfirm = setEntry::confirm,
+        onDismiss = setEntry::dismiss,
+    )
+
+/** The guided flow's actions, wired to the ViewModel that serves them. */
+private fun ActiveSessionViewModel.guidedActions() =
+    GuidedActions(
+        onStartExercise = ::onStartExercise,
+        onStartNext = ::onStartNextExercise,
+        onWeightChanged = { guided.changeSetup(weight = it) },
+        onSetupRepsChanged = { guided.changeSetup(reps = it) },
+        onRepsChanged = guided::changeReps,
+        onSetsChanged = { guided.changeSetup(sets = it) },
+        onBegin = guided::begin,
+        onDismissSetup = guided::dismissSetup,
+        onFinishSet = guided::finishSet,
+        onStop = guided::stop,
+    )
+
+/**
+ * Everything guided mode can be asked to do (US-05a).
+ *
+ * One record rather than ten loose lambdas on [LoggingScreen], which had accumulated
+ * thirty-five of them. Grouped by feature, not by arity: these are the actions of one flow,
+ * and they arrive and leave together.
+ */
+data class GuidedActions(
+    val onStartExercise: (SessionExerciseRow) -> Unit = {},
+    val onStartNext: (SessionExerciseRow) -> Unit = {},
+    val onWeightChanged: (String) -> Unit = {},
+    /** The target typed in the start dialog. */
+    val onSetupRepsChanged: (String) -> Unit = {},
+    /** The count actually managed on the set about to be finished — not the same thing. */
+    val onRepsChanged: (String) -> Unit = {},
+    val onSetsChanged: (String) -> Unit = {},
+    val onBegin: () -> Unit = {},
+    val onDismissSetup: () -> Unit = {},
+    val onFinishSet: () -> Unit = {},
+    val onStop: () -> Unit = {},
+)
 
 @Composable
 internal fun LoggingScreen(
@@ -149,31 +201,108 @@ internal fun LoggingScreen(
     onResolveStale: (StaleSessionPrompt) -> Unit,
     onFinishWorkout: () -> Unit = {},
     onAddSet: (SessionExerciseRow) -> Unit = {},
+    onRemoveExercise: (SessionExerciseId) -> Unit = {},
+    onUndoRemoval: () -> Unit = {},
+    guided: GuidedActions = GuidedActions(),
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onBrowseCatalog: () -> Unit = {},
     onCloseHistory: () -> Unit = {},
     onDeleteWorkout: (SessionId) -> Unit = {},
     onUndoDelete: () -> Unit = {},
+    onOpenWorkout: (SessionId) -> Unit = {},
+    onCloseWorkout: () -> Unit = {},
     setEntry: SetEntryCallbacks = SetEntryCallbacks.Inert,
     onAddExercise: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (state.history.isOpen) {
-        // Back leaves history rather than the app — it is a side trip from the session
-        // screen, not a second entry point.
-        BackHandler(onBack = onCloseHistory)
-        HistoryScreen(
-            state = state.history,
-            unit = state.unit,
-            onDelete = onDeleteWorkout,
-            onUndo = onUndoDelete,
-            onDone = onCloseHistory,
-            modifier = modifier,
-        )
-        return
-    }
+    val running = state.guided.running
+    val openWorkout = state.history.detail
 
+    // Which full-screen thing is showing. A `when` rather than a chain of early returns: the
+    // branches are exclusive and reading them as one list is the point (ADR-0013 keeps these
+    // out of the navigation graph deliberately — see ADR-0017 for the guided one).
+    when {
+        // Guided mode takes the screen while it runs, but it is a lens over the same rows —
+        // every set is already logged, so leaving it loses nothing (US-05a).
+        running != null -> {
+            BackHandler(onBack = guided.onStop)
+            GuidedExerciseScreen(
+                running = running,
+                unit = state.unit,
+                restRemaining = state.restRemaining,
+                onRepsChanged = guided.onRepsChanged,
+                onFinishSet = guided.onFinishSet,
+                onStartNext = guided.onStartNext,
+                onStop = guided.onStop,
+                modifier = modifier,
+            )
+        }
+
+        // Before the list, because a workout is only ever open while history is (US-06b).
+        openWorkout != null -> {
+            BackHandler(onBack = onCloseWorkout)
+            WorkoutDetailScreen(
+                detail = openWorkout,
+                unit = state.unit,
+                onBack = onCloseWorkout,
+                modifier = modifier,
+            )
+        }
+
+        state.history.isOpen -> {
+            // Back leaves history rather than the app — it is a side trip from the session
+            // screen, not a second entry point.
+            BackHandler(onBack = onCloseHistory)
+            HistoryScreen(
+                state = state.history,
+                unit = state.unit,
+                onDelete = onDeleteWorkout,
+                onUndo = onUndoDelete,
+                onDone = onCloseHistory,
+                onOpenWorkout = onOpenWorkout,
+                modifier = modifier,
+            )
+        }
+
+        else ->
+            SessionScreen(
+                state = state,
+                onStartWorkout = onStartWorkout,
+                onResolveStale = onResolveStale,
+                onFinishWorkout = onFinishWorkout,
+                onAddSet = onAddSet,
+                onRemoveExercise = onRemoveExercise,
+                onUndoRemoval = onUndoRemoval,
+                guided = guided,
+                onSkipRest = onSkipRest,
+                onOpenHistory = onOpenHistory,
+                onBrowseCatalog = onBrowseCatalog,
+                setEntry = setEntry,
+                onAddExercise = onAddExercise,
+                modifier = modifier,
+            )
+    }
+}
+
+/** The session itself: the body, and the two dialogs that can sit over it. */
+@Composable
+private fun SessionScreen(
+    state: SessionUiState,
+    onStartWorkout: () -> Unit,
+    onResolveStale: (StaleSessionPrompt) -> Unit,
+    onFinishWorkout: () -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onUndoRemoval: () -> Unit,
+    guided: GuidedActions,
+    onSkipRest: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onBrowseCatalog: () -> Unit,
+    setEntry: SetEntryCallbacks,
+    onAddExercise: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
         SessionBody(
             state = state,
@@ -182,12 +311,20 @@ internal fun LoggingScreen(
             onBrowseCatalog = onBrowseCatalog,
             onAddExercise = onAddExercise,
             onAddSet = onAddSet,
+            onRemoveExercise = onRemoveExercise,
+            onUndoRemoval = onUndoRemoval,
+            onStartExercise = guided.onStartExercise,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             modifier = Modifier.padding(padding),
         )
 
-        SessionDialogs(state = state, onResolveStale = onResolveStale, setEntry = setEntry)
+        SessionDialogs(
+            state = state,
+            onResolveStale = onResolveStale,
+            guided = guided,
+            setEntry = setEntry,
+        )
     }
 }
 
@@ -203,6 +340,9 @@ private fun SessionBody(
     onBrowseCatalog: () -> Unit,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onUndoRemoval: () -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -221,6 +361,10 @@ private fun SessionBody(
                     restRemaining = state.restRemaining,
                     onAddExercise = onAddExercise,
                     onAddSet = onAddSet,
+                    onRemoveExercise = onRemoveExercise,
+                    canUndoRemoval = state.canUndoRemoval,
+                    onUndoRemoval = onUndoRemoval,
+                    onStartExercise = onStartExercise,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )
@@ -229,15 +373,28 @@ private fun SessionBody(
     }
 }
 
-/** The two things that can sit over the session screen: the stale prompt, and set entry. */
+/** The things that can sit over the session screen: the stale prompt, guided setup, and set entry. */
 @Composable
 private fun SessionDialogs(
     state: SessionUiState,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    guided: GuidedActions,
     setEntry: SetEntryCallbacks,
 ) {
     state.stalePrompt?.let { prompt ->
         AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+    }
+
+    state.guided.setup?.let { setup ->
+        GuidedSetupDialog(
+            setup = setup,
+            unit = state.unit,
+            onWeightChanged = guided.onWeightChanged,
+            onRepsChanged = guided.onSetupRepsChanged,
+            onSetsChanged = guided.onSetsChanged,
+            onBegin = guided.onBegin,
+            onDismiss = guided.onDismissSetup,
+        )
     }
 
     state.setEntry?.let { entry ->
@@ -285,6 +442,10 @@ private fun ActiveSession(
     restRemaining: Duration?,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    canUndoRemoval: Boolean,
+    onUndoRemoval: () -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
 ) {
@@ -308,8 +469,17 @@ private fun ActiveSession(
                 exercises = exercises,
                 unit = unit,
                 onAddSet = onAddSet,
+                onRemoveExercise = onRemoveExercise,
+                onStartExercise = onStartExercise,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
+        }
+
+        // Below the list and above the primary action, same slot the rest banner uses: neither
+        // may cover the row you were about to read or the button you were about to press
+        // (US-02c, US-05).
+        if (canUndoRemoval) {
+            RemovalUndoBar(onUndoRemoval)
         }
 
         // Above the bottom action and never over the list: the rest banner displays the stored
@@ -441,31 +611,87 @@ private fun FinishWorkoutDialog(
  *
  * One card per exercise, each ending in a full-width "Add set" (ADR-0016). It used to be a
  * small text button on the row's right edge — the most-tapped control in the app rendered as
- * the smallest thing on screen.
+ * the smallest thing on screen. "Start exercise" (US-05a) and "Remove" (US-02c) sit above it as
+ * a lighter-weight row: "Add set" stays the one filled action per card.
  */
 @Composable
 private fun SessionExercises(
     exercises: List<SessionExerciseRow>,
     unit: WeightUnit,
     onAddSet: (SessionExerciseRow) -> Unit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-        items(exercises, key = { it.sessionExercise.id.value }) { row ->
+        itemsIndexed(exercises, key = { _, row -> row.sessionExercise.id.value }) { index, row ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(GymDimens.Gap),
                     verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
                 ) {
-                    // The catalog entry is only absent if the row outlived its exercise,
-                    // which the schema forbids; show the id rather than a blank line.
-                    Text(
-                        text = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        // The catalog entry is only absent if the row outlived its exercise,
+                        // which the schema forbids; show the id rather than a blank line.
+                        Text(
+                            text = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        // The place added, not the place shown (US-02b): the list itself is
+                        // newest-first, but this number counts up in the order you added them,
+                        // so removing one leaves a gap on purpose rather than renumbering.
+                        Text(
+                            text = "${exercises.size - index}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     LoggedSets(row.sets, unit)
+                    Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+                        TextButton(
+                            onClick = { onStartExercise(row) },
+                            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                        ) {
+                            Text("Start exercise")
+                        }
+                        // Red, and the only red on the card: ADR-0016 reserves the error colour
+                        // for destructive actions, matching history's "Delete" (US-02c).
+                        TextButton(
+                            onClick = { onRemoveExercise(row.sessionExercise.id) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                        ) {
+                            Text("Remove")
+                        }
+                    }
                     PrimaryActionButton(text = "Add set", onClick = { onAddSet(row) })
                 }
+            }
+        }
+    }
+}
+
+/** US-02c's five-second window, worded like history's so the two read alike. */
+@Composable
+private fun RemovalUndoBar(onUndo: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = GymDimens.Gap),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Exercise removed", style = MaterialTheme.typography.bodyMedium)
+            TextButton(
+                onClick = onUndo,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Undo")
             }
         }
     }

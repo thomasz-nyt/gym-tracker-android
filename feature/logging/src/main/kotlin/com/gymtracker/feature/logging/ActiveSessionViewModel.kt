@@ -3,6 +3,7 @@ package com.gymtracker.feature.logging
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Exercise
@@ -20,7 +21,10 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
+import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
@@ -36,6 +40,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -64,17 +69,34 @@ data class SessionUiState(
     val restRemaining: Duration? = null,
     /** History, and the workout deleted from it that can still be put back (US-06, US-06a). */
     val history: HistoryState = HistoryState(),
+    /** Whether the exercise just removed from the session can still be put back (US-02c). */
+    val canUndoRemoval: Boolean = false,
+    /** The exercise being walked through, if any (US-05a). */
+    val guided: GuidedState = GuidedState(),
 )
 
 /**
- * The tail of [SessionUiState], grouped only because `combine` takes a fixed number of flows.
- * Not a concept — do not let it become one.
+ * What the session screen itself renders, grouped only because `combine` takes a fixed number
+ * of flows. Not a concept — do not let it become one.
  */
 private data class ScreenExtras(
     val unit: WeightUnit,
     val entry: SetEntry?,
     val rest: Duration?,
+)
+
+/**
+ * The screens reached *from* the session — history, the undo of a removal, the guided flow.
+ * Grouped for the same reason, and just as much not a concept.
+ *
+ * Two grouping records on one screen is the signal ADR-0017 named: this ViewModel now drives
+ * the session, history, the workout detail, set entry, removal and the guided flow. The next
+ * thing added here should split it rather than add a third.
+ */
+private data class SideTrips(
     val history: HistoryState,
+    val canUndoRemoval: Boolean,
+    val guided: GuidedState,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -96,8 +118,12 @@ class ActiveSessionViewModel
         private val addExerciseToSession: AddExerciseToSession,
         private val endSession: EndSession,
         sessionHistory: SessionHistory,
+        workoutDetail: WorkoutDetail,
         deleteSession: DeleteSession,
         restoreSession: RestoreSession,
+        removeExerciseFromSession: RemoveExerciseFromSession,
+        restoreExerciseToSession: RestoreExerciseToSession,
+        private val guidedPlanStore: GuidedPlanStore,
         private val clock: Clock,
     ) : ViewModel() {
         /** The rest between sets lives in its own state holder; see [RestController]. */
@@ -107,9 +133,18 @@ class ActiveSessionViewModel
         val history =
             HistoryController(
                 history = sessionHistory,
+                workoutDetail = workoutDetail,
                 deleteSession = deleteSession,
                 restoreSession = restoreSession,
                 currentMember = currentMember,
+                scope = viewModelScope,
+            )
+
+        /** Removing an exercise lives in its own state holder; see [ExerciseRemovalController]. */
+        val removal =
+            ExerciseRemovalController(
+                removeExercise = removeExerciseFromSession,
+                restoreExercise = restoreExerciseToSession,
                 scope = viewModelScope,
             )
 
@@ -133,7 +168,7 @@ class ActiveSessionViewModel
             member.flatMapLatest { sessions.observeActiveSession(it) }
 
         @OptIn(ExperimentalCoroutinesApi::class)
-        private val exercises: Flow<List<SessionExerciseRow>> =
+        private val exercisesInOrder: Flow<List<SessionExerciseRow>> =
             combine(activeSession, member) { session, memberId -> session to memberId }
                 .flatMapLatest { (session, memberId) ->
                     if (session == null) {
@@ -161,18 +196,50 @@ class ActiveSessionViewModel
                     }
                 }
 
+        /**
+         * US-02b: newest first, so the exercise just added is under the thumb rather than at
+         * the bottom of a growing list.
+         *
+         * Reversed here and not in SQL on purpose. [exercisesInOrder] stays in `position`
+         * order — the order the workout was performed in, which is what history (US-06b)
+         * reads, what US-06a's restore promises back unchanged, and what guided mode walks
+         * through to find the next exercise (US-05a).
+         */
+        private val exercises: Flow<List<SessionExerciseRow>> = exercisesInOrder.map { it.asReversed() }
+
+        /**
+         * Walking through one exercise lives in its own state holder; see [GuidedController].
+         *
+         * Declared after [exercisesInOrder] because it reads it, and given the in-order flow
+         * rather than the display one so "the next exercise" means the next one performed.
+         */
+        val guided =
+            GuidedController(
+                performSet = { sessionExerciseId, input ->
+                    // Write first, rest second, and only if the write returned — the same
+                    // ordering SetEntryController holds to for the manual path (US-05).
+                    logSets(sessionExerciseId = sessionExerciseId, input = input, sets = 1)
+                    rest.startAfterSet()
+                },
+                unitPreference = unitPreference,
+                planStore = guidedPlanStore,
+                exercises = exercisesInOrder,
+                clock = clock,
+                scope = viewModelScope,
+            )
+
         val uiState: StateFlow<SessionUiState> =
             combine(
                 activeSession,
                 stalePrompt,
                 exercises,
-                combine(
-                    unitPreference.observe(),
-                    setEntry.entry,
-                    rest.remaining(),
-                    history.state,
-                ) { unit, entry, rest, past -> ScreenExtras(unit, entry, rest, past) },
-            ) { session, prompt, inSession, extras ->
+                combine(unitPreference.observe(), setEntry.entry, rest.remaining()) { unit, entry, left ->
+                    ScreenExtras(unit, entry, left)
+                },
+                combine(history.state, removal.canUndo, guided.state) { past, canUndoRemoval, guidedState ->
+                    SideTrips(past, canUndoRemoval, guidedState)
+                },
+            ) { session, prompt, inSession, extras, sideTrips ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = session,
@@ -181,7 +248,9 @@ class ActiveSessionViewModel
                     unit = extras.unit,
                     setEntry = extras.entry,
                     restRemaining = extras.rest,
-                    history = extras.history,
+                    history = sideTrips.history,
+                    canUndoRemoval = sideTrips.canUndoRemoval,
+                    guided = sideTrips.guided,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
@@ -213,17 +282,52 @@ class ActiveSessionViewModel
          *
          * Browse is a navigation destination of its own now, so it hands an id back rather
          * than this screen owning a search overlay. Adding the same exercise twice is allowed
-         * — US-02 says so, and each appearance is its own row.
+         * — US-02 says so, and each appearance is its own row, which is also what lets one
+         * visit to browse add the same movement more than once (US-02a).
          */
-        fun onExerciseChosen(exerciseId: ExerciseId) {
+        fun onExerciseChosen(exerciseId: ExerciseId) = onExercisesChosen(listOf(exerciseId))
+
+        /**
+         * Appends everything one visit to the browse screen picked, in pick order (US-02a).
+         *
+         * **One coroutine, appended in sequence**, which matters more than it looks:
+         * `AddExerciseToSession` takes its position from `MAX(position) + 1`, so appending
+         * concurrently would let two exercises read the same maximum and land on the same
+         * position. Looping over [onExerciseChosen] instead of this would do exactly that.
+         */
+        fun onExercisesChosen(exerciseIds: List<ExerciseId>) {
+            if (exerciseIds.isEmpty()) return
+
             viewModelScope.launch {
                 // Read the session from the repository rather than uiState: uiState is shared
                 // WhileSubscribed, so its value is the initial placeholder whenever the screen
                 // is not currently collecting. The database is the source of truth (§2).
                 val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
-                addExerciseToSession(session.id, exerciseId)
+                exerciseIds.forEach { addExerciseToSession(session.id, it) }
             }
         }
+
+        /**
+         * Opens the guided start dialog for an exercise (US-05a).
+         *
+         * The prefill is looked up here rather than inside [GuidedController] so US-03's
+         * prefilling rule stays in one place and the controller stays small enough to test.
+         */
+        fun onStartExercise(row: SessionExerciseRow) {
+            viewModelScope.launch { guided.start(row, prefillFor(row)) }
+        }
+
+        /** Moves from the summary of one exercise to the start of the next (US-05a). */
+        fun onStartNextExercise(row: SessionExerciseRow) {
+            viewModelScope.launch { guided.startNext(row, prefillFor(row)) }
+        }
+
+        private suspend fun prefillFor(row: SessionExerciseRow) =
+            prefillFromLastSet(
+                row.sessionExercise.exerciseId,
+                currentMember.id(),
+                unitPreference.current(),
+            )
 
         /**
          * Applies the member's answer to the abandoned-session prompt. [StaleSessionPrompt]

@@ -15,9 +15,16 @@ interface SessionExerciseDao {
     @Query("SELECT * FROM session_exercises WHERE session_id IN (:sessionIds) ORDER BY position ASC")
     fun observeForSessions(sessionIds: List<String>): Flow<List<SessionExerciseEntity>>
 
+    @Query("SELECT * FROM session_exercises WHERE id = :id")
+    suspend fun find(id: String): SessionExerciseEntity?
+
     @Query("SELECT COALESCE(MAX(position), 0) FROM session_exercises WHERE session_id = :sessionId")
     suspend fun maxPosition(sessionId: String): Int
 
     @Insert
     suspend fun insert(sessionExercise: SessionExerciseEntity)
+
+    /** US-02c. The row's sets go with it via `ON DELETE CASCADE` on `sets`. */
+    @Query("DELETE FROM session_exercises WHERE id = :id")
+    suspend fun delete(id: String)
 }

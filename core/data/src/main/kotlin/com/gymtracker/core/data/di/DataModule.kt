@@ -10,6 +10,7 @@ import com.gymtracker.core.data.exercise.AndroidCatalogAssetReader
 import com.gymtracker.core.data.exercise.CatalogAssetReader
 import com.gymtracker.core.data.exercise.ExerciseDao
 import com.gymtracker.core.data.exercise.RoomExerciseCatalog
+import com.gymtracker.core.data.guided.DataStoreGuidedPlanStore
 import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
@@ -20,6 +21,7 @@ import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -32,7 +34,10 @@ import com.gymtracker.core.domain.session.RestoreSession
 import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
+import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
@@ -173,6 +178,26 @@ object DataModule {
         sessionExercises: SessionExerciseRepository,
         sets: SetRepository,
     ): RestoreSession = RestoreSession(sessions, sessionExercises, sets)
+
+    @Provides
+    fun workoutDetail(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        catalog: ExerciseCatalog,
+    ): WorkoutDetail = WorkoutDetail(sessions, sessionExercises, sets, catalog)
+
+    @Provides
+    fun removeExerciseFromSession(
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): RemoveExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets)
+
+    @Provides
+    fun restoreExerciseToSession(
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): RestoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets)
 }
 
 @Module
@@ -189,6 +214,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun restTimerStore(impl: DataStoreRestTimerStore): RestTimerStore
+
+    @Binds
+    abstract fun guidedPlanStore(impl: DataStoreGuidedPlanStore): GuidedPlanStore
 
     @Binds
     abstract fun exerciseCatalog(impl: RoomExerciseCatalog): ExerciseCatalog

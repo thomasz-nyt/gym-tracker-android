@@ -129,6 +129,18 @@ reading a denormalised `exercise_id` off the set (ADR-0004).
 
 `sync_state`: `SYNCED | PENDING | ERROR`.
 
+### What is deliberately not a table
+
+Per ADR-0005, anything that only ever describes *this device or this install* lives in
+DataStore rather than Room: the local member UUID, the unit preference, the rest timer's end
+time and default (ADR-0010), and the guided flow's in-flight target (US-05a, ADR-0017).
+
+The last one is the one worth stating explicitly, because it looks like it wants a table and
+does not have one. A guided target is the sets-by-reps typed when the exercise was started; it
+lasts for that exercise and is discarded. Giving it a row would make it a prescription entity —
+which ADR-0009 rejected and ADR-0017 keeps rejecting. The **sets it produces** are ordinary
+rows in `sets`, written one at a time as they are performed.
+
 ### Catalog IDs are deterministic
 
 The bundled catalog (free-exercise-db) is converted at build time by a script in
