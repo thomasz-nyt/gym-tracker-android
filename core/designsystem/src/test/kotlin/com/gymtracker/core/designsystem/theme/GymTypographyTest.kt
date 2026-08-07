@@ -67,6 +67,16 @@ class GymTypographyTest {
     }
 
     @Test
+    fun `every role is set in Archivo, not the platform default`() {
+        // ADR-0019 replaces Roboto with Archivo. Setting it on one role and forgetting the rest
+        // is the failure this catches — a typeface that applies to three quarters of a screen
+        // looks like a rendering bug rather than a decision.
+        roles.forEach { (role, styles) ->
+            assertEquals(ArchivoFamily, styles.first.fontFamily, "$role is not set in Archivo")
+        }
+    }
+
+    @Test
     fun `line height leaves room for the text it holds`() {
         roles.forEach { (role, styles) ->
             val style = styles.first
