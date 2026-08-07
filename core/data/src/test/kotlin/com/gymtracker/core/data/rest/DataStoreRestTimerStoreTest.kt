@@ -25,9 +25,9 @@ class DataStoreRestTimerStoreTest {
         PreferenceDataStoreFactory.create { folder.newFile("rest.preferences_pb") }
 
     @Test
-    fun `a fresh install rests for ninety seconds`() =
+    fun `a fresh install rests for one minute`() =
         runTest {
-            assertEquals(Duration.ofSeconds(90), DataStoreRestTimerStore(store()).defaultRest.first())
+            assertEquals(Duration.ofSeconds(60), DataStoreRestTimerStore(store()).defaultRest.first())
         }
 
     @Test

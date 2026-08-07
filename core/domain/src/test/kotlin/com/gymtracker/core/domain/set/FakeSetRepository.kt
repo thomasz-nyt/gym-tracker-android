@@ -41,6 +41,11 @@ class FakeSetRepository : SetRepository {
         state.value = state.value.filterNot { sessionOf[it.sessionExerciseId] == sessionId }
     }
 
+    /** Stands in for the `ON DELETE CASCADE` from one `session_exercises` row (US-02c). */
+    fun cascadeDeleteExercise(sessionExerciseId: SessionExerciseId) {
+        state.value = state.value.filterNot { it.sessionExerciseId == sessionExerciseId }
+    }
+
     override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
         state.map { rows -> rows.filter { it.sessionExerciseId == sessionExerciseId }.sortedBy { it.setIndex } }
 

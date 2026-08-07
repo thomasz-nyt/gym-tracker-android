@@ -28,7 +28,8 @@ internal object Logging
 /**
  * @property pickForSession whether a tap adds the exercise to the workout in progress
  *   (US-02's path, reached from the session) or opens its detail screen (reached from home).
- *   The same screen either way, which is what US-12 asks for.
+ *   The same screen either way, which is what US-12 asks for. When picking, the screen stays
+ *   up across taps so several exercises can be added in one visit (US-02a).
  */
 @Serializable
 internal data class Browse(
@@ -60,17 +61,17 @@ fun GymTrackerNavHost(
         modifier = modifier,
     ) {
         composable<Logging> { entry ->
-            // Browse hands an exercise back here rather than knowing anything about sessions,
+            // Browse hands exercises back here rather than knowing anything about sessions,
             // which is what lets one screen serve both entry points.
             val picked by entry.savedStateHandle
-                .getStateFlow<String?>(PICKED_EXERCISE, null)
+                .getStateFlow(PICKED_EXERCISES, ArrayList<String>())
                 .collectAsStateWithLifecycle()
 
             LoggingRoute(
                 onBrowseCatalog = { navController.navigate(Browse(pickForSession = false)) },
                 onAddExercise = { navController.navigate(Browse(pickForSession = true)) },
-                pickedExerciseId = picked,
-                onPickHandled = { entry.savedStateHandle[PICKED_EXERCISE] = null },
+                pickedExerciseIds = picked,
+                onPicksHandled = { entry.savedStateHandle[PICKED_EXERCISES] = ArrayList<String>() },
             )
         }
 
@@ -78,12 +79,17 @@ fun GymTrackerNavHost(
             val pickForSession = entry.toRoute<Browse>().pickForSession
 
             BrowseRoute(
+                pickForSession = pickForSession,
                 onChosen = { id ->
                     if (pickForSession) {
-                        // Straight back to the session with the exercise added — US-02's path
-                        // gains no steps by having become a destination.
-                        navController.previousBackStackEntry?.savedStateHandle?.set(PICKED_EXERCISE, id.value)
-                        navController.popBackStack()
+                        // Accumulated rather than popped on the first pick: picking three
+                        // exercises is one visit (US-02a). The browse screen decides when it
+                        // is finished, through onBack.
+                        val handle = navController.previousBackStackEntry?.savedStateHandle
+                        val alreadyPicked = handle?.get<ArrayList<String>>(PICKED_EXERCISES).orEmpty()
+                        // ArrayList, not the List the rest of the code sees: a SavedStateHandle
+                        // value has to survive being written to a Bundle.
+                        handle?.set(PICKED_EXERCISES, ArrayList(alreadyPicked + id.value))
                     } else {
                         navController.navigate(ExerciseDetail(id.value))
                     }
@@ -101,5 +107,10 @@ fun GymTrackerNavHost(
     }
 }
 
-/** Where the browse screen leaves the exercise it was asked to pick. */
-private const val PICKED_EXERCISE = "picked-exercise"
+/**
+ * Where the browse screen leaves the exercises it was asked to pick.
+ *
+ * A list, not one id: a single visit can add several (US-02a), and the same exercise twice
+ * (US-02), so this is appended to rather than overwritten.
+ */
+private const val PICKED_EXERCISES = "picked-exercises"

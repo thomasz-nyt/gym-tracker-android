@@ -1,6 +1,7 @@
 package com.gymtracker.core.domain.sessionexercise
 
 import com.gymtracker.core.domain.model.SessionExercise
+import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import kotlinx.coroutines.flow.Flow
 
@@ -17,9 +18,25 @@ interface SessionExerciseRepository {
      */
     fun observeForSessions(sessionIds: List<SessionId>): Flow<List<SessionExercise>>
 
+    /** One appearance, or null if it is not there. */
+    suspend fun find(id: SessionExerciseId): SessionExercise?
+
     /** Appends [sessionExercise]. Callers get its position from [nextPosition]. */
     suspend fun add(sessionExercise: SessionExercise)
 
-    /** The position an exercise appended to [sessionId] should take. 1-based. */
+    /**
+     * Removes one appearance (US-02c). Its sets go with it via `ON DELETE CASCADE`.
+     *
+     * Positions are left as they are: the surviving rows keep the numbers they were performed
+     * under, and the gap is closed when the list is displayed (US-02b).
+     */
+    suspend fun remove(id: SessionExerciseId)
+
+    /**
+     * The position an exercise appended to [sessionId] should take. 1-based.
+     *
+     * `MAX(position) + 1` rather than a count, so removing from the middle of a session cannot
+     * mint a position that a surviving row already holds.
+     */
     suspend fun nextPosition(sessionId: SessionId): Int
 }

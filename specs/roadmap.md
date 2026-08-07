@@ -32,7 +32,7 @@ Goal: an empty app that builds, lints, and tests in CI.
 Goal: log a workout end-to-end with no account and no network. This is the
 milestone that decides whether the app is good.
 
-Stories: US-01 … US-06
+Stories: US-01 … US-06b
 
 - [x] Room schema: `sessions`, `exercises`, `session_exercises`, `sets`
 - [x] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
@@ -45,6 +45,23 @@ Stories: US-01 … US-06
 - [x] End a session, and the session history list (US-06)
 - [x] Delete a past workout, with undo (US-06a, ADR-0012)
 - [x] Unit preference (kg / lb), stored per user, converted at the edge only. Both units are shown (ADR-0008)
+- [x] Add several exercises in one visit to the catalog (US-02a)
+- [x] Newest exercise first in the active session (US-02b)
+- [x] Remove an exercise from the session, with undo (US-02c)
+- [x] Guided flow through one exercise (US-05a, ADR-0017)
+- [x] Workout detail from history (US-06b)
+
+The last five were added 2026-08-02 from a real session on the gym floor, the same
+way US-06a and ADR-0011 arrived. They are ergonomics on the core loop, not new
+scope: none of them adds a table or a migration. A sixth idea from that session —
+sensor-based rep counting — is **not** here on purpose; it is deferred in
+`adr/0017-sensor-assisted-rep-counting.md` because constitution §2.4 forbids
+logging an inferred value.
+
+US-02a was written against the in-session search and had to be rebuilt when M3
+made browsing a destination of its own (ADR-0013). The complaint it answers
+outlived its first implementation: picking three exercises should not be three
+round trips, whether the picker is an overlay or a screen.
 
 **Exit:** two-tap set logging measured and asserted in an instrumented test. You
 personally log three real workouts on your own device without wanting to fix
@@ -93,8 +110,10 @@ does not contain and a Storage bucket M2 has not built — see ADR-0014.
 - [x] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
 - [ ] Navigation Compose replaces state-derived routing (ADR-0013). **Partly done:** the
       graph covers home/session, browse and detail, and the exercise search is a destination
-      rather than an overlay. History is the one screen still selected by state inside the
-      logging route.
+      rather than an overlay. Three screens are still selected by state inside the logging
+      route: history, the workout detail reached from it (US-06b), and the guided flow
+      (US-05a). The guided one is deliberate and is not a candidate for the graph — see
+      ADR-0017; the other two are the remaining work here.
 
 **Exit:** in airplane mode, standing at an unfamiliar machine, you can narrow the catalog
 by body part and equipment and confirm the machine from its photo or its numbered steps.

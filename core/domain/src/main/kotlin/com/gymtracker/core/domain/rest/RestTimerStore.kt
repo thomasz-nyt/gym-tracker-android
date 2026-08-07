@@ -14,7 +14,7 @@ interface RestTimerStore {
     /** When the running rest ends, or null if none is running. */
     val restEndsAt: Flow<Instant?>
 
-    /** How long a rest lasts, 90 seconds until the member changes it (US-05). */
+    /** How long a rest lasts, 60 seconds until the member changes it (US-05). */
     val defaultRest: Flow<Duration>
 
     /** True until the notification permission has been requested once (US-05: never re-prompted). */
