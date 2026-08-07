@@ -5,54 +5,62 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * The app's palette (ADR-0016).
+ * The app's palette (ADR-0019, superseding ADR-0016's orange).
  *
- * One accent, high-visibility orange, in both schemes. Text on it is near-black rather than
- * white, which is how high-vis actually works — no orange bright enough to read as bright can
- * carry white text at AA contrast.
+ * A mono system: everything on screen is achromatic except one accent, red. The light scheme
+ * fills with a deep red under a pale label; the dark scheme fills with a brighter red under a
+ * near-black one. Both directions are gated at WCAG AA by `GymColorSchemeTest`.
  *
- * Red belongs to destructive actions and errors only, so Delete can never dress like Save.
+ * Red is *not* reserved for destructive actions any more — it cannot be, it is the accent.
+ * ADR-0019 replaced that guarantee with a layout rule: a destructive control never shares a
+ * surface with a save, and is outlined rather than filled. Colour no longer carries it.
  *
- * `GymColorSchemeTest` asserts the contrast ratios, the accent's hue and brightness, and that
- * error stays red. Changing a value here means making that suite agree.
+ * Changing a value here means making the contrast suite agree.
  */
-private val Orange = Color(0xFFF26200)
-private val OrangeBright = Color(0xFFFF6D00)
-private val OnOrange = Color(0xFF1A0E00)
+private val Red = Color(0xFFAE1800)
+private val RedBright = Color(0xFFFF563C)
+private val OnRed = Color(0xFFF3F2F2)
+private val OnRedBright = Color(0xFF2A0500)
 
-private val OrangeContainerLight = Color(0xFFFFDBC7)
-private val OrangeContainerDark = Color(0xFF6B2A00)
-private val OnOrangeContainerLight = Color(0xFF331200)
+private val RedContainerLight = Color(0xFFFFDAD4)
+private val RedContainerDark = Color(0xFF7C1405)
+private val OnRedContainerLight = Color(0xFF410000)
 
-private val WarmNeutralLight = Color(0xFFEADDD0)
-private val WarmNeutralDark = Color(0xFF453A2F)
-private val OnWarmNeutralLight = Color(0xFF3B2E22)
+// ── The ground ────────────────────────────────────────────────────────────────────────
+// Achromatic by measurement, not by intention: `GymColorSchemeTest` asserts saturation on
+// every one of these. Material's own surface ramp is violet-tinted, and overriding `surface`
+// alone leaves the rest of it that way — the bug ADR-0016 caught in the cards and finding 08
+// caught one token further on, in `outlineVariant`.
+private val GroundLight = Color(0xFFF3F2F2)
+private val InkLight = Color(0xFF201E1D)
+private val GroundDark = Color(0xFF131212)
+private val InkDark = Color(0xFFEDEBEA)
 
-private val SurfaceLight = Color(0xFFFFFBF7)
-private val OnSurfaceLight = Color(0xFF1C1B1A)
-private val SurfaceDark = Color(0xFF16130F)
-private val OnSurfaceDark = Color(0xFFEDE0D4)
+private val MutedInkLight = Color(0xFF444141)
+private val MutedInkDark = Color(0xFFC6C4C3)
 
-private val SurfaceVariantLight = Color(0xFFEFE0D5)
-private val OnSurfaceVariantLight = Color(0xFF4F4539)
-private val SurfaceVariantDark = Color(0xFF3A322B)
-private val OnSurfaceVariantDark = Color(0xFFD8C7B8)
+private val GreyLight = Color(0xFFE3E1E0)
+private val GreyDark = Color(0xFF3A3837)
 
-// The elevation ramp cards and the set-entry sheet are drawn on. Material's defaults for these
-// are tinted violet, and overriding `surface` alone leaves them that way — which shipped as a
-// lavender card on a warm-white screen and was only visible on a device. `GymColorSchemeTest`
-// now asserts every surface is neutral or warm.
 private val SurfaceContainerLowestLight = Color(0xFFFFFFFF)
-private val SurfaceContainerLowLight = Color(0xFFFBF4EC)
-private val SurfaceContainerLight = Color(0xFFF5EEE5)
-private val SurfaceContainerHighLight = Color(0xFFEFE8DF)
-private val SurfaceContainerHighestLight = Color(0xFFE9E2D9)
+private val SurfaceContainerLowLight = Color(0xFFEDECEC)
+private val SurfaceContainerLight = Color(0xFFE8E7E6)
+private val SurfaceContainerHighLight = Color(0xFFE2E1E0)
+private val SurfaceContainerHighestLight = Color(0xFFDCDBDA)
 
-private val SurfaceContainerLowestDark = Color(0xFF100D0A)
-private val SurfaceContainerLowDark = Color(0xFF1E1A16)
-private val SurfaceContainerDark = Color(0xFF221E19)
-private val SurfaceContainerHighDark = Color(0xFF2D2822)
-private val SurfaceContainerHighestDark = Color(0xFF38322B)
+private val SurfaceContainerLowestDark = Color(0xFF0D0C0C)
+private val SurfaceContainerLowDark = Color(0xFF1C1B1A)
+private val SurfaceContainerDark = Color(0xFF201E1D)
+private val SurfaceContainerHighDark = Color(0xFF2A2827)
+private val SurfaceContainerHighestDark = Color(0xFF353332)
+
+private val OutlineLight = Color(0xFF605D5D)
+private val OutlineDark = Color(0xFF8F8C8B)
+
+// The token `HorizontalDivider` reads. Never set before ADR-0019, so it drew Material's
+// #CAC4D0 lavender on browse, history and workout detail — redesign audit, finding 08.
+private val OutlineVariantLight = Color(0xFFC6C4C3)
+private val OutlineVariantDark = Color(0xFF4A4847)
 
 private val ErrorLight = Color(0xFFBA1A1A)
 private val ErrorDark = Color(0xFFFFB4AB)
@@ -60,56 +68,58 @@ private val OnErrorDark = Color(0xFF690005)
 
 val GymLightColorScheme =
     lightColorScheme(
-        primary = Orange,
-        onPrimary = OnOrange,
-        primaryContainer = OrangeContainerLight,
-        onPrimaryContainer = OnOrangeContainerLight,
-        secondary = OnWarmNeutralLight,
-        onSecondary = Color.White,
-        secondaryContainer = WarmNeutralLight,
-        onSecondaryContainer = OnWarmNeutralLight,
-        tertiary = OnWarmNeutralLight,
-        onTertiary = Color.White,
-        background = SurfaceLight,
-        onBackground = OnSurfaceLight,
-        surface = SurfaceLight,
-        onSurface = OnSurfaceLight,
-        surfaceVariant = SurfaceVariantLight,
-        onSurfaceVariant = OnSurfaceVariantLight,
+        primary = Red,
+        onPrimary = OnRed,
+        primaryContainer = RedContainerLight,
+        onPrimaryContainer = OnRedContainerLight,
+        secondary = InkLight,
+        onSecondary = GroundLight,
+        secondaryContainer = GreyLight,
+        onSecondaryContainer = InkLight,
+        tertiary = InkLight,
+        onTertiary = GroundLight,
+        background = GroundLight,
+        onBackground = InkLight,
+        surface = GroundLight,
+        onSurface = InkLight,
+        surfaceVariant = GreyLight,
+        onSurfaceVariant = MutedInkLight,
         surfaceContainerLowest = SurfaceContainerLowestLight,
         surfaceContainerLow = SurfaceContainerLowLight,
         surfaceContainer = SurfaceContainerLight,
         surfaceContainerHigh = SurfaceContainerHighLight,
         surfaceContainerHighest = SurfaceContainerHighestLight,
-        outline = Color(0xFF6B5F52),
+        outline = OutlineLight,
+        outlineVariant = OutlineVariantLight,
         error = ErrorLight,
         onError = Color.White,
     )
 
 val GymDarkColorScheme =
     darkColorScheme(
-        primary = OrangeBright,
-        onPrimary = OnOrange,
-        primaryContainer = OrangeContainerDark,
-        onPrimaryContainer = OrangeContainerLight,
-        secondary = OnSurfaceVariantDark,
-        onSecondary = Color(0xFF3B2E22),
-        secondaryContainer = WarmNeutralDark,
-        onSecondaryContainer = WarmNeutralLight,
-        tertiary = OnSurfaceVariantDark,
-        onTertiary = Color(0xFF3B2E22),
-        background = SurfaceDark,
-        onBackground = OnSurfaceDark,
-        surface = SurfaceDark,
-        onSurface = OnSurfaceDark,
-        surfaceVariant = SurfaceVariantDark,
-        onSurfaceVariant = OnSurfaceVariantDark,
+        primary = RedBright,
+        onPrimary = OnRedBright,
+        primaryContainer = RedContainerDark,
+        onPrimaryContainer = RedContainerLight,
+        secondary = InkDark,
+        onSecondary = GroundDark,
+        secondaryContainer = GreyDark,
+        onSecondaryContainer = GreyLight,
+        tertiary = InkDark,
+        onTertiary = GroundDark,
+        background = GroundDark,
+        onBackground = InkDark,
+        surface = GroundDark,
+        onSurface = InkDark,
+        surfaceVariant = GreyDark,
+        onSurfaceVariant = MutedInkDark,
         surfaceContainerLowest = SurfaceContainerLowestDark,
         surfaceContainerLow = SurfaceContainerLowDark,
         surfaceContainer = SurfaceContainerDark,
         surfaceContainerHigh = SurfaceContainerHighDark,
         surfaceContainerHighest = SurfaceContainerHighestDark,
-        outline = Color(0xFF9C8C7C),
+        outline = OutlineDark,
+        outlineVariant = OutlineVariantDark,
         error = ErrorDark,
         onError = OnErrorDark,
     )

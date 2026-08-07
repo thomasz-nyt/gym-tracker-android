@@ -5,9 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 
 /**
- * The app theme. Nothing here is a Material default: the type scale is ADR-0011's and the
- * palette is ADR-0016's high-visibility orange, both chosen for reading a phone at arm's
- * length on a gym floor.
+ * The app theme. Nothing here is a Material default: the type scale is ADR-0011's, the palette
+ * is ADR-0019's mono-with-one-red-accent, and every corner is square per the same ADR — all of
+ * it chosen for reading a phone at arm's length on a gym floor.
  *
  * The system light/dark setting is honoured for the same reason ADR-0011 kept sizes in `sp` —
  * a member who has already told the OS what they want should not be overridden by this app.
@@ -21,6 +21,7 @@ fun GymTrackerTheme(
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) GymDarkColorScheme else GymLightColorScheme,
+        shapes = GymShapes,
         typography = GymTypography,
         content = content,
     )

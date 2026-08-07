@@ -28,6 +28,7 @@ fun PrimaryActionButton(
     Button(
         onClick = onClick,
         enabled = enabled,
+        shape = MaterialTheme.shapes.large,
         modifier = modifier.fillMaxWidth().height(GymDimens.PrimaryAction),
     ) {
         Text(text, style = MaterialTheme.typography.titleMedium)
@@ -48,6 +49,7 @@ fun SecondaryActionButton(
 ) {
     FilledTonalButton(
         onClick = onClick,
+        shape = MaterialTheme.shapes.large,
         modifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
     ) {
         Text(text, style = MaterialTheme.typography.titleSmall)

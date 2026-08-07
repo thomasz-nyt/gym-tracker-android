@@ -7,18 +7,25 @@ import kotlin.math.pow
 import kotlin.test.assertTrue
 
 /**
- * ADR-0016: the palette is gated by this test, not by eye.
+ * ADR-0019: the palette is gated by this test, not by eye. Inherited from ADR-0016, which set
+ * that rule for an orange palette; the rule outlived the colour.
  *
- * The rules it encodes: every pair the app renders as text-on-fill meets WCAG AA; the accent
- * is a bright orange in both schemes, so the "bright color" the maintainer asked for cannot
- * quietly drift muted; and error stays red, so a destructive control can never be mistaken
- * for the primary action it sits next to.
+ * What it encodes now: every pair the app renders as text-on-fill meets WCAG AA; the accent is
+ * a saturated red in both schemes, so the one identity decision cannot quietly drift to brown;
+ * every surface is achromatic, because the system is mono and a tinted surface is a bug.
+ *
+ * What it deliberately no longer encodes: that a destructive control looks different from a
+ * save. ADR-0016 got that from the palette — red meant Delete, orange meant Save. The accent is
+ * red now, so colour cannot carry it, and ADR-0019 replaced it with a **layout** invariant: a
+ * destructive control never shares a surface with a save, and is outlined rather than filled.
+ * That is asserted by Compose UI tests over the screens that have both. If those tests are
+ * deleted, nothing here will catch it.
  */
 class GymColorSchemeTest {
     private val schemes: Map<String, ColorScheme> =
         mapOf("light" to GymLightColorScheme, "dark" to GymDarkColorScheme)
 
-    /** The pairs the app actually renders text on, per ADR-0016. */
+    /** The pairs the app actually renders text on, per ADR-0019. */
     private fun ColorScheme.renderedPairs(): Map<String, Pair<Color, Color>> =
         mapOf(
             "primary" to (primary to onPrimary),
@@ -33,8 +40,13 @@ class GymColorSchemeTest {
             "error" to (error to onError),
         )
 
-    /** Every surface the app renders, paired with the name the failure message should use. */
-    private fun ColorScheme.surfaces(): Map<String, Color> =
+    /**
+     * Every achromatic role the app renders. `outlineVariant` is in here for a reason: it is
+     * the token `HorizontalDivider` reads, it was never overridden, and it shipped as Material's
+     * lavender #CAC4D0 on three screens. Same class of bug ADR-0016 caught in the card
+     * surfaces, one token over.
+     */
+    private fun ColorScheme.achromaticRoles(): Map<String, Color> =
         mapOf(
             "surface" to surface,
             "surfaceContainerLowest" to surfaceContainerLowest,
@@ -43,6 +55,8 @@ class GymColorSchemeTest {
             "surfaceContainerHigh" to surfaceContainerHigh,
             "surfaceContainerHighest" to surfaceContainerHighest,
             "surfaceVariant" to surfaceVariant,
+            "outline" to outline,
+            "outlineVariant" to outlineVariant,
         )
 
     @Test
@@ -59,56 +73,69 @@ class GymColorSchemeTest {
     }
 
     @Test
-    fun `the accent is orange in both schemes, not a hue that drifted`() {
+    fun `the accent is red in both schemes, not a hue that drifted`() {
         schemes.forEach { (name, scheme) ->
             val hue = hueDegrees(scheme.primary)
             assertTrue(
-                hue in ORANGE_BAND,
-                "$name primary has hue $hue°, outside the orange band $ORANGE_BAND",
+                hue <= RED_BAND_END || hue >= RED_BAND_START,
+                "$name primary has hue $hue°, outside the red band ADR-0019 chose",
             )
         }
     }
 
     @Test
-    fun `the accent is bright, which was the request`() {
-        // High-vis works as a bright fill with dark text on it, so the fill itself must stay
-        // luminous — this is the assertion that stops "orange" becoming "brown".
+    fun `the accent is saturated, so it cannot decay into a brown`() {
+        // ADR-0016 asserted luminance here, because high-vis orange had to stay bright under
+        // dark text. ADR-0019 inverts that on the light scheme — a deep red fill under a pale
+        // label — so brightness is the wrong gate and saturation is the right one. A red that
+        // loses its saturation is a brown, and a brown is not an identity.
         schemes.forEach { (name, scheme) ->
             assertTrue(
-                relativeLuminance(scheme.primary) >= BRIGHT_FLOOR,
-                "$name primary has luminance ${relativeLuminance(scheme.primary)}, " +
-                    "too dark to read as a bright accent",
+                saturation(scheme.primary) >= ACCENT_SATURATION_FLOOR,
+                "$name primary has saturation ${saturation(scheme.primary)}, " +
+                    "too washed out to read as the accent",
             )
         }
     }
 
     @Test
-    fun `no surface keeps Material's purple tint`() {
-        // The bug this pins: overriding `surface` alone leaves surfaceContainer* at Material's
-        // defaults, which are tinted violet. It shipped as a lavender card on a warm-white
-        // screen, and it was only visible on a device. A surface is near-neutral, and what
-        // little tint it has leans warm like the rest of the palette — never blue or violet.
+    fun `no surface or outline carries a tint`() {
+        // The system is mono: the accent is the only colour on screen. Anything that is
+        // structurally grey must measure grey, which is what stops Material's violet-tinted
+        // defaults from leaking back in through a role nobody overrode.
         schemes.forEach { (name, scheme) ->
-            scheme.surfaces().forEach { (role, color) ->
-                val hue = hueDegrees(color)
-                val neutral = saturation(color) <= NEUTRAL_SATURATION
+            scheme.achromaticRoles().forEach { (role, color) ->
                 assertTrue(
-                    neutral || hue in WARM_BAND,
-                    "$name $role has hue $hue° at saturation ${saturation(color)} — " +
-                        "surfaces stay neutral or warm, and this one does not",
+                    saturation(color) <= NEUTRAL_SATURATION,
+                    "$name $role has saturation ${saturation(color)} at hue " +
+                        "${hueDegrees(color)}° — mono means this role measures grey",
                 )
             }
         }
     }
 
     @Test
-    fun `error stays red, so Delete can never dress like Save`() {
+    fun `outlineVariant is not Material's lavender default`() {
+        // Finding 08 of the redesign audit, pinned. The three HorizontalDivider() calls in the
+        // app read this token and drew #CAC4D0 because Color.kt never set it.
+        schemes.forEach { (name, scheme) ->
+            assertTrue(
+                scheme.outlineVariant != MATERIAL_DEFAULT_OUTLINE_VARIANT,
+                "$name outlineVariant is still Material's #CAC4D0 lavender",
+            )
+        }
+    }
+
+    @Test
+    fun `error stays red`() {
+        // Note this no longer separates Delete from Save — see the class comment. It survives
+        // because error red is a convention worth keeping, not because it guarantees anything
+        // about the primary next to it.
         schemes.forEach { (name, scheme) ->
             val hue = hueDegrees(scheme.error)
             assertTrue(
                 hue <= RED_BAND_END || hue >= RED_BAND_START,
-                "$name error has hue $hue°, which is not red — ADR-0016 reserves red for " +
-                    "destructive actions and orange for emphasis",
+                "$name error has hue $hue°, which is not red",
             )
         }
     }
@@ -159,16 +186,19 @@ class GymColorSchemeTest {
 
     private companion object {
         const val WCAG_AA = 4.5
-        val ORANGE_BAND = 15.0..45.0
-
-        /** Warm: reds through yellows. A violet surface lands nowhere near this. */
-        val WARM_BAND = 0.0..60.0
 
         /** Below this a colour reads as grey and its hue is not worth arguing about. */
         const val NEUTRAL_SATURATION = 0.10
+
+        /** The accent measures 1.00 light and 0.76 dark; this leaves room without inviting a brown. */
+        const val ACCENT_SATURATION_FLOOR = 0.60
+
         const val RED_BAND_START = 345.0
         const val RED_BAND_END = 15.0
-        const val BRIGHT_FLOOR = 0.25
+
+        /** `ColorScheme`'s unoverridden `outlineVariant`, the colour finding 08 is about. */
+        val MATERIAL_DEFAULT_OUTLINE_VARIANT = Color(0xFFCAC4D0)
+
         const val DEGREES_PER_SEXTANT = 60.0
         const val SEXTANTS = 6.0
         const val FULL_CIRCLE = 360.0
