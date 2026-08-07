@@ -2,6 +2,7 @@ package com.gymtracker.core.domain.set
 
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
+import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Clock
@@ -15,6 +16,7 @@ import java.time.Clock
  */
 class LogSet(
     private val sets: SetRepository,
+    private val sessionExercises: SessionExerciseRepository,
     private val clock: Clock,
     private val newId: () -> String,
 ) {
@@ -51,6 +53,11 @@ class LogSet(
         // Persisted before this returns, so the caller cannot transition the UI on a set that
         // is not yet on disk (US-03).
         sets.add(set)
+
+        // A new set un-finishes the exercise it lands on (US-02d). Here, next to the write,
+        // so every path that logs — manual, several-at-once, guided — gets it for free and
+        // "done" can never be displayed about an exercise with a newer set (ADR-0019).
+        sessionExercises.setFinishedAt(sessionExerciseId, null)
         return set
     }
 

@@ -78,6 +78,31 @@ mistake; there was no way to take one back out.
 - Removing the last exercise leaves an empty active session, not a discarded one.
   US-01 and US-06 still own ending or discarding it.
 
+### US-02d — Mark an exercise done
+Added 2026-08-04, from testing on the gym floor. Mid-workout the list mixes what
+you are still doing with what you are finished with, and every card shouts equally.
+See `adr/0019-finished-exercises.md`.
+- From the active session, I can mark an exercise **done**. This is always my
+  explicit act — the app never infers it (constitution §2.4). `finished_at` records
+  when; the mark survives a process kill like everything else on this screen.
+- The list shows exercises still in progress above the ones marked done. Each group
+  reads newest-first by its own clock: in-progress by US-02b's rule, done by
+  `finished_at`.
+- A done card is visibly quieter: muted text, a checkmark against the name, and its
+  "Add set" demoted from the filled primary button to the tonal supporting one.
+  Still a ≥ 48dp target — drop sets happen.
+- Logging a set against a done exercise **clears the mark** and the card rejoins the
+  in-progress group. "Done" can never be displayed about an exercise whose newest
+  set came after it.
+- The mark toggles: tapping it on a done card takes it back. Mis-taps cost one tap.
+- On a done card, "Start exercise" (US-05a) is not offered; unmark first. "Remove"
+  (US-02c) remains.
+- Completing the last set of a guided walkthrough (US-05a) marks the exercise done.
+  Leaving the walkthrough early marks nothing — abandoning is not finishing.
+- Removing a done exercise and undoing the removal (US-02c) restores `finished_at`
+  unchanged. Past workouts (US-06, US-06b) are unaffected: they read `position`
+  order and show no done state.
+
 ### US-03 — Log a set  ← the story that matters most
 - Given an exercise in the active session, when I tap "Add set", weight and reps
   are **prefilled from my most recent set of that exercise** (any session).

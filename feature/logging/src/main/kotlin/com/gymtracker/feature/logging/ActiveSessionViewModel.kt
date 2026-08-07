@@ -23,6 +23,7 @@ import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.FinishExercise
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
@@ -123,6 +124,7 @@ class ActiveSessionViewModel
         restoreSession: RestoreSession,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
+        private val finishExercise: FinishExercise,
         private val guidedPlanStore: GuidedPlanStore,
         private val clock: Clock,
     ) : ViewModel() {
@@ -198,14 +200,22 @@ class ActiveSessionViewModel
 
         /**
          * US-02b: newest first, so the exercise just added is under the thumb rather than at
-         * the bottom of a growing list.
+         * the bottom of a growing list. US-02d then partitions: what you are still doing
+         * stays on top, what you marked done sinks below it, each half newest-first by its
+         * own clock — `position` for in-progress, `finished_at` for done. Recent floats up
+         * in both halves, so a fresh mark lands just under the in-progress group rather than
+         * leaping to the far bottom of a long list.
          *
-         * Reversed here and not in SQL on purpose. [exercisesInOrder] stays in `position`
+         * Reordered here and not in SQL on purpose. [exercisesInOrder] stays in `position`
          * order — the order the workout was performed in, which is what history (US-06b)
          * reads, what US-06a's restore promises back unchanged, and what guided mode walks
          * through to find the next exercise (US-05a).
          */
-        private val exercises: Flow<List<SessionExerciseRow>> = exercisesInOrder.map { it.asReversed() }
+        private val exercises: Flow<List<SessionExerciseRow>> =
+            exercisesInOrder.map { rows ->
+                val (done, inProgress) = rows.asReversed().partition { it.sessionExercise.finishedAt != null }
+                inProgress + done.sortedByDescending { it.sessionExercise.finishedAt }
+            }
 
         /**
          * Walking through one exercise lives in its own state holder; see [GuidedController].
@@ -215,12 +225,19 @@ class ActiveSessionViewModel
          */
         val guided =
             GuidedController(
-                performSet = { sessionExerciseId, input ->
-                    // Write first, rest second, and only if the write returned — the same
-                    // ordering SetEntryController holds to for the manual path (US-05).
-                    logSets(sessionExerciseId = sessionExerciseId, input = input, sets = 1)
-                    rest.startAfterSet()
-                },
+                writes =
+                    GuidedWrites(
+                        performSet = { sessionExerciseId, input ->
+                            // Write first, rest second, and only if the write returned — the same
+                            // ordering SetEntryController holds to for the manual path (US-05).
+                            logSets(sessionExerciseId = sessionExerciseId, input = input, sets = 1)
+                            rest.startAfterSet()
+                        },
+                        // Completing the walkthrough is the guided path's spelling of the
+                        // member's "done" (US-02d) — stamped after the last write, so the
+                        // write's own clearing of the mark cannot undo it.
+                        markFinished = finishExercise::mark,
+                    ),
                 unitPreference = unitPreference,
                 planStore = guidedPlanStore,
                 exercises = exercisesInOrder,
@@ -320,6 +337,21 @@ class ActiveSessionViewModel
         /** Moves from the summary of one exercise to the start of the next (US-05a). */
         fun onStartNextExercise(row: SessionExerciseRow) {
             viewModelScope.launch { guided.startNext(row, prefillFor(row)) }
+        }
+
+        /**
+         * Marks an exercise done, or takes the mark back (US-02d).
+         *
+         * One handler for both directions because the card renders one control: whatever
+         * state the row shows is the state being toggled away from. The third transition —
+         * a new set clearing the mark — is not here; it lives next to the write in
+         * [com.gymtracker.core.domain.set.LogSet], where no caller can forget it (ADR-0019).
+         */
+        fun onToggleFinished(row: SessionExerciseRow) {
+            viewModelScope.launch {
+                val id = row.sessionExercise.id
+                if (row.sessionExercise.finishedAt == null) finishExercise.mark(id) else finishExercise.clear(id)
+            }
         }
 
         private suspend fun prefillFor(row: SessionExerciseRow) =

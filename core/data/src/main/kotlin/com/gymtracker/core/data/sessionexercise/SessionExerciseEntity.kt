@@ -10,6 +10,7 @@ import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import java.time.Instant
 
 /**
  * The `session_exercises` table from `data-model.md` (ADR-0004).
@@ -34,6 +35,8 @@ data class SessionExerciseEntity(
     @ColumnInfo(name = "session_id") val sessionId: String,
     @ColumnInfo(name = "exercise_id") val exerciseId: String,
     @ColumnInfo(name = "position") val position: Int,
+    /** Epoch millis of the member marking this appearance done; null = in progress (US-02d). */
+    @ColumnInfo(name = "finished_at") val finishedAt: Long?,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "sync_state") val syncState: String,
 )
@@ -44,4 +47,5 @@ internal fun SessionExerciseEntity.toDomain(): SessionExercise =
         sessionId = SessionId(sessionId),
         exerciseId = ExerciseId(exerciseId),
         position = position,
+        finishedAt = finishedAt?.let(Instant::ofEpochMilli),
     )

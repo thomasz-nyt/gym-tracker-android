@@ -6,6 +6,7 @@ import com.gymtracker.core.domain.model.SessionId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 
 /**
  * Hand-written fake, per `specs/testing-strategy.md`: mocked repositories test that a
@@ -50,6 +51,13 @@ class FakeSessionExerciseRepository(
     override suspend fun remove(id: SessionExerciseId) {
         state.value = state.value.filterNot { it.id == id }
         cascade(id)
+    }
+
+    override suspend fun setFinishedAt(
+        id: SessionExerciseId,
+        finishedAt: Instant?,
+    ) {
+        state.value = state.value.map { if (it.id == id) it.copy(finishedAt = finishedAt) else it }
     }
 
     // MAX(position) + 1, as the DAO does it. A count would reuse a position after a removal

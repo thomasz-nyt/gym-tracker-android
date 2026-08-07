@@ -31,6 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** US-02: appending exercises to a session, and ranking the catalog by recent use. */
@@ -313,6 +314,73 @@ class SessionExerciseTest {
         }
 }
 
+/** US-02d: `finished_at` through Room — written, cleared, and preserved by the restore path. */
+@OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+class FinishedAtRoundTripTest {
+    private lateinit var database: GymTrackerDatabase
+    private lateinit var sessionExercises: RoomSessionExerciseRepository
+
+    private val now: Instant = Instant.parse("2026-08-04T18:00:00Z")
+
+    @Before
+    fun setUp() {
+        database =
+            Room
+                .inMemoryDatabaseBuilder(
+                    ApplicationProvider.getApplicationContext(),
+                    GymTrackerDatabase::class.java,
+                ).build()
+        sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao())
+    }
+
+    @After
+    fun tearDown() = database.close()
+
+    private suspend fun seedAppearance(): SessionExerciseId {
+        RoomSessionRepository(database.sessionDao()).startSession(
+            WorkoutSession(
+                id = SessionId("s1"),
+                userId = UserId("alice"),
+                gymName = null,
+                startedAt = now,
+                endedAt = null,
+                metrics = null,
+            ),
+        )
+        AddExerciseToSession(sessionExercises) { SessionExerciseId("se-1") }(
+            SessionId("s1"),
+            ExerciseId("bench"),
+        )
+        return SessionExerciseId("se-1")
+    }
+
+    @Test
+    fun `finished at survives the round trip and clears to null`() =
+        runTest {
+            val id = seedAppearance()
+            assertNull(sessionExercises.find(id)?.finishedAt, "an appearance starts in progress")
+
+            sessionExercises.setFinishedAt(id, now)
+            assertEquals(now, sessionExercises.find(id)?.finishedAt)
+
+            sessionExercises.setFinishedAt(id, null)
+            assertNull(sessionExercises.find(id)?.finishedAt)
+        }
+
+    @Test
+    fun `adding an appearance writes its mark, which is what restore relies on`() =
+        runTest {
+            val id = seedAppearance()
+            val marked = checkNotNull(sessionExercises.find(id)).copy(finishedAt = now)
+            sessionExercises.remove(id)
+
+            sessionExercises.add(marked)
+
+            assertEquals(now, sessionExercises.find(id)?.finishedAt, "US-02c's undo keeps the mark")
+        }
+}
+
 /** The v2 to v3 migration adds `session_exercises` without disturbing what is already there. */
 @RunWith(RobolectricTestRunner::class)
 class SessionExerciseMigrationTest {
@@ -354,6 +422,41 @@ class SessionExerciseMigrationTest {
         v3.query("SELECT COUNT(*) FROM session_exercises").use {
             assertTrue(it.moveToFirst())
             assertEquals(0, it.getInt(0))
+        }
+    }
+}
+
+/** The v6 to v7 migration adds `finished_at` (US-02d) and reads every existing row as in progress. */
+@RunWith(RobolectricTestRunner::class)
+class FinishedAtMigrationTest {
+    @get:Rule
+    val helper =
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            GymTrackerDatabase::class.java,
+        )
+
+    @Test
+    fun `migrating from 6 to 7 keeps appearances, unmarked`() {
+        val name = "migration-6-7.db"
+
+        helper.createDatabase(name, 6).use { v6 ->
+            v6.execSQL(
+                "INSERT INTO sessions (id, user_id, gym_name, started_at, ended_at, avg_hr, max_hr, " +
+                    "active_kcal, metrics_source, updated_at, sync_state) " +
+                    "VALUES ('s1', 'u1', NULL, 1000, NULL, NULL, NULL, NULL, NULL, 1000, 'PENDING')",
+            )
+            v6.execSQL(
+                "INSERT INTO session_exercises (id, session_id, exercise_id, position, updated_at, sync_state) " +
+                    "VALUES ('se1', 's1', 'e1', 1, 1000, 'PENDING')",
+            )
+        }
+
+        val v7 = helper.runMigrationsAndValidate(name, 7, true, GymTrackerDatabase.MIGRATION_6_7)
+
+        v7.query("SELECT finished_at FROM session_exercises WHERE id = 'se1'").use {
+            assertTrue(it.moveToFirst(), "the appearance survives the upgrade")
+            assertTrue(it.isNull(0), "a pre-existing appearance reads as in progress, never as done")
         }
     }
 }

@@ -2,6 +2,7 @@ package com.gymtracker.core.domain.set
 
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
+import com.gymtracker.core.domain.sessionexercise.FakeSessionExerciseRepository
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -18,7 +19,10 @@ class LogSetsTest {
     private val sets = RecordingSets()
     private var next = 1
 
-    private fun logSets() = LogSets(LogSet(sets, Clock.fixed(now, ZoneOffset.UTC)) { "set-${next++}" })
+    private fun logSets() =
+        LogSets(
+            LogSet(sets, FakeSessionExerciseRepository(), Clock.fixed(now, ZoneOffset.UTC)) { "set-${next++}" },
+        )
 
     @Test
     fun `one set is the default shape and writes a single row`() =

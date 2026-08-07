@@ -31,6 +31,9 @@ class RoomSessionExerciseRepository
                     sessionId = sessionExercise.sessionId.value,
                     exerciseId = sessionExercise.exerciseId.value,
                     position = sessionExercise.position,
+                    // Written, not defaulted: US-02c's undo re-adds the row and must bring
+                    // the done mark back with it (US-02d).
+                    finishedAt = sessionExercise.finishedAt?.toEpochMilli(),
                     updatedAt = Instant.now().toEpochMilli(),
                     syncState = SYNC_STATE_PENDING,
                 ),
@@ -39,6 +42,13 @@ class RoomSessionExerciseRepository
 
         override suspend fun remove(id: SessionExerciseId) {
             dao.delete(id.value)
+        }
+
+        override suspend fun setFinishedAt(
+            id: SessionExerciseId,
+            finishedAt: Instant?,
+        ) {
+            dao.setFinishedAt(id.value, finishedAt?.toEpochMilli(), Instant.now().toEpochMilli())
         }
 
         override suspend fun nextPosition(sessionId: SessionId): Int = dao.maxPosition(sessionId.value) + 1

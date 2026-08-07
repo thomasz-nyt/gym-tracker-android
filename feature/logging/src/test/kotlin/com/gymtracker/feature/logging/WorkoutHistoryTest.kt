@@ -16,6 +16,7 @@ import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
+import com.gymtracker.core.domain.sessionexercise.FinishExercise
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.set.LogSet
@@ -118,7 +119,7 @@ class WorkoutHistoryTest {
             catalog = catalog,
             currentMember = FakeCurrentMember(member),
             sets = sets,
-            logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
+            logSets = LogSets(LogSet(sets, sessionExercises, clock) { "set-${nextSet++}" }),
             restTimer = RestTimer(restStore, clock),
             restTimerStore = restStore,
             prefillFromLastSet = PrefillFromLastSet(sets),
@@ -133,6 +134,7 @@ class WorkoutHistoryTest {
             restoreSession = RestoreSession(repository, sessionExercises, sets),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
             restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+            finishExercise = FinishExercise(sessionExercises, clock),
             guidedPlanStore = guidedStore,
             clock = clock,
         )

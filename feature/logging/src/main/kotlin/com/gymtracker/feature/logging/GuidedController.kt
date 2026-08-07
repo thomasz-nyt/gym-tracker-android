@@ -67,6 +67,22 @@ data class GuidedState(
 )
 
 /**
+ * The two writes guided mode performs, gathered so the controller takes one parameter rather
+ * than two loose lambdas.
+ *
+ * @property performSet writes one set and *then* starts the rest that follows it. One function
+ *   rather than [LogSets] plus a separate callback, because the **order** is the guarantee: a
+ *   write that failed must not leave a timer counting down for a set that does not exist.
+ * @property markFinished runs when the last planned set is written (US-02d) — reaching the
+ *   summary is the guided path's spelling of "mark it done". Only completion calls it;
+ *   [GuidedController.stop] never does, because abandoning is not finishing.
+ */
+data class GuidedWrites(
+    val performSet: suspend (SessionExerciseId, SetInput) -> Unit,
+    val markFinished: suspend (SessionExerciseId) -> Unit,
+)
+
+/**
  * Walking through one exercise, set by set (US-05a, ADR-0017).
  *
  * Opt-in and additive: this is a lens over the same rows the session screen shows, never a
@@ -78,14 +94,7 @@ data class GuidedState(
  * Here each set is logged as it finishes, so each carries a real one.
  */
 class GuidedController(
-    /**
-     * Writes one set and then starts the rest that follows it.
-     *
-     * One parameter rather than [LogSets] plus a separate callback, because the **order** is
-     * the guarantee: a write that failed must not leave a timer counting down for a set that
-     * does not exist. Two parameters would let a caller wire them the other way round.
-     */
-    private val performSet: suspend (SessionExerciseId, SetInput) -> Unit,
+    private val writes: GuidedWrites,
     private val unitPreference: UnitPreference,
     private val planStore: GuidedPlanStore,
     private val exercises: Flow<List<SessionExerciseRow>>,
@@ -186,7 +195,15 @@ class GuidedController(
             val typed = typedReps.value ?: plan.targetReps.toString()
             val reps = typed.toIntOrNull()?.takeIf { it >= 1 } ?: return@launch
 
-            performSet(
+            // Counted before the write, from the same rows the screen derives setsDone from,
+            // so "this set completes the plan" does not depend on when the flow re-emits.
+            val setsDoneBefore =
+                exercises
+                    .first()
+                    .firstOrNull { it.sessionExercise.id == plan.sessionExerciseId }
+                    ?.let { (it.sets.size - plan.setsAtStart).coerceAtLeast(0) } ?: 0
+
+            writes.performSet(
                 plan.sessionExerciseId,
                 SetInput(
                     // Already canonical kilograms; the plan stored it converted, so it is
@@ -197,6 +214,12 @@ class GuidedController(
                     rpe = null,
                 ),
             )
+
+            // After the write: logging a set clears the mark (ADR-0019), so stamping first
+            // would erase what was just stamped.
+            if (setsDoneBefore + 1 >= plan.targetSets) {
+                writes.markFinished(plan.sessionExerciseId)
+            }
             typedReps.value = null
         }
     }
