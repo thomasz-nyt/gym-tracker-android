@@ -33,6 +33,8 @@ import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.progress.ExerciseTrendOf
+import com.gymtracker.core.domain.progress.WeeklyVolumeByBodyPart
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
@@ -76,6 +78,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import java.time.Clock
+import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Singleton
 
@@ -171,6 +174,34 @@ object DataModule {
 
     @Provides
     fun lastPerformanceOf(sets: SetRepository): LastPerformanceOf = LastPerformanceOf(sets)
+
+    /**
+     * The member's own zone — the one exception to the UTC rule above, and a deliberate one.
+     *
+     * Instants are stored and compared in UTC. But a chart's unit is a *day*, and which day a
+     * 23:30 session belongs to is a question only the member's zone can answer. Bucketing in
+     * UTC would move a late Sunday workout into Monday for anyone west of Greenwich, which is
+     * a wrong answer rather than a rounding one.
+     */
+    @Provides
+    fun zone(): ZoneId = ZoneId.systemDefault()
+
+    @Provides
+    fun exerciseTrendOf(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        zone: ZoneId,
+    ): ExerciseTrendOf = ExerciseTrendOf(sessions, sessionExercises, sets, zone)
+
+    @Provides
+    fun weeklyVolumeByBodyPart(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        catalog: ExerciseCatalog,
+        zone: ZoneId,
+    ): WeeklyVolumeByBodyPart = WeeklyVolumeByBodyPart(sessions, sessionExercises, sets, catalog, zone)
 
     @Provides
     fun addExerciseToSession(sessionExercises: SessionExerciseRepository): AddExerciseToSession =

@@ -58,6 +58,7 @@ import com.gymtracker.core.domain.model.ExerciseId
 fun ExerciseDetailRoute(
     exerciseId: ExerciseId,
     onBack: () -> Unit,
+    onSeeProgress: (ExerciseId) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: CatalogViewModel = hiltViewModel(),
 ) {
@@ -66,6 +67,7 @@ fun ExerciseDetailRoute(
 
     ExerciseDetailScreen(
         exercise = exercise,
+        onSeeProgress = { onSeeProgress(exerciseId) },
         onWatchSearch = { url ->
             context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         },
@@ -77,6 +79,7 @@ fun ExerciseDetailRoute(
 @Composable
 internal fun ExerciseDetailScreen(
     exercise: Exercise?,
+    onSeeProgress: () -> Unit = {},
     onWatchSearch: (String) -> Unit,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -117,6 +120,15 @@ internal fun ExerciseDetailScreen(
             MuscleTags(exercise)
 
             Instructions(exercise.instructions)
+
+            // US-16, reached from the movement it is about. A push rather than a panel here,
+            // so :feature:catalog does not have to depend on :feature:progress.
+            OutlinedButton(
+                onClick = onSeeProgress,
+                modifier = Modifier.fillMaxWidth().sizeIn(minHeight = MIN_TARGET),
+            ) {
+                Text("See your progress on this exercise")
+            }
 
             // US-14: a search, and it says so. Nobody has vetted the result (ADR-0015).
             YouTubeSearch.forExercise(exercise.name)?.let { url ->

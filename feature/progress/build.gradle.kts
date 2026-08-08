@@ -1,7 +1,31 @@
 plugins {
     id("gymtracker.android.library")
+    id("gymtracker.android.compose")
+    id("gymtracker.hilt")
 }
 
 android {
     namespace = "com.gymtracker.feature.progress"
+}
+
+dependencies {
+    implementation(project(":core:designsystem"))
+    implementation(project(":core:domain"))
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.kotlinx.coroutines.core)
+
+    // Charts. Approved in `specs/tech-stack.md`, so no ADR: "Compose-native, no AndroidView
+    // wrapper", which is the property that mattered when it was chosen.
+    implementation(libs.vico.compose.m3)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(testFixtures(project(":core:domain")))
 }
