@@ -1,13 +1,11 @@
 package com.gymtracker
 
 import android.Manifest
-import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -146,8 +144,7 @@ class TwoTapSetLoggingTest {
             awaitReadyToLogASet()
 
             // Tap 1 — open set entry. It arrives prefilled from last week.
-            // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
-            compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
+            addSetButton().performScrollTo().performClick()
             awaitSheetOpen()
 
             // The whole reason two taps is possible: last week's numbers are already there.
@@ -172,8 +169,7 @@ class TwoTapSetLoggingTest {
             // after does not lose it." LogSet is awaited before the sheet closes, so once the
             // dialog is gone the row is already committed — there is no window to lose it in.
             awaitReadyToLogASet()
-            // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
-            compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
+            addSetButton().performScrollTo().performClick()
             awaitSheetOpen()
             compose.onNodeWithText("Save set").performClick()
             awaitSheetClosed()
@@ -186,29 +182,42 @@ class TwoTapSetLoggingTest {
     }
 
     /**
-     * Waits for the entry sheet to appear, which is the same synchronisation problem as
-     * [awaitSheetClosed] at the other end of the sheet's life.
+     * "Add set", scrolled into view first.
      *
-     * `SetEntryController.open` reads the unit preference and then the member's last set of
-     * this exercise — a Room query — and only then sets the state the sheet renders from. So
-     * the sheet cannot appear un-prefilled: **the sheet being up is itself the proof that the
-     * prefill landed.** What `waitForIdle` does not do is wait for that coroutine; it
-     * synchronises Compose, and a suspend read is not Compose. Asserting straight after it
-     * therefore looked for "135" before the sheet existed — which passed on a fast machine
-     * and failed on CI's emulator, on every PR from #19 onward.
+     * `ListItem` merges its descendants' semantics, so the button lives in the unmerged tree.
+     * The `performScrollTo` is the part that matters, and it is what CI was actually failing on.
      *
-     * This adds no interaction, so US-03's two-tap count is untouched: the test still performs
-     * exactly two `performClick` calls before asserting.
+     * The exercise cards sit in a `LazyColumn`, and on a short screen "Add set" falls **below
+     * the fold** inside that viewport. It is still in the semantics tree, so `onNodeWithText`
+     * finds it and `performClick` taps its coordinates — which are clipped, so the tap lands on
+     * nothing and the sheet never opens. Nothing about it is timing-dependent, which is why it
+     * failed every single CI run while passing on any roomy screen.
+     *
+     * It began at #19 because the bottom navigation bar that PR added took the vertical space
+     * that had been keeping the button on screen, and CI's emulator is 320x640. Scrolling first
+     * makes the test independent of how tall the device is.
+     *
+     * `performScrollTo` is not an interaction, so US-03's ceiling is untouched: both tests still
+     * perform exactly two `performClick` calls. A human on a screen this small scrolls too, and
+     * scrolling is not one of the two taps that confirm a set.
+     */
+    private fun addSetButton() = compose.onNodeWithText("Add set", useUnmergedTree = true)
+
+    /**
+     * Waits for the entry sheet to appear, the mirror of [awaitSheetClosed].
+     *
+     * `SetEntryController.open` reads the unit preference and then the member's last set of this
+     * exercise — a Room query — and only then sets the state the sheet renders from. So the
+     * sheet cannot appear un-prefilled: **it being up is itself the proof that the prefill
+     * landed**, which is what makes this the right thing to wait on.
+     *
+     * `waitForIdle` would not do: it synchronises Compose, and a suspend read is not a
+     * recomposition. That race is real but it is **not** what was failing on CI — see
+     * [addSetButton] for what was. This is here so the test cannot start depending on it.
      */
     private fun awaitSheetOpen() {
-        try {
-            compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-                compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isNotEmpty()
-            }
-        } catch (timeout: ComposeTimeoutException) {
-            // TEMPORARY DIAGNOSTIC: this reproduces only on CI, so the tree has to come from
-            // CI. Remove once the cause is known.
-            throw AssertionError("sheet never opened. Tree was:\n${compose.onRoot().printToString()}", timeout)
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

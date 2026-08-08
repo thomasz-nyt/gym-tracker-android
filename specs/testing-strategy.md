@@ -60,31 +60,36 @@ kill survivable — `LogSet` is awaited before the entry sheet closes, so by the
 the UI has moved on the row is already committed. Verified manually on device by
 force-stopping and relaunching.
 
-### `waitForIdle` is not a wait, in this codebase
+### Two traps the instrumented suite has already fallen into
 
-This has now cost two debugging sessions, so it is written down rather than
-rediscovered a third time.
+Both cost a debugging session, so they are written down rather than rediscovered.
 
-**Every sheet in the app is opened by a coroutine.** `SetEntryController.open` reads
-the unit preference and then the member's last set of the exercise — a Room query —
-and only *then* sets the state the sheet renders from. `SetEditController.open` does
-the same with the unit preference. The sheet therefore cannot appear holding empty or
-stale values: it appearing at all is the proof that its data arrived.
+**A node in the tree is not a node on screen.** The exercise cards sit in a `LazyColumn`.
+On a short screen a control below the fold is still in the semantics tree, so
+`onNodeWithText` finds it and `performClick` taps its coordinates — which are clipped, so
+the tap lands on nothing and the test then waits for something that will never happen.
+`TwoTapSetLoggingTest` failed on **every** CI run from #19 onward for exactly this reason:
+that PR's bottom navigation bar took the vertical space that had been keeping "Add set" on
+screen, and CI's emulator is 320x640. It passed on every developer machine, which is what
+made it look like flakiness. **Call `performScrollTo()` before clicking anything inside a
+scrolling list.** It is not an interaction, so the two-tap count above is unaffected.
 
-`compose.waitForIdle()` synchronises **Compose**, not that coroutine. A suspend read
-is not a recomposition, so it returns while the query is still in flight and any
-assertion after it races the database. That passes on a developer machine and fails on
-CI's slower emulator — which is exactly what happened: `TwoTapSetLoggingTest` failed on
-every PR from #19 onward while passing locally, and was merged red twice before it was
-chased down.
+Worth noting for CI: nothing in `.github/workflows/ci.yml` pins an emulator `profile`, so
+the suite runs on whatever default the action picks — currently a screen far smaller than
+any phone this household owns. Testing a realistic profile would be an improvement; it
+would also have hidden this bug, so the `performScrollTo` above is the load-bearing fix.
 
-**So: never assert on a sheet straight after `waitForIdle`.** Use a `waitUntil` on the
-condition actually meant — `awaitSheetOpen`, `awaitSheetClosed`, `awaitEditorOpen`,
-`awaitEditorClosed`. These add no interaction, so the two-tap count above is unaffected.
+**`waitForIdle` is not a wait for anything that suspends.** Every sheet in this app is
+opened by a coroutine: `SetEntryController.open` reads the unit preference and then the
+member's last set — a Room query — and only then sets the state the sheet renders from.
+`SetEditController.open` does the same. So a sheet can never appear holding empty or stale
+values; it appearing at all is the proof its data arrived. But `waitForIdle` synchronises
+Compose, and a suspend read is not a recomposition, so asserting straight after it races
+the database. Use a `waitUntil` on the condition actually meant — `awaitSheetOpen`,
+`awaitSheetClosed`, `awaitEditorOpen`, `awaitEditorClosed`.
 
-Note what the diagnosis was *not*: there is no production bug here. The window the test
-was racing does not exist in the app, because the sheet is gated on state that is only
-written once the read has completed.
+Note what neither of these was: a product bug. Both times the app was correct and the test
+was asking the wrong question.
 
 ### 3. RLS isolation
 See `data-model.md`. Includes a test that enumerates `public` tables and fails on
