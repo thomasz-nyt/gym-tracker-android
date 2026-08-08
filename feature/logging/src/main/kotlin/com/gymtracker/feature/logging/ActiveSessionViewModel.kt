@@ -26,9 +26,12 @@ import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
+import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.SetRepository
+import com.gymtracker.core.domain.set.UpdateSet
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -65,6 +68,10 @@ data class SessionUiState(
     val exercises: List<SessionExerciseRow> = emptyList(),
     val unit: WeightUnit = WeightUnit.LB,
     val setEntry: SetEntry? = null,
+    /** The logged set being corrected, if any (US-04). */
+    val setEdit: SetEdit? = null,
+    /** Whether the set just deleted can still be put back (US-04). */
+    val canUndoSetDelete: Boolean = false,
     /** Time left in the current rest, or null when none is running (US-05). */
     val restRemaining: Duration? = null,
     /** History, and the workout deleted from it that can still be put back (US-06, US-06a). */
@@ -78,11 +85,17 @@ data class SessionUiState(
 /**
  * What the session screen itself renders, grouped only because `combine` takes a fixed number
  * of flows. Not a concept — do not let it become one.
+ *
+ * US-04's editor joined this one rather than becoming a third record, because correcting a set
+ * happens *on* the session screen — it is the same kind of thing as [entry], not a side trip.
+ * See [SideTrips] for why a third record was the line not to cross.
  */
 private data class ScreenExtras(
     val unit: WeightUnit,
     val entry: SetEntry?,
     val rest: Duration?,
+    val edit: SetEdit?,
+    val canUndoSetDelete: Boolean,
 )
 
 /**
@@ -123,6 +136,9 @@ class ActiveSessionViewModel
         restoreSession: RestoreSession,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
+        updateSet: UpdateSet,
+        deleteSet: DeleteSet,
+        restoreSet: RestoreSet,
         private val guidedPlanStore: GuidedPlanStore,
         private val clock: Clock,
     ) : ViewModel() {
@@ -156,6 +172,16 @@ class ActiveSessionViewModel
                 prefillFromLastSet = prefillFromLastSet,
                 unitPreference = unitPreference,
                 currentMember = currentMember,
+                scope = viewModelScope,
+            )
+
+        /** Correcting a logged set lives in its own state holder; see [SetEditController]. */
+        val setEdit =
+            SetEditController(
+                updateSet = updateSet,
+                deleteSet = deleteSet,
+                restoreSet = restoreSet,
+                unitPreference = unitPreference,
                 scope = viewModelScope,
             )
 
@@ -233,8 +259,14 @@ class ActiveSessionViewModel
                 activeSession,
                 stalePrompt,
                 exercises,
-                combine(unitPreference.observe(), setEntry.entry, rest.remaining()) { unit, entry, left ->
-                    ScreenExtras(unit, entry, left)
+                combine(
+                    unitPreference.observe(),
+                    setEntry.entry,
+                    rest.remaining(),
+                    setEdit.edit,
+                    setEdit.canUndo,
+                ) { unit, entry, left, edit, canUndoSetDelete ->
+                    ScreenExtras(unit, entry, left, edit, canUndoSetDelete)
                 },
                 combine(history.state, removal.canUndo, guided.state) { past, canUndoRemoval, guidedState ->
                     SideTrips(past, canUndoRemoval, guidedState)
@@ -247,6 +279,8 @@ class ActiveSessionViewModel
                     exercises = inSession,
                     unit = extras.unit,
                     setEntry = extras.entry,
+                    setEdit = extras.edit,
+                    canUndoSetDelete = extras.canUndoSetDelete,
                     restRemaining = extras.rest,
                     history = sideTrips.history,
                     canUndoRemoval = sideTrips.canUndoRemoval,

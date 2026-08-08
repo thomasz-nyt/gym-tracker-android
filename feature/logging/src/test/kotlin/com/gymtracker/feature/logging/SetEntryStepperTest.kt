@@ -15,9 +15,12 @@ import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
+import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.RestoreSet
+import com.gymtracker.core.domain.set.UpdateSet
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -96,6 +99,9 @@ class SetEntryStepperTest {
                 restoreSession = RestoreSession(repository, sessionExercises, sets),
                 removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
                 restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+                updateSet = UpdateSet(sets),
+                deleteSet = DeleteSet(sets),
+                restoreSet = RestoreSet(sets),
                 guidedPlanStore = FakeGuidedPlanStore(),
                 clock = clock,
             )

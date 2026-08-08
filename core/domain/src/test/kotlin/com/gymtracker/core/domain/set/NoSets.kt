@@ -26,4 +26,8 @@ internal open class NoSets : SetRepository {
     override suspend fun nextSetIndex(sessionExerciseId: SessionExerciseId): Int = 1
 
     override suspend fun add(set: ExerciseSet) = Unit
+
+    override suspend fun update(set: ExerciseSet) = Unit
+
+    override suspend fun delete(id: String): ExerciseSet? = null
 }

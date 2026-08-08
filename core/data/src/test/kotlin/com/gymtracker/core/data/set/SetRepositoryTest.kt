@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.session.RoomSessionRepository
+import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExercise
@@ -208,6 +209,89 @@ class SetRepositoryTest {
             sessions.deleteSession(SessionId("s1"))
 
             assertTrue(sets.observeForSessionExercise(se).first().isEmpty(), "cascade through session_exercises")
+        }
+
+    @Test
+    fun `update persists the new weight, reps and rpe`() =
+        runTest {
+            val se = appearance("s1")
+            val logged = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = 7.0)
+
+            sets.update(logged.copy(weightKg = 65.0, reps = 6, rpe = 8.0))
+
+            val stored = sets.observeForSessionExercise(se).first().single()
+            assertEquals(65.0, stored.weightKg)
+            assertEquals(6, stored.reps)
+            assertEquals(8.0, stored.rpe)
+        }
+
+    @Test
+    fun `update keeps the set's id, index and performed_at`() =
+        runTest {
+            val se = appearance("s1")
+            val logged = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = null)
+
+            sets.update(logged.copy(weightKg = 65.0, reps = 6, rpe = null))
+
+            val stored = sets.observeForSessionExercise(se).first().single()
+            assertEquals(logged.id, stored.id)
+            assertEquals(logged.setIndex, stored.setIndex)
+            assertEquals(logged.performedAt, stored.performedAt)
+        }
+
+    @Test
+    fun `update marks the row pending and bumps updated_at`() =
+        runTest {
+            val se = appearance("s1")
+            val logged = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = null)
+            val insertedAt = database.setDao().find(logged.id)?.updatedAt
+
+            sets.update(logged.copy(weightKg = 65.0))
+
+            val entity = database.setDao().find(logged.id)
+            assertEquals(SYNC_STATE_PENDING, entity?.syncState)
+            assertTrue((entity?.updatedAt ?: 0) >= (insertedAt ?: 0), "updated_at is stamped on write, per add()")
+        }
+
+    @Test
+    fun `delete removes the row and returns what was deleted`() =
+        runTest {
+            val se = appearance("s1")
+            val logged = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = 7.5)
+
+            val deleted = sets.delete(logged.id)
+
+            assertEquals(logged, deleted)
+            assertTrue(sets.observeForSessionExercise(se).first().isEmpty())
+        }
+
+    @Test
+    fun `deleting a set does not touch its siblings`() =
+        runTest {
+            val se = appearance("s1")
+            val first = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = null)
+            val second = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = null)
+
+            sets.delete(first.id)
+
+            assertEquals(listOf(second), sets.observeForSessionExercise(se).first())
+        }
+
+    @Test
+    fun `deleting a set does not touch its parent session_exercise`() =
+        runTest {
+            val se = appearance("s1")
+            val logged = logSet(now)(se, 60.0, WeightUnit.KG, reps = 5, rpe = null)
+
+            sets.delete(logged.id)
+
+            assertEquals(se, sessionExercises.find(se)?.id, "the session_exercise row survives its last set")
+        }
+
+    @Test
+    fun `deleting a set that does not exist reports nothing to undo`() =
+        runTest {
+            assertNull(sets.delete("never-existed"))
         }
 }
 

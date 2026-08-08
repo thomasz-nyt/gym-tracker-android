@@ -155,8 +155,11 @@ is no way to answer "what did I do on Tuesday, and at what weight".
   order I performed them.
 - Each exercise shows its name, its equipment, its primary muscles, and its bundled
   photo where it has one — no placeholder where it does not, per US-02.
-- Sets are shown grouped as in ADR-0009 — `3 × 12` rather than three near-identical
-  lines — with weight in both units (ADR-0008) and per-exercise volume.
+- Sets are shown **one row per set**, with weight in both units (ADR-0008) and
+  per-exercise volume. *Amended 2026-08-07 by ADR-0022:* this criterion read "grouped as
+  in ADR-0009 — `3 × 12` rather than three near-identical lines" until US-04 needed every
+  set to be individually correctable here too, and a grouped line has no set id behind it
+  to tap.
 - A bodyweight set is shown as bodyweight and counted separately. It is never folded
   into volume as zero, per US-06.
 - Session metrics that were never recorded are shown as "not recorded", never as

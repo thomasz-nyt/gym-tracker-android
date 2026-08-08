@@ -109,16 +109,18 @@ class WorkoutDetailTest {
         }
 
     @Test
-    fun `identical consecutive sets are grouped for reading`() =
+    fun `sets are returned individually, not collapsed, so any one can be corrected`() =
         runTest {
-            // ADR-0009's display grouping, reused rather than re-derived.
+            // ADR-0022 removed the display grouping ADR-0009 gave this screen: two identical
+            // sets used to read as one line with no id behind it. Now every set comes back on
+            // its own, in `set_index` order, with its own values intact.
             finishedWorkout()
 
             detail(target, alice).test {
                 val benchPress = checkNotNull(awaitItem()).exercises.first()
-                assertEquals(listOf(2, 1), benchPress.groups.map { it.count }, "60x10 twice, then 70x8")
-                assertEquals(listOf(60.0, 70.0), benchPress.groups.map { it.weightKg })
-                assertEquals(3, benchPress.sets.size, "the grouping is display only")
+                assertEquals(listOf(1, 2, 3), benchPress.sets.map { it.setIndex })
+                assertEquals(listOf(60.0, 60.0, 70.0), benchPress.sets.map { it.weightKg })
+                assertEquals(listOf(10, 10, 8), benchPress.sets.map { it.reps })
             }
         }
 
@@ -176,7 +178,6 @@ class WorkoutDetailTest {
             detail(target, alice).test {
                 val only = checkNotNull(awaitItem()).exercises.single()
                 assertEquals(emptyList(), only.sets)
-                assertEquals(emptyList(), only.groups)
                 assertNull(only.volumeKg)
             }
         }

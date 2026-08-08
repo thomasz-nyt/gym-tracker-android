@@ -1,6 +1,7 @@
 package com.gymtracker.feature.logging
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,9 +20,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.component.SecondaryActionButton
@@ -39,7 +45,6 @@ import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionSummary
-import com.gymtracker.core.domain.set.SetGroup
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Duration
@@ -56,12 +61,17 @@ import java.util.Locale
  *
  * Instruction steps, GIFs and filtering by body part are US-12 and US-13, at M3. What is shown
  * here is only what the catalog row already carries.
+ *
+ * Sets render one row per [ExerciseSet], each its own tap target for [onEditSet] — the same
+ * shape `LoggedSets` in `ActiveSessionScreen.kt` uses, and for the same reason (ADR-0022, US-04's
+ * third criterion: correcting a past session's set).
  */
 @Composable
 internal fun WorkoutDetailScreen(
     detail: SessionDetail,
     unit: WeightUnit,
     onBack: () -> Unit,
+    onEditSet: (PerformedExercise, ExerciseSet) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
@@ -87,7 +97,7 @@ internal fun WorkoutDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
                 ) {
                     items(detail.exercises, key = { it.sessionExercise.id.value }) { performed ->
-                        PerformedExerciseCard(performed, unit)
+                        PerformedExerciseCard(performed, unit, onEditSet)
                         HorizontalDivider()
                     }
                 }
@@ -143,6 +153,7 @@ private fun WorkoutHeader(
 private fun PerformedExerciseCard(
     performed: PerformedExercise,
     unit: WeightUnit,
+    onEditSet: (PerformedExercise, ExerciseSet) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -164,18 +175,54 @@ private fun PerformedExerciseCard(
                 )
             }
 
-            if (performed.groups.isEmpty()) {
+            if (performed.sets.isEmpty()) {
                 // ADR-0004 makes this representable: added, then never used.
                 Text("No sets logged", style = MaterialTheme.typography.bodyMedium)
             } else {
-                performed.groups.forEach { group ->
-                    Text(group.describe(unit), style = MaterialTheme.typography.titleMedium)
-                }
+                PastLoggedSets(performed.sets, unit) { set -> onEditSet(performed, set) }
                 Text(
                     text = performed.describeTotals(unit),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The sets logged against one exercise in a past workout, one row per [ExerciseSet] and each
+ * its own tap target for correcting it (US-04's third criterion, ADR-0022).
+ *
+ * Copies `LoggedSets` in `ActiveSessionScreen.kt` row for row — same label, same content
+ * description, same tap target — because a past set and an active one are corrected through the
+ * same editor and must be indistinguishable in how they read.
+ */
+@Composable
+private fun PastLoggedSets(
+    sets: List<ExerciseSet>,
+    unit: WeightUnit,
+    onEditSet: (ExerciseSet) -> Unit,
+) {
+    Column {
+        sets.forEach { set ->
+            val weight = WeightFormatter.format(set.weightKg, unit)
+            Text(
+                text =
+                    buildString {
+                        append("${set.setIndex}.  ${set.reps} reps")
+                        append("   ${weight.primary}")
+                        weight.secondary?.let { append("  ·  $it") }
+                        set.rpe?.let { append("   RPE $it") }
+                    },
+                style = MaterialTheme.typography.titleMedium,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                        .clickable { onEditSet(set) }
+                        .semantics { contentDescription = "Edit set ${set.setIndex}" }
+                        .wrapContentHeight(Alignment.CenterVertically),
+            )
         }
     }
 }
@@ -192,17 +239,6 @@ private fun Exercise.describeEquipmentAndMuscles(): String =
             append(primaryMuscles.joinToString { it.readable() })
         }
     }
-
-/** "3 × 12   135 lb  ·  61.2 kg   RPE 8", matching how the session screen reads. */
-private fun SetGroup.describe(unit: WeightUnit): String {
-    val weight = WeightFormatter.format(weightKg, unit)
-    return buildString {
-        if (count > 1) append("$count × $reps") else append("$firstSetIndex.  $reps reps")
-        append("   ${weight.primary}")
-        weight.secondary?.let { append("  ·  $it") }
-        rpe?.let { append("   RPE $it") }
-    }
-}
 
 /**
  * Volume for this exercise, with bodyweight sets counted alongside rather than folded in as
@@ -303,7 +339,6 @@ private fun WorkoutDetailPreview() {
                                         source = "free-exercise-db",
                                     ),
                                 sets = sets,
-                                groups = SetGroup.of(sets),
                                 volumeKg = 1224.6,
                                 bodyweightSetCount = 0,
                             ),

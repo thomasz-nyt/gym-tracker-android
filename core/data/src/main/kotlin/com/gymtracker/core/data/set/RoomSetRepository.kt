@@ -36,18 +36,26 @@ class RoomSetRepository
             dao.maxSetIndex(sessionExerciseId.value) + 1
 
         override suspend fun add(set: ExerciseSet) {
-            dao.insert(
-                SetEntity(
-                    id = set.id,
-                    sessionExerciseId = set.sessionExerciseId.value,
-                    setIndex = set.setIndex,
-                    weightKg = set.weightKg,
-                    reps = set.reps,
-                    rpe = set.rpe,
-                    performedAt = set.performedAt.toEpochMilli(),
-                    updatedAt = Instant.now().toEpochMilli(),
-                    syncState = SYNC_STATE_PENDING,
-                ),
-            )
+            dao.insert(set.toEntity())
         }
+
+        override suspend fun update(set: ExerciseSet) {
+            dao.update(set.toEntity())
+        }
+
+        override suspend fun delete(id: String): ExerciseSet? = dao.deleteAndReturn(id)?.toDomain()
+
+        /** Every write stamps `updated_at` and marks the row pending, exactly as [add] does. */
+        private fun ExerciseSet.toEntity() =
+            SetEntity(
+                id = id,
+                sessionExerciseId = sessionExerciseId.value,
+                setIndex = setIndex,
+                weightKg = weightKg,
+                reps = reps,
+                rpe = rpe,
+                performedAt = performedAt.toEpochMilli(),
+                updatedAt = Instant.now().toEpochMilli(),
+                syncState = SYNC_STATE_PENDING,
+            )
     }

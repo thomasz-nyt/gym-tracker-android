@@ -3,6 +3,8 @@ package com.gymtracker.core.data.set
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Queries over `sets`. */
@@ -63,4 +65,29 @@ interface SetDao {
 
     @Insert
     suspend fun insert(set: SetEntity)
+
+    /** One set by id, or null — used to snapshot a row before [deleteById] takes it (US-04). */
+    @Query("SELECT * FROM sets WHERE id = :id")
+    suspend fun find(id: String): SetEntity?
+
+    /** Overwrites every mutable column of an existing row, matched by primary key (US-04). */
+    @Update
+    suspend fun update(set: SetEntity)
+
+    @Query("DELETE FROM sets WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    /**
+     * Deletes one set, returning the row as it was just before, or null if there was none —
+     * the snapshot [com.gymtracker.core.domain.set.DeleteSet] needs for undo (US-04).
+     *
+     * A default method rather than two calls from the repository, so the read-then-delete is
+     * one Room transaction instead of two round trips that could race a concurrent write.
+     */
+    @Transaction
+    suspend fun deleteAndReturn(id: String): SetEntity? {
+        val existing = find(id) ?: return null
+        deleteById(id)
+        return existing
+    }
 }

@@ -37,4 +37,18 @@ interface SetRepository {
 
     /** Persists a set. Must complete before any UI transition (US-03). */
     suspend fun add(set: ExerciseSet)
+
+    /**
+     * Writes back a corrected weight, reps or RPE for a set that already exists (US-04). [set]'s
+     * `id` addresses the row; every other field on it is the new value to store.
+     */
+    suspend fun update(set: ExerciseSet)
+
+    /**
+     * Deletes one set by id (US-04).
+     *
+     * @return the set as it was just before the delete, so a caller can undo it, or null if
+     *   there was no set with that id — meaning there is nothing to undo either.
+     */
+    suspend fun delete(id: String): ExerciseSet?
 }
