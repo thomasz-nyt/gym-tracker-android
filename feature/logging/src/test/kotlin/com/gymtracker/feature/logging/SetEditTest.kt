@@ -7,6 +7,7 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.EndSession
@@ -196,6 +197,34 @@ class SetEditTest {
             assertEquals(emptyList(), sets.all, "the delete stands")
         }
 
+    @Test
+    fun `the rest panel offers the next set, and logs it in one tap`() =
+        runTest {
+            // ADR-0023. The panel is the whole point: same weight, same reps, next set, without
+            // opening anything.
+            val viewModel = viewModelWithLoggedSet()
+
+            val next = viewModel.uiState.first { it.upNext != null }.upNext!!
+            assertEquals(2, next.setNumber, "one set logged, so the next is 2 — never \"2 of N\"")
+
+            viewModel.onLogNextSet(next)
+
+            val logged = sets.all.sortedBy { it.setIndex }
+            assertEquals(2, logged.size, "the set was written from the panel")
+            assertEquals(8, logged.last().reps, "carried from the prefill")
+            assertEquals(WEIGHT_KG, logged.last().weightKg)
+        }
+
+    @Test
+    fun `there is nothing up next before anything has been logged`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            viewModel.uiState.first { it.exercises.isNotEmpty() }
+
+            assertNull(viewModel.uiState.first().upNext, "no set, no rest, nothing to be next")
+        }
+
     private fun loggedSet() =
         ExerciseSet(
             id = SET_ID,
@@ -251,6 +280,7 @@ class SetEditTest {
                 restoreSession = RestoreSession(repository, sessionExercises, sets),
                 removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
                 restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+                determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
                 updateSet = UpdateSet(sets),
                 deleteSet = DeleteSet(sets),
                 restoreSet = RestoreSet(sets),

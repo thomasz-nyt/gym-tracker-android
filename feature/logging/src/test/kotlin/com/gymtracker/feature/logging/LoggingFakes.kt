@@ -93,6 +93,9 @@ internal class FakeSets(
     private val state = MutableStateFlow(emptyList<ExerciseSet>())
     val lastFor = mutableMapOf<ExerciseId, String>()
 
+    /** The exercise whose most recent set from an earlier session the ADR-0023 comparison should find. */
+    val lastBeforeFor = mutableMapOf<ExerciseId, String>()
+
     val all: List<ExerciseSet> get() = state.value
 
     fun seed(set: ExerciseSet) {
@@ -119,6 +122,12 @@ internal class FakeSets(
         exerciseId: ExerciseId,
         member: UserId,
     ): ExerciseSet? = lastFor[exerciseId]?.let { id -> state.value.firstOrNull { it.id == id } }
+
+    override suspend fun lastSetOfBefore(
+        exerciseId: ExerciseId,
+        member: UserId,
+        excludingSessionId: SessionId,
+    ): ExerciseSet? = lastBeforeFor[exerciseId]?.let { id -> state.value.firstOrNull { it.id == id } }
 
     override suspend fun lastSetAtInSession(sessionId: SessionId): Instant? =
         state.value.filter { sessionOf(it.sessionExerciseId) == sessionId }.maxOfOrNull { it.performedAt }

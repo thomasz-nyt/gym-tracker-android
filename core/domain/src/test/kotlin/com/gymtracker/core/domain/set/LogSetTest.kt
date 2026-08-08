@@ -158,6 +158,12 @@ class LogSetTest {
             member: UserId,
         ): ExerciseSet? = lastFor[exerciseId to member]?.let { id -> state.value.firstOrNull { it.id == id } }
 
+        override suspend fun lastSetOfBefore(
+            exerciseId: ExerciseId,
+            member: UserId,
+            excludingSessionId: SessionId,
+        ): ExerciseSet? = null
+
         override suspend fun lastSetAtInSession(sessionId: SessionId): Instant? =
             state.value.maxOfOrNull { it.performedAt }
 

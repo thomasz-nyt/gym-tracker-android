@@ -26,6 +26,7 @@ import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.DeleteSession
@@ -201,6 +202,13 @@ object DataModule {
         sessionExercises: SessionExerciseRepository,
         sets: SetRepository,
     ): RestoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets)
+
+    @Provides
+    fun determineUpNextSet(
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        prefillFromLastSet: PrefillFromLastSet,
+    ): DetermineUpNextSet = DetermineUpNextSet(sessionExercises, sets, prefillFromLastSet)
 
     @Provides
     fun updateSet(sets: SetRepository): UpdateSet = UpdateSet(sets)

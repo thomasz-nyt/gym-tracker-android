@@ -21,6 +21,12 @@ internal open class NoSets : SetRepository {
         member: UserId,
     ): ExerciseSet? = null
 
+    override suspend fun lastSetOfBefore(
+        exerciseId: ExerciseId,
+        member: UserId,
+        excludingSessionId: SessionId,
+    ): ExerciseSet? = null
+
     override suspend fun lastSetAtInSession(sessionId: SessionId): Instant? = null
 
     override suspend fun nextSetIndex(sessionExerciseId: SessionExerciseId): Int = 1
