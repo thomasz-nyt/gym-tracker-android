@@ -60,6 +60,32 @@ kill survivable — `LogSet` is awaited before the entry sheet closes, so by the
 the UI has moved on the row is already committed. Verified manually on device by
 force-stopping and relaunching.
 
+### `waitForIdle` is not a wait, in this codebase
+
+This has now cost two debugging sessions, so it is written down rather than
+rediscovered a third time.
+
+**Every sheet in the app is opened by a coroutine.** `SetEntryController.open` reads
+the unit preference and then the member's last set of the exercise — a Room query —
+and only *then* sets the state the sheet renders from. `SetEditController.open` does
+the same with the unit preference. The sheet therefore cannot appear holding empty or
+stale values: it appearing at all is the proof that its data arrived.
+
+`compose.waitForIdle()` synchronises **Compose**, not that coroutine. A suspend read
+is not a recomposition, so it returns while the query is still in flight and any
+assertion after it races the database. That passes on a developer machine and fails on
+CI's slower emulator — which is exactly what happened: `TwoTapSetLoggingTest` failed on
+every PR from #19 onward while passing locally, and was merged red twice before it was
+chased down.
+
+**So: never assert on a sheet straight after `waitForIdle`.** Use a `waitUntil` on the
+condition actually meant — `awaitSheetOpen`, `awaitSheetClosed`, `awaitEditorOpen`,
+`awaitEditorClosed`. These add no interaction, so the two-tap count above is unaffected.
+
+Note what the diagnosis was *not*: there is no production bug here. The window the test
+was racing does not exist in the app, because the sheet is gated on state that is only
+written once the read has completed.
+
 ### 3. RLS isolation
 See `data-model.md`. Includes a test that enumerates `public` tables and fails on
 any without RLS enabled — so the check keeps working as the schema grows.

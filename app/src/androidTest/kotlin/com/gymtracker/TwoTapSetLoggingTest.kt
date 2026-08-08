@@ -145,7 +145,7 @@ class TwoTapSetLoggingTest {
             // Tap 1 — open set entry. It arrives prefilled from last week.
             // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
             compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
-            compose.waitForIdle()
+            awaitSheetOpen()
 
             // The whole reason two taps is possible: last week's numbers are already there.
             compose.onNodeWithText("135").assertExists("weight should be prefilled from last week")
@@ -171,7 +171,7 @@ class TwoTapSetLoggingTest {
             awaitReadyToLogASet()
             // ListItem merges its descendants' semantics, so the button lives in the unmerged tree.
             compose.onNodeWithText("Add set", useUnmergedTree = true).performClick()
-            compose.waitForIdle()
+            awaitSheetOpen()
             compose.onNodeWithText("Save set").performClick()
             awaitSheetClosed()
 
@@ -179,6 +179,27 @@ class TwoTapSetLoggingTest {
                 sets.observeForSessionExercise(TODAY).first().singleOrNull(),
                 "the sheet closed, so the set must already be on disk",
             )
+        }
+    }
+
+    /**
+     * Waits for the entry sheet to appear, which is the same synchronisation problem as
+     * [awaitSheetClosed] at the other end of the sheet's life.
+     *
+     * `SetEntryController.open` reads the unit preference and then the member's last set of
+     * this exercise — a Room query — and only then sets the state the sheet renders from. So
+     * the sheet cannot appear un-prefilled: **the sheet being up is itself the proof that the
+     * prefill landed.** What `waitForIdle` does not do is wait for that coroutine; it
+     * synchronises Compose, and a suspend read is not Compose. Asserting straight after it
+     * therefore looked for "135" before the sheet existed — which passed on a fast machine
+     * and failed on CI's emulator, on every PR from #19 onward.
+     *
+     * This adds no interaction, so US-03's two-tap count is untouched: the test still performs
+     * exactly two `performClick` calls before asserting.
+     */
+    private fun awaitSheetOpen() {
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isNotEmpty()
         }
     }
 
