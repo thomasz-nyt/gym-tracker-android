@@ -18,9 +18,12 @@ import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
+import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.RestoreSet
+import com.gymtracker.core.domain.set.UpdateSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -133,6 +136,9 @@ class WorkoutHistoryTest {
             restoreSession = RestoreSession(repository, sessionExercises, sets),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
             restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+            updateSet = UpdateSet(sets),
+            deleteSet = DeleteSet(sets),
+            restoreSet = RestoreSet(sets),
             guidedPlanStore = guidedStore,
             clock = clock,
         )
@@ -152,7 +158,11 @@ class WorkoutHistoryTest {
                 val performed = detail.exercises.single()
                 assertEquals("Bench Press", performed.exercise?.name)
                 assertEquals(2, performed.sets.size)
-                assertEquals(listOf(2), performed.groups.map { it.count }, "identical sets group")
+                assertEquals(
+                    listOf(60.0, 60.0),
+                    performed.sets.map { it.weightKg },
+                    "both identical sets are kept individually, not merged (ADR-0022)",
+                )
             }
         }
 

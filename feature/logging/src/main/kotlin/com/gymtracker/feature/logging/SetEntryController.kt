@@ -11,8 +11,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlin.math.ceil
-import kotlin.math.floor
 
 /** The set-entry sheet for one exercise in the session (US-03). */
 data class SetEntry(
@@ -201,31 +199,5 @@ class SetEntryController(
     }
 }
 
-// The stepper arithmetic below is deliberately outside the controller: none of it touches the
-// controller's state, and it is easier to check when it reads as plain functions.
-
-/** US-03 for reps, ADR-0009 for sets: neither is meaningful below one. */
-private const val WHOLE_NUMBER_FLOOR = 1
-
-private fun String.stepWholeNumber(direction: Int): String {
-    val from = trim().toIntOrNull() ?: 0
-    return (from + direction).coerceAtLeast(WHOLE_NUMBER_FLOOR).toString()
-}
-
-/**
- * The next multiple of [increment] in [direction], starting from [from].
- *
- * Rounding towards the direction of travel is what makes an off-grid value tidy itself up on
- * the first press instead of carrying its remainder forever.
- */
-private fun snap(
-    from: Double,
-    increment: Double,
-    direction: Int,
-): Double {
-    val steps = from / increment
-    val next = if (direction >= 0) floor(steps) + 1 else ceil(steps) - 1
-    return next * increment
-}
-
-private fun trimNumber(value: Double): String = if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+// The stepper arithmetic these use lives in SetSteppers.kt, shared with US-04's editor so a
+// corrected set and a freshly logged one cannot disagree about what one press means.

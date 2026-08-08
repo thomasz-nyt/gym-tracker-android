@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -62,9 +64,10 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.session.PerformedExercise
+import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
-import com.gymtracker.core.domain.set.SetGroup
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -138,6 +141,17 @@ fun LoggingRoute(
         onOpenWorkout = viewModel.history::openWorkout,
         onCloseWorkout = viewModel.history::closeWorkout,
         setEntry = viewModel.setEntryCallbacks(),
+        onEditSet = { row, set ->
+            viewModel.setEdit.open(set, row.exercise?.name ?: row.sessionExercise.exerciseId.value)
+        },
+        setEdit = viewModel.setEditCallbacks(),
+        onUndoSetDelete = viewModel.setEdit::undo,
+        onEditPastSet = { performed, set ->
+            viewModel.setEdit.open(
+                set,
+                performed.exercise?.name ?: performed.sessionExercise.exerciseId.value,
+            )
+        },
         onAddExercise = onAddExercise,
         modifier = modifier,
     )
@@ -155,6 +169,19 @@ private fun ActiveSessionViewModel.setEntryCallbacks() =
         onRpeChanged = { setEntry.change(rpe = it) },
         onConfirm = setEntry::confirm,
         onDismiss = setEntry::dismiss,
+    )
+
+/** The set editor's actions (US-04), wired to the controller that serves them. */
+private fun ActiveSessionViewModel.setEditCallbacks() =
+    SetEditCallbacks(
+        onWeightChanged = { setEdit.change(weight = it) },
+        onWeightStepped = setEdit::stepWeight,
+        onRepsChanged = { setEdit.change(reps = it) },
+        onRepsStepped = setEdit::stepReps,
+        onRpeChanged = { setEdit.change(rpe = it) },
+        onSave = setEdit::save,
+        onDelete = setEdit::delete,
+        onDismiss = setEdit::dismiss,
     )
 
 /** The guided flow's actions, wired to the ViewModel that serves them. */
@@ -213,42 +240,34 @@ internal fun LoggingScreen(
     onOpenWorkout: (SessionId) -> Unit = {},
     onCloseWorkout: () -> Unit = {},
     setEntry: SetEntryCallbacks = SetEntryCallbacks.Inert,
+    onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit = { _, _ -> },
+    setEdit: SetEditCallbacks = SetEditCallbacks.Inert,
+    onUndoSetDelete: () -> Unit = {},
+    // Opens the editor on a set from a past workout (US-04's third criterion, ADR-0022).
+    onEditPastSet: (PerformedExercise, ExerciseSet) -> Unit = { _, _ -> },
     onAddExercise: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val running = state.guided.running
     val openWorkout = state.history.detail
 
-    // Which full-screen thing is showing. A `when` rather than a chain of early returns: the
-    // branches are exclusive and reading them as one list is the point (ADR-0013 keeps these
-    // out of the navigation graph deliberately — see ADR-0017 for the guided one).
+    // Which full-screen thing is showing (ADR-0013 keeps these out of the navigation graph
+    // deliberately — see ADR-0017 for the guided one).
     when {
-        // Guided mode takes the screen while it runs, but it is a lens over the same rows —
-        // every set is already logged, so leaving it loses nothing (US-05a).
-        running != null -> {
-            BackHandler(onBack = guided.onStop)
-            GuidedExerciseScreen(
-                running = running,
-                unit = state.unit,
-                restRemaining = state.restRemaining,
-                onRepsChanged = guided.onRepsChanged,
-                onFinishSet = guided.onFinishSet,
-                onStartNext = guided.onStartNext,
-                onStop = guided.onStop,
-                modifier = modifier,
-            )
-        }
+        // A lens over the already-logged rows, so leaving it loses nothing (US-05a).
+        running != null ->
+            GuidedRoute(running = running, state = state, guided = guided, modifier = modifier)
 
         // Before the list, because a workout is only ever open while history is (US-06b).
-        openWorkout != null -> {
-            BackHandler(onBack = onCloseWorkout)
-            WorkoutDetailScreen(
+        openWorkout != null ->
+            PastWorkoutDetail(
                 detail = openWorkout,
-                unit = state.unit,
-                onBack = onCloseWorkout,
+                state = state,
+                onCloseWorkout = onCloseWorkout,
+                onEditPastSet = onEditPastSet,
+                setEdit = setEdit,
                 modifier = modifier,
             )
-        }
 
         state.history.isOpen -> {
             // Back leaves history rather than the app — it is a side trip from the session
@@ -279,10 +298,65 @@ internal fun LoggingScreen(
                 onOpenHistory = onOpenHistory,
                 onBrowseCatalog = onBrowseCatalog,
                 setEntry = setEntry,
+                onEditSet = onEditSet,
+                setEdit = setEdit,
+                onUndoSetDelete = onUndoSetDelete,
                 onAddExercise = onAddExercise,
                 modifier = modifier,
             )
     }
+}
+
+/**
+ * A past workout (US-06b), plus the same set editor the active session uses.
+ *
+ * Split out of [LoggingScreen] rather than left inline: the editor is hosted here rather than
+ * inside [WorkoutDetailScreen] itself, because it is the same sheet over the same
+ * `SetEditController` the active session opens — a set is corrected through one editor no
+ * matter which screen it was tapped from (ADR-0022, US-04's third criterion).
+ */
+@Composable
+private fun PastWorkoutDetail(
+    detail: SessionDetail,
+    state: SessionUiState,
+    onCloseWorkout: () -> Unit,
+    onEditPastSet: (PerformedExercise, ExerciseSet) -> Unit,
+    setEdit: SetEditCallbacks,
+    modifier: Modifier = Modifier,
+) {
+    // Back leaves the workout, not history behind it (US-06b).
+    BackHandler(onBack = onCloseWorkout)
+    WorkoutDetailScreen(
+        detail = detail,
+        unit = state.unit,
+        onBack = onCloseWorkout,
+        onEditSet = onEditPastSet,
+        modifier = modifier,
+    )
+    state.setEdit?.let { edit ->
+        SetEditSheet(edit = edit, unit = state.unit, callbacks = setEdit)
+    }
+}
+
+/** The guided flow's own screen (US-05a), kept behind the same `BackHandler` its stop button offers. */
+@Composable
+private fun GuidedRoute(
+    running: GuidedRunning,
+    state: SessionUiState,
+    guided: GuidedActions,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = guided.onStop)
+    GuidedExerciseScreen(
+        running = running,
+        unit = state.unit,
+        restRemaining = state.restRemaining,
+        onRepsChanged = guided.onRepsChanged,
+        onFinishSet = guided.onFinishSet,
+        onStartNext = guided.onStartNext,
+        onStop = guided.onStop,
+        modifier = modifier,
+    )
 }
 
 /** The session itself: the body, and the two dialogs that can sit over it. */
@@ -300,6 +374,9 @@ private fun SessionScreen(
     onOpenHistory: () -> Unit,
     onBrowseCatalog: () -> Unit,
     setEntry: SetEntryCallbacks,
+    onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
+    setEdit: SetEditCallbacks,
+    onUndoSetDelete: () -> Unit,
     onAddExercise: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -314,6 +391,8 @@ private fun SessionScreen(
             onRemoveExercise = onRemoveExercise,
             onUndoRemoval = onUndoRemoval,
             onStartExercise = guided.onStartExercise,
+            onEditSet = onEditSet,
+            onUndoSetDelete = onUndoSetDelete,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             modifier = Modifier.padding(padding),
@@ -324,6 +403,7 @@ private fun SessionScreen(
             onResolveStale = onResolveStale,
             guided = guided,
             setEntry = setEntry,
+            setEdit = setEdit,
         )
     }
 }
@@ -343,6 +423,8 @@ private fun SessionBody(
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onUndoRemoval: () -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
+    onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
+    onUndoSetDelete: () -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -365,6 +447,9 @@ private fun SessionBody(
                     canUndoRemoval = state.canUndoRemoval,
                     onUndoRemoval = onUndoRemoval,
                     onStartExercise = onStartExercise,
+                    onEditSet = onEditSet,
+                    canUndoSetDelete = state.canUndoSetDelete,
+                    onUndoSetDelete = onUndoSetDelete,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )
@@ -380,6 +465,7 @@ private fun SessionDialogs(
     onResolveStale: (StaleSessionPrompt) -> Unit,
     guided: GuidedActions,
     setEntry: SetEntryCallbacks,
+    setEdit: SetEditCallbacks,
 ) {
     state.stalePrompt?.let { prompt ->
         AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
@@ -399,6 +485,10 @@ private fun SessionDialogs(
 
     state.setEntry?.let { entry ->
         SetEntrySheet(entry = entry, unit = state.unit, callbacks = setEntry)
+    }
+
+    state.setEdit?.let { edit ->
+        SetEditSheet(edit = edit, unit = state.unit, callbacks = setEdit)
     }
 }
 
@@ -446,6 +536,9 @@ private fun ActiveSession(
     canUndoRemoval: Boolean,
     onUndoRemoval: () -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
+    onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
+    canUndoSetDelete: Boolean,
+    onUndoSetDelete: () -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
 ) {
@@ -471,6 +564,7 @@ private fun ActiveSession(
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
                 onStartExercise = onStartExercise,
+                onEditSet = onEditSet,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
         }
@@ -480,6 +574,10 @@ private fun ActiveSession(
         // (US-02c, US-05).
         if (canUndoRemoval) {
             RemovalUndoBar(onUndoRemoval)
+        }
+
+        if (canUndoSetDelete) {
+            SetDeleteUndoBar(onUndoSetDelete)
         }
 
         // Above the bottom action and never over the list: the rest banner displays the stored
@@ -621,6 +719,7 @@ private fun SessionExercises(
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
+    onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
@@ -649,7 +748,7 @@ private fun SessionExercises(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    LoggedSets(row.sets, unit)
+                    LoggedSets(row.sets, unit) { set -> onEditSet(row, set) }
                     Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
                         TextButton(
                             onClick = { onStartExercise(row) },
@@ -657,8 +756,12 @@ private fun SessionExercises(
                         ) {
                             Text("Start exercise")
                         }
-                        // Red, and the only red on the card: ADR-0016 reserves the error colour
-                        // for destructive actions, matching history's "Delete" (US-02c).
+                        // ADR-0019 replaced ADR-0016's "red means destructive" with a structural
+                        // rule, because red is the accent now: a destructive control never
+                        // shares a surface with a save, and is outlined rather than filled. This
+                        // button predates that rule and still sits beside "Add set" on the same
+                        // card — a known exception ADR-0019 flags to revisit, not a pattern to
+                        // copy (US-02c).
                         TextButton(
                             onClick = { onRemoveExercise(row.sessionExercise.id) },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -769,11 +872,20 @@ private fun RestNotifications(viewModel: ActiveSessionViewModel) {
     }
 }
 
-/** The sets already logged against one exercise, each in both units (ADR-0008). */
+/**
+ * The sets already logged against one exercise, each in both units (ADR-0008), and each its own
+ * tap target (ADR-0022).
+ *
+ * These used to be collapsed — three identical sets read as "3 × 12" on one line (ADR-0009).
+ * That was fine to read and impossible to correct: one line, three rows, three ids, and no way
+ * for a tap to say which. US-04 needs every set reachable, so the grouping went and the set
+ * index stays as the label, naming the row it edits.
+ */
 @Composable
 private fun LoggedSets(
     sets: List<ExerciseSet>,
     unit: WeightUnit,
+    onEditSet: (ExerciseSet) -> Unit,
 ) {
     if (sets.isEmpty()) {
         Text("No sets yet", style = MaterialTheme.typography.bodyMedium)
@@ -781,25 +893,28 @@ private fun LoggedSets(
     }
 
     Column {
-        // Identical consecutive sets read as "3 × 12" rather than three near-identical
-        // lines (ADR-0009). The rows underneath stay separate.
-        SetGroup.of(sets).forEach { group ->
-            val weight = WeightFormatter.format(group.weightKg, unit)
+        sets.forEach { set ->
+            val weight = WeightFormatter.format(set.weightKg, unit)
             Text(
                 text =
                     buildString {
-                        if (group.count > 1) {
-                            append("${group.count} × ${group.reps}")
-                        } else {
-                            append("${group.firstSetIndex}.  ${group.reps} reps")
-                        }
+                        append("${set.setIndex}.  ${set.reps} reps")
                         append("   ${weight.primary}")
                         weight.secondary?.let { append("  ·  $it") }
-                        group.rpe?.let { append("   RPE $it") }
+                        set.rpe?.let { append("   RPE $it") }
                     },
                 // The line you came back to the phone to read, so it takes the role that says
                 // so rather than the smallest one there is (ADR-0011).
                 style = MaterialTheme.typography.titleMedium,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                        .clickable { onEditSet(set) }
+                        // Named rather than left to the row's text, so the target says what it
+                        // does — for TalkBack (M7) as much as for the tests.
+                        .semantics { contentDescription = "Edit set ${set.setIndex}" }
+                        .wrapContentHeight(Alignment.CenterVertically),
             )
         }
     }
@@ -863,6 +978,153 @@ private fun SetEntrySheet(
                     .padding(horizontal = GymDimens.ScreenPadding)
                     .padding(top = GymDimens.Gap, bottom = GymDimens.ScreenPadding),
         )
+    }
+}
+
+/**
+ * Correcting a set already logged (US-04), in the same sheet shape as set entry.
+ *
+ * Two differences from [SetEntrySheet], both deliberate:
+ *
+ * - **No "Sets" field.** Logging can write three identical rows at once (ADR-0009); correcting
+ *   is always about the one row you tapped, and a repeat count here would mean "turn this set
+ *   into three".
+ * - **"Delete set" lives here**, and nowhere else. ADR-0019 replaced ADR-0016's rule that red
+ *   means destructive — red is the accent now — with a structural one: a destructive control
+ *   never shares a surface with a save, and is outlined rather than filled. So delete is not on
+ *   the set row, not on the card next to "Add set", and is the only outlined thing in the sheet.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SetEditSheet(
+    edit: SetEdit,
+    unit: WeightUnit,
+    callbacks: SetEditCallbacks,
+) {
+    ModalBottomSheet(
+        onDismissRequest = callbacks.onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        SetEditFields(
+            edit = edit,
+            unit = unit,
+            callbacks = callbacks,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = GymDimens.ScreenPadding),
+        )
+
+        // Pinned outside the scroll for the reason set entry's is: a sheet that opens showing
+        // the numbers but not the button that saves them is a scroll nobody asked for.
+        PrimaryActionButton(
+            text = "Save changes",
+            onClick = callbacks.onSave,
+            enabled = edit.reps.toIntOrNull()?.let { it >= 1 } == true,
+            modifier =
+                Modifier
+                    .padding(horizontal = GymDimens.ScreenPadding)
+                    .padding(top = GymDimens.Gap),
+        )
+
+        OutlinedButton(
+            onClick = callbacks.onDelete,
+            // Square, like every other control: `OutlinedButton` reads `CornerFull` rather than
+            // the shape scale, so ADR-0019's radius-0 does not reach it on its own. See Shape.kt.
+            shape = MaterialTheme.shapes.large,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .padding(horizontal = GymDimens.ScreenPadding)
+                    .padding(top = GymDimens.TightGap, bottom = GymDimens.ScreenPadding),
+        ) {
+            Text("Delete set")
+        }
+    }
+}
+
+/** The editor's fields: the same numbers as entry, minus the repeat count. */
+@Composable
+private fun SetEditFields(
+    edit: SetEdit,
+    unit: WeightUnit,
+    callbacks: SetEditCallbacks,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+        Text(edit.exerciseName, style = MaterialTheme.typography.titleLarge)
+        Text("Set ${edit.set.setIndex}", style = MaterialTheme.typography.bodyMedium)
+
+        StepperField(
+            label = "Weight (${unit.name.lowercase()})",
+            value = edit.weight,
+            onValueChange = callbacks.onWeightChanged,
+            onStep = callbacks.onWeightStepped,
+            placeholder = "Bodyweight",
+            supporting = edit.weight.otherUnit(unit),
+            keyboardType = KeyboardType.Decimal,
+        )
+
+        StepperField(
+            label = "Reps",
+            value = edit.reps,
+            onValueChange = callbacks.onRepsChanged,
+            onStep = callbacks.onRepsStepped,
+        )
+
+        OutlinedTextField(
+            value = edit.rpe,
+            onValueChange = callbacks.onRpeChanged,
+            label = { Text("RPE (optional)") },
+            placeholder = { Text("—") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** What the editor can do, gathered up like [SetEntryCallbacks]. */
+internal data class SetEditCallbacks(
+    val onWeightChanged: (String) -> Unit,
+    val onWeightStepped: (Int) -> Unit,
+    val onRepsChanged: (String) -> Unit,
+    val onRepsStepped: (Int) -> Unit,
+    val onRpeChanged: (String) -> Unit,
+    val onSave: () -> Unit,
+    val onDelete: () -> Unit,
+    val onDismiss: () -> Unit,
+) {
+    companion object {
+        /** For previews and for callers that only render the session behind the sheet. */
+        val Inert = SetEditCallbacks({}, {}, {}, {}, {}, {}, {}, {})
+    }
+}
+
+/** US-04's five-second window, worded like the other two so all three read alike. */
+@Composable
+private fun SetDeleteUndoBar(onUndo: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = GymDimens.Gap),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Set deleted", style = MaterialTheme.typography.bodyMedium)
+            TextButton(
+                onClick = onUndo,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Undo")
+            }
+        }
     }
 }
 

@@ -40,7 +40,7 @@ Stories: US-01 … US-06b
 - [x] Add an exercise to a session
 - [x] Log a set: weight, reps (RPE in the domain; not yet in the UI)
 - [x] Prefill from the last time this exercise was performed
-- [ ] Edit and delete a set
+- [x] Edit and delete a set (US-04). One row per set, so any one is reachable (ADR-0022)
 - [x] Rest timer between sets
 - [x] End a session, and the session history list (US-06)
 - [x] Delete a past workout, with undo (US-06a, ADR-0012)

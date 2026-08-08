@@ -131,8 +131,12 @@ private fun WorkoutList(
                     Text(summary.describe(unit), style = MaterialTheme.typography.bodyMedium)
                 },
                 trailingContent = {
-                    // Red, and the only red on the screen: ADR-0016 reserves the error colour
-                    // for destructive actions so this can never be mistaken for the accent.
+                    // ADR-0019 replaced ADR-0016's "red means destructive" with a structural
+                    // rule, because red is the accent now: a destructive control never shares a
+                    // surface with a save, and is outlined rather than filled. This button
+                    // predates that rule and still sits on the same row as the primary action —
+                    // opening the workout — so it is a known exception ADR-0019 flags to
+                    // revisit, not a pattern to copy.
                     TextButton(
                         onClick = { onDelete(summary.session.id) },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),

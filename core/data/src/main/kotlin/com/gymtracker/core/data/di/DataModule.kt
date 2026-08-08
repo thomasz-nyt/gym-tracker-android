@@ -39,10 +39,13 @@ import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
+import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.SetRepository
+import com.gymtracker.core.domain.set.UpdateSet
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -198,6 +201,15 @@ object DataModule {
         sessionExercises: SessionExerciseRepository,
         sets: SetRepository,
     ): RestoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets)
+
+    @Provides
+    fun updateSet(sets: SetRepository): UpdateSet = UpdateSet(sets)
+
+    @Provides
+    fun deleteSet(sets: SetRepository): DeleteSet = DeleteSet(sets)
+
+    @Provides
+    fun restoreSet(sets: SetRepository): RestoreSet = RestoreSet(sets)
 }
 
 @Module

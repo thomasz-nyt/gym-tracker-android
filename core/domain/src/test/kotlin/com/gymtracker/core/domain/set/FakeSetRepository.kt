@@ -66,4 +66,14 @@ class FakeSetRepository : SetRepository {
     override suspend fun add(set: ExerciseSet) {
         state.value = state.value + set
     }
+
+    override suspend fun update(set: ExerciseSet) {
+        state.value = state.value.map { if (it.id == set.id) set else it }
+    }
+
+    override suspend fun delete(id: String): ExerciseSet? {
+        val existing = state.value.firstOrNull { it.id == id } ?: return null
+        state.value = state.value.filterNot { it.id == id }
+        return existing
+    }
 }

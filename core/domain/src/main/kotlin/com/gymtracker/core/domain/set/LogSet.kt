@@ -31,11 +31,8 @@ class LogSet(
         reps: Int,
         rpe: Double?,
     ): ExerciseSet {
-        require(reps >= MIN_REPS) { "A set needs at least $MIN_REPS rep, but was $reps" }
-        rpe?.let {
-            require(it in MIN_RPE..MAX_RPE) { "RPE is $MIN_RPE..$MAX_RPE, but was $it" }
-            require((it * 2) % 1.0 == 0.0) { "RPE moves in half steps, but was $it" }
-        }
+        SetValidation.requireValidReps(reps)
+        SetValidation.requireValidRpe(rpe)
 
         val set =
             ExerciseSet(
@@ -52,11 +49,5 @@ class LogSet(
         // is not yet on disk (US-03).
         sets.add(set)
         return set
-    }
-
-    private companion object {
-        const val MIN_REPS = 1
-        const val MIN_RPE = 5.0
-        const val MAX_RPE = 10.0
     }
 }

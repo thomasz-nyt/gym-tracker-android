@@ -7,7 +7,6 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
-import com.gymtracker.core.domain.set.SetGroup
 import com.gymtracker.core.domain.set.SetRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -20,8 +19,9 @@ import kotlinx.coroutines.flow.flowOf
  *
  * @property exercise the catalog entry, or null if the row somehow outlived it. The schema
  *   forbids that; the type stays honest about it rather than forcing a lie.
- * @property groups the sets, collapsed for reading by [SetGroup] (ADR-0009). The rows
- *   underneath stay separate.
+ * @property sets every set logged against this exercise, in `set_index` order, one row each —
+ *   ADR-0022 removed the display-only grouping this once carried, because a group has no id
+ *   for a tap to mean and every set must be individually correctable (US-04's third criterion).
  * @property volumeKg weight moved on this exercise, over the sets that recorded one. Null
  *   when none did — never zero, per constitution §2.4.
  * @property bodyweightSetCount sets logged without a weight, reported rather than folded in.
@@ -30,7 +30,6 @@ data class PerformedExercise(
     val sessionExercise: SessionExercise,
     val exercise: Exercise?,
     val sets: List<ExerciseSet>,
-    val groups: List<SetGroup>,
     val volumeKg: Double?,
     val bodyweightSetCount: Int,
 )
@@ -105,7 +104,6 @@ class WorkoutDetail(
             sessionExercise = appearance,
             exercise = exercise,
             sets = mine,
-            groups = SetGroup.of(mine),
             volumeKg = if (weighted.isEmpty()) null else weighted.sum(),
             bodyweightSetCount = mine.count { it.weightKg == null },
         )
