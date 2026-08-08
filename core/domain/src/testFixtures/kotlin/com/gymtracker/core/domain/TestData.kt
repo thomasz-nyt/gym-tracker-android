@@ -1,5 +1,8 @@
 package com.gymtracker.core.domain
 
+import com.gymtracker.core.domain.model.BodyPart
+import com.gymtracker.core.domain.model.Equipment
+import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
@@ -41,6 +44,41 @@ object TestData {
     val DEADLIFT = ExerciseId("Barbell_Deadlift")
     val ROW = ExerciseId("Seated_Cable_Rows")
     val PULLDOWN = ExerciseId("Wide-Grip_Lat_Pulldown")
+
+    /**
+     * The catalog entries for the five lifts.
+     *
+     * Here rather than left to each test to invent, because a volume-by-body-part figure is
+     * only meaningful if the exercise resolves to a muscle — a fixture whose ids the catalog
+     * does not know silently produces empty charts (US-17).
+     */
+    val exercises: List<Exercise> =
+        listOf(
+            catalogEntry(BENCH, "Barbell Bench Press - Medium Grip", BodyPart.CHEST, Equipment.BARBELL),
+            catalogEntry(SQUAT, "Barbell Squat", BodyPart.QUADS, Equipment.BARBELL),
+            catalogEntry(DEADLIFT, "Barbell Deadlift", BodyPart.HAMSTRINGS, Equipment.BARBELL),
+            catalogEntry(ROW, "Seated Cable Rows", BodyPart.BACK, Equipment.CABLE),
+            catalogEntry(PULLDOWN, "Wide-Grip Lat Pulldown", BodyPart.BACK, Equipment.CABLE),
+        )
+
+    private fun catalogEntry(
+        id: ExerciseId,
+        name: String,
+        primary: BodyPart,
+        equipment: Equipment,
+    ) = Exercise(
+        id = id,
+        name = name,
+        aliases = emptyList(),
+        primaryMuscles = listOf(primary),
+        secondaryMuscles = emptyList(),
+        equipment = equipment,
+        instructions = emptyList(),
+        mediaUrl = null,
+        mediaType = null,
+        youtubeUrl = null,
+        source = "free-exercise-db",
+    )
 
     /** The five lifts, with the load each starts at and gains per week. */
     private val LIFTS =
