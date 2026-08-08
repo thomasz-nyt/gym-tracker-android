@@ -140,7 +140,7 @@ Added 2026-08-08 out of the `Redesign.dc.html` audit, whose finding 01 — "a se
 no plan" — is the one the rest of that redesign leans on. Taken before M4 for the reason
 M3 was taken before M2: none of it needs an account, a backend, or a network.
 
-- [ ] Warm-up timer that records nothing (US-28, ADR-0021)
+- [x] Warm-up timer that records nothing (US-28, ADR-0021)
 - [ ] `routines` + `routine_items`, additive migration, no change to `sessions`,
       `session_exercises` or `sets` (US-29, ADR-0020)
 - [ ] Create, rename, delete a routine; add, remove and reorder its movements

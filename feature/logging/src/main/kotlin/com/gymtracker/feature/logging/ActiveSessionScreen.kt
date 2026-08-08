@@ -107,8 +107,10 @@ fun LoggingRoute(
     onPicksHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
+    warmUpViewModel: WarmUpViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val warmUpElapsed by warmUpViewModel.elapsed.collectAsStateWithLifecycle()
     RestNotifications(viewModel)
 
     // Browse is a destination of its own, so it hands exercises back through the nav result
@@ -143,6 +145,12 @@ fun LoggingRoute(
         onUndoSetDelete = viewModel.setEdit::undo,
         onLogNextSet = viewModel::onLogNextSet,
         onAddExercise = onAddExercise,
+        warmUp =
+            WarmUp(
+                elapsed = warmUpElapsed,
+                onStart = warmUpViewModel::onStartWarmUp,
+                onStop = warmUpViewModel::onStopWarmUp,
+            ),
         modifier = modifier,
     )
 }
@@ -211,6 +219,23 @@ data class GuidedActions(
     val onStop: () -> Unit = {},
 )
 
+/**
+ * The warm-up, and the two things it can be asked to do (US-28, ADR-0021).
+ *
+ * A record for the same reason [GuidedActions] is one, and it carries its own state rather
+ * than reading it off [SessionUiState] — because a warm-up is not part of the session. It has
+ * no row, adds nothing to the duration, and never reaches history, and it comes from
+ * [WarmUpViewModel] rather than from the session's own state to keep that true structurally.
+ *
+ * [elapsed] is null when no warm-up is running, and [Duration.ZERO] for one that has just
+ * begun. Those are different states and the screen renders them differently.
+ */
+data class WarmUp(
+    val elapsed: Duration? = null,
+    val onStart: () -> Unit = {},
+    val onStop: () -> Unit = {},
+)
+
 @Composable
 internal fun LoggingScreen(
     state: SessionUiState,
@@ -230,6 +255,7 @@ internal fun LoggingScreen(
     onUndoSetDelete: () -> Unit = {},
     onLogNextSet: (UpNextSet) -> Unit = {},
     onAddExercise: () -> Unit = {},
+    warmUp: WarmUp = WarmUp(),
     modifier: Modifier = Modifier,
 ) {
     val running = state.guided.running
@@ -259,6 +285,7 @@ internal fun LoggingScreen(
             onUndoSetDelete = onUndoSetDelete,
             onLogNextSet = onLogNextSet,
             onAddExercise = onAddExercise,
+            warmUp = warmUp,
             modifier = modifier,
         )
     }
@@ -305,6 +332,7 @@ private fun SessionScreen(
     onUndoSetDelete: () -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
     onAddExercise: () -> Unit,
+    warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
@@ -323,6 +351,7 @@ private fun SessionScreen(
             onLogNextSet = onLogNextSet,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
+            warmUp = warmUp,
             modifier = Modifier.padding(padding),
         )
 
@@ -356,6 +385,7 @@ private fun SessionBody(
     onLogNextSet: (UpNextSet) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
+    warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -383,6 +413,7 @@ private fun SessionBody(
                     onLogNextSet = onLogNextSet,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
+                    warmUp = warmUp,
                 )
             else -> NoSession(onStartWorkout, onOpenHistory, onBrowseCatalog)
         }
@@ -474,6 +505,7 @@ private fun ActiveSession(
     onLogNextSet: (UpNextSet) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
+    warmUp: WarmUp,
 ) {
     var confirmingFinish by remember { mutableStateOf(false) }
 
@@ -501,6 +533,11 @@ private fun ActiveSession(
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
         }
+
+        // The warm-up sits above the undo bars and the rest, in the same never-over-the-list
+        // slot. It is drawn on the session screen but is no part of the session (ADR-0021):
+        // it logs nothing, so there is nothing here that a set could be confused with.
+        WarmUpPanel(warmUp)
 
         // Below the list and above the primary action, same slot the rest banner uses: neither
         // may cover the row you were about to read or the button you were about to press
@@ -576,6 +613,62 @@ private fun SessionHeader(
             modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
         ) {
             Text("Finish")
+        }
+    }
+}
+
+/**
+ * The warm-up: a stopwatch, and nothing else (US-28, ADR-0021).
+ *
+ * Idle, it is one quiet text button — the warm-up is the least of what this screen does and it
+ * does not get to look like the most. Running, it counts up at the size the rest countdown uses,
+ * because it is read from the same distance.
+ *
+ * What is deliberately absent: a weight field, a rep field, an exercise name, and any "save".
+ * There is nothing to save. Stopping it discards it, which is why the control says "Done"
+ * rather than anything that sounds like it writes a row.
+ */
+@Composable
+private fun WarmUpPanel(warmUp: WarmUp) {
+    val elapsed = warmUp.elapsed
+
+    if (elapsed == null) {
+        TextButton(
+            onClick = warmUp.onStart,
+            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+        ) {
+            Text("Start warm-up")
+        }
+        return
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.Gap),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text("Warm-up", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = elapsed.asCountdown(),
+                    style = MaterialTheme.typography.displayMedium,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription = "Warm-up ${elapsed.asCountdown()} elapsed, not recorded"
+                        },
+                )
+            }
+            TextButton(
+                onClick = warmUp.onStop,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Done")
+            }
         }
     }
 }
@@ -1319,6 +1412,26 @@ private fun RestingPreview() {
                 ),
             onStartWorkout = {},
             onResolveStale = {},
+        )
+    }
+}
+
+/**
+ * The eight minutes on the treadmill, counting up (US-28).
+ *
+ * Worth a preview of its own because of what it has to *not* show: no weight, no reps, no
+ * exercise, and no save. If a future edit puts any of those here, this preview is where it
+ * will look wrong first.
+ */
+@GymPreviews
+@Composable
+private fun WarmingUpPreview() {
+    GymTrackerTheme {
+        LoggingScreen(
+            state = SessionUiState(isLoading = false, activeSession = previewSession),
+            onStartWorkout = {},
+            onResolveStale = {},
+            warmUp = WarmUp(elapsed = Duration.ofSeconds(252)),
         )
     }
 }
