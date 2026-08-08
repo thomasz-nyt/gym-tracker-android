@@ -12,7 +12,9 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
+import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.RestoreSession
@@ -30,6 +32,7 @@ import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.RestoreSet
+import com.gymtracker.core.domain.set.SetInput
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.set.UpdateSet
 import com.gymtracker.core.domain.units.WeightUnit
@@ -74,12 +77,23 @@ data class SessionUiState(
     val canUndoSetDelete: Boolean = false,
     /** Time left in the current rest, or null when none is running (US-05). */
     val restRemaining: Duration? = null,
+    /** What the rest panel says is coming, or null before anything is logged (ADR-0023). */
+    val upNext: UpNextSet? = null,
     /** History, and the workout deleted from it that can still be put back (US-06, US-06a). */
     val history: HistoryState = HistoryState(),
     /** Whether the exercise just removed from the session can still be put back (US-02c). */
     val canUndoRemoval: Boolean = false,
     /** The exercise being walked through, if any (US-05a). */
     val guided: GuidedState = GuidedState(),
+)
+
+/**
+ * The rest, as ADR-0023 made it: a countdown and the set it is counting down to. They travel
+ * together because they are one panel, and because it keeps [ScreenExtras] at five fields.
+ */
+private data class RestPanel(
+    val remaining: Duration?,
+    val upNext: UpNextSet?,
 )
 
 /**
@@ -93,7 +107,7 @@ data class SessionUiState(
 private data class ScreenExtras(
     val unit: WeightUnit,
     val entry: SetEntry?,
-    val rest: Duration?,
+    val rest: RestPanel,
     val edit: SetEdit?,
     val canUndoSetDelete: Boolean,
 )
@@ -136,6 +150,7 @@ class ActiveSessionViewModel
         restoreSession: RestoreSession,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
+        private val determineUpNextSet: DetermineUpNextSet,
         updateSet: UpdateSet,
         deleteSet: DeleteSet,
         restoreSet: RestoreSet,
@@ -254,6 +269,25 @@ class ActiveSessionViewModel
                 scope = viewModelScope,
             )
 
+        /**
+         * What follows the running rest (ADR-0023), recomputed from the database whenever the
+         * session's sets change. `exercises` already re-emits on every write, so it is the
+         * trigger; nothing about "up next" is remembered between emissions.
+         */
+        private val restPanel: Flow<RestPanel> =
+            combine(
+                rest.remaining(),
+                activeSession,
+                member,
+                unitPreference.observe(),
+                exercises,
+            ) { remaining, session, memberId, unit, _ ->
+                RestPanel(
+                    remaining = remaining,
+                    upNext = session?.let { determineUpNextSet(it.id, memberId, unit) },
+                )
+            }
+
         val uiState: StateFlow<SessionUiState> =
             combine(
                 activeSession,
@@ -262,11 +296,11 @@ class ActiveSessionViewModel
                 combine(
                     unitPreference.observe(),
                     setEntry.entry,
-                    rest.remaining(),
+                    restPanel,
                     setEdit.edit,
                     setEdit.canUndo,
-                ) { unit, entry, left, edit, canUndoSetDelete ->
-                    ScreenExtras(unit, entry, left, edit, canUndoSetDelete)
+                ) { unit, entry, panel, edit, canUndoSetDelete ->
+                    ScreenExtras(unit, entry, panel, edit, canUndoSetDelete)
                 },
                 combine(history.state, removal.canUndo, guided.state) { past, canUndoRemoval, guidedState ->
                     SideTrips(past, canUndoRemoval, guidedState)
@@ -281,7 +315,8 @@ class ActiveSessionViewModel
                     setEntry = extras.entry,
                     setEdit = extras.edit,
                     canUndoSetDelete = extras.canUndoSetDelete,
-                    restRemaining = extras.rest,
+                    restRemaining = extras.rest.remaining,
+                    upNext = extras.rest.upNext,
                     history = sideTrips.history,
                     canUndoRemoval = sideTrips.canUndoRemoval,
                     guided = sideTrips.guided,
@@ -290,6 +325,31 @@ class ActiveSessionViewModel
 
         init {
             checkForAbandonedSession()
+        }
+
+        /**
+         * Logs the set the rest panel is offering, without opening the sheet (ADR-0023).
+         *
+         * One tap, which is under US-03's two-tap ceiling rather than at it. The rest then
+         * restarts exactly as it does after any other set, so successive sets can be logged
+         * from the panel alone. [next] is passed in rather than read back out of the state so
+         * that what is written is unambiguously what was on screen when the thumb landed.
+         */
+        fun onLogNextSet(next: UpNextSet) {
+            viewModelScope.launch {
+                logSets(
+                    sessionExerciseId = next.sessionExerciseId,
+                    input =
+                        SetInput(
+                            weight = next.prefill.weight,
+                            unit = unitPreference.current(),
+                            reps = next.prefill.reps,
+                            rpe = null,
+                        ),
+                    sets = 1,
+                )
+                rest.startAfterSet()
+            }
         }
 
         /** Starts a session, or does nothing visible if one is already running (US-01). */

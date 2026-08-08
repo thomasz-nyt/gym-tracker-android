@@ -80,6 +80,48 @@ class SetRepositoryTest {
     }
 
     @Test
+    fun `the earlier-session lookup skips the session being performed`() =
+        runTest {
+            // ADR-0023's comparison: "what you lifted last time" must not find the set you just
+            // logged a minute ago in the workout you are standing in.
+            val lastWeek = appearance("s-last-week", startedAt = now.minus(Duration.ofDays(7)))
+            logSet(now.minus(Duration.ofDays(7)))(lastWeek, 100.0, WeightUnit.LB, reps = 8, rpe = null)
+            val today = appearance("s-today")
+            logSet(now)(today, 135.0, WeightUnit.LB, reps = 5, rpe = null)
+
+            val comparison = sets.lastSetOfBefore(bench, alice, SessionId("s-today"))
+
+            assertEquals(45.36, comparison?.weightKg, "last week's 100 lb, not today's 135")
+            assertEquals(8, comparison?.reps)
+        }
+
+    @Test
+    fun `the earlier-session lookup finds nothing on a first-ever set`() =
+        runTest {
+            val today = appearance("s-today")
+            logSet(now)(today, 135.0, WeightUnit.LB, reps = 5, rpe = null)
+
+            assertNull(
+                sets.lastSetOfBefore(bench, alice, SessionId("s-today")),
+                "nothing to compare against is rendered as nothing, never as zero",
+            )
+        }
+
+    @Test
+    fun `the earlier-session lookup does not cross members`() =
+        runTest {
+            val hers = appearance("s-bob", member = bob, startedAt = now.minus(Duration.ofDays(7)))
+            logSet(now.minus(Duration.ofDays(7)))(hers, 200.0, WeightUnit.LB, reps = 8, rpe = null)
+            val today = appearance("s-today")
+            logSet(now)(today, 135.0, WeightUnit.LB, reps = 5, rpe = null)
+
+            assertNull(
+                sets.lastSetOfBefore(bench, alice, SessionId("s-today")),
+                "another member's set is not this member's history",
+            )
+        }
+
+    @Test
     fun `a logged set round-trips through the database`() =
         runTest {
             val se = appearance("s1")

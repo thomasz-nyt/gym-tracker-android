@@ -9,6 +9,11 @@ import kotlinx.coroutines.flow.Flow
 
 /** Queries over `sets`. */
 @Dao
+// One query past detekt's interface threshold. Suppressed rather than split because a DAO is a
+// query surface, not a class with behaviour: the rule exists to catch objects that have grown too
+// many responsibilities, and this has exactly one — reading and writing `sets`. Splitting it would
+// put two DAOs on one table and make the next reader hunt for which half a query lives in.
+@Suppress("TooManyFunctions")
 interface SetDao {
     @Query("SELECT * FROM sets WHERE session_exercise_id = :sessionExerciseId ORDER BY set_index ASC")
     fun observeForSessionExercise(sessionExerciseId: String): Flow<List<SetEntity>>
@@ -48,6 +53,27 @@ interface SetDao {
     suspend fun lastSetOf(
         exerciseId: String,
         userId: String,
+    ): SetEntity?
+
+    /**
+     * The member's most recent set of an exercise, from a session other than the one being
+     * excluded — the ADR-0023 rest-panel comparison, which must never compare a set to the one
+     * that was just logged in the same session.
+     */
+    @Query(
+        """
+        SELECT s.* FROM sets s
+        JOIN session_exercises se ON se.id = s.session_exercise_id
+        JOIN sessions ss ON ss.id = se.session_id
+        WHERE se.exercise_id = :exerciseId AND ss.user_id = :userId AND se.session_id != :excludingSessionId
+        ORDER BY s.performed_at DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun lastSetOfBefore(
+        exerciseId: String,
+        userId: String,
+        excludingSessionId: String,
     ): SetEntity?
 
     /** The most recent set time in a session, which is what US-01 calls "last activity". */

@@ -8,6 +8,7 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.EndSession
@@ -119,6 +120,7 @@ class ActiveSessionViewModelTest {
             restoreSession = RestoreSession(repository, sessionExercises, sets),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
             restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+            determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
             updateSet = UpdateSet(sets),
             deleteSet = DeleteSet(sets),
             restoreSet = RestoreSet(sets),

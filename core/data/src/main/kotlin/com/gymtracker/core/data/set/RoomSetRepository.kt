@@ -29,6 +29,12 @@ class RoomSetRepository
             member: UserId,
         ): ExerciseSet? = dao.lastSetOf(exerciseId.value, member.value)?.toDomain()
 
+        override suspend fun lastSetOfBefore(
+            exerciseId: ExerciseId,
+            member: UserId,
+            excludingSessionId: SessionId,
+        ): ExerciseSet? = dao.lastSetOfBefore(exerciseId.value, member.value, excludingSessionId.value)?.toDomain()
+
         override suspend fun lastSetAtInSession(sessionId: SessionId): Instant? =
             dao.lastPerformedAtInSession(sessionId.value)?.let(Instant::ofEpochMilli)
 

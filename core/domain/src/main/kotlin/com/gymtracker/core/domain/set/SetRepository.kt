@@ -29,6 +29,20 @@ interface SetRepository {
         member: UserId,
     ): ExerciseSet?
 
+    /**
+     * The member's most recent set of [exerciseId] from a session other than
+     * [excludingSessionId], or null when there is none — either the exercise has never been
+     * performed, or every time it was is the session being excluded.
+     *
+     * Backs the ADR-0023 rest-panel comparison, which must show what was lifted last *time*,
+     * never the set that was just logged in this same session compared against itself.
+     */
+    suspend fun lastSetOfBefore(
+        exerciseId: ExerciseId,
+        member: UserId,
+        excludingSessionId: SessionId,
+    ): ExerciseSet?
+
     /** The `performed_at` of the most recent set in a session, or null. Backs US-01's staleness. */
     suspend fun lastSetAtInSession(sessionId: SessionId): Instant?
 

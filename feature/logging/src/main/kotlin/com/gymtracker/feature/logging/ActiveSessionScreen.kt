@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -64,6 +63,7 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.StaleSessionPolicy
@@ -146,6 +146,7 @@ fun LoggingRoute(
         },
         setEdit = viewModel.setEditCallbacks(),
         onUndoSetDelete = viewModel.setEdit::undo,
+        onLogNextSet = viewModel::onLogNextSet,
         onEditPastSet = { performed, set ->
             viewModel.setEdit.open(
                 set,
@@ -243,6 +244,7 @@ internal fun LoggingScreen(
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit = { _, _ -> },
     setEdit: SetEditCallbacks = SetEditCallbacks.Inert,
     onUndoSetDelete: () -> Unit = {},
+    onLogNextSet: (UpNextSet) -> Unit = {},
     // Opens the editor on a set from a past workout (US-04's third criterion, ADR-0022).
     onEditPastSet: (PerformedExercise, ExerciseSet) -> Unit = { _, _ -> },
     onAddExercise: () -> Unit = {},
@@ -301,6 +303,7 @@ internal fun LoggingScreen(
                 onEditSet = onEditSet,
                 setEdit = setEdit,
                 onUndoSetDelete = onUndoSetDelete,
+                onLogNextSet = onLogNextSet,
                 onAddExercise = onAddExercise,
                 modifier = modifier,
             )
@@ -377,6 +380,7 @@ private fun SessionScreen(
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     setEdit: SetEditCallbacks,
     onUndoSetDelete: () -> Unit,
+    onLogNextSet: (UpNextSet) -> Unit,
     onAddExercise: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -393,6 +397,7 @@ private fun SessionScreen(
             onStartExercise = guided.onStartExercise,
             onEditSet = onEditSet,
             onUndoSetDelete = onUndoSetDelete,
+            onLogNextSet = onLogNextSet,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             modifier = Modifier.padding(padding),
@@ -425,6 +430,7 @@ private fun SessionBody(
     onStartExercise: (SessionExerciseRow) -> Unit,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     onUndoSetDelete: () -> Unit,
+    onLogNextSet: (UpNextSet) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -450,6 +456,8 @@ private fun SessionBody(
                     onEditSet = onEditSet,
                     canUndoSetDelete = state.canUndoSetDelete,
                     onUndoSetDelete = onUndoSetDelete,
+                    upNext = state.upNext,
+                    onLogNextSet = onLogNextSet,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                 )
@@ -539,6 +547,8 @@ private fun ActiveSession(
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     canUndoSetDelete: Boolean,
     onUndoSetDelete: () -> Unit,
+    upNext: UpNextSet?,
+    onLogNextSet: (UpNextSet) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
 ) {
@@ -583,7 +593,18 @@ private fun ActiveSession(
         // Above the bottom action and never over the list: the rest banner displays the stored
         // end time (ADR-0010) and gates nothing, which is US-05's "it never blocks logging the
         // next set". Every "Add set" above it stays live while it counts down.
-        restRemaining?.let { remaining -> RestBanner(remaining, onSkipRest) }
+        restRemaining?.let { remaining ->
+            val row = exercises.firstOrNull { it.sessionExercise.id == upNext?.sessionExerciseId }
+            RestBanner(
+                remaining = remaining,
+                upNext = upNext,
+                exerciseName = row?.exercise?.name,
+                unit = unit,
+                onSkipRest = onSkipRest,
+                onLogNext = { upNext?.let(onLogNextSet) },
+                onAdjust = { row?.let(onAddSet) },
+            )
+        }
 
         PrimaryActionButton(text = "Add exercise", onClick = onAddExercise)
     }
@@ -645,36 +666,112 @@ private fun SessionHeader(
 @Composable
 private fun RestBanner(
     remaining: Duration,
+    upNext: UpNextSet?,
+    exerciseName: String?,
+    unit: WeightUnit,
     onSkipRest: () -> Unit,
+    onLogNext: () -> Unit,
+    onAdjust: () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = RoundedCornerShape(GymDimens.Gap),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = GymDimens.Gap, vertical = GymDimens.TightGap),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.Gap),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
         ) {
-            Column {
-                Text("Rest", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = remaining.asCountdown(),
-                    style = MaterialTheme.typography.displayMedium,
-                    modifier = Modifier.semantics { contentDescription = "Rest ${remaining.asCountdown()} remaining" },
-                )
-            }
-            TextButton(
-                onClick = onSkipRest,
-                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Skip")
+                Column {
+                    Text("Rest", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = remaining.asCountdown(),
+                        style = MaterialTheme.typography.displayMedium,
+                        modifier =
+                            Modifier.semantics {
+                                contentDescription = "Rest ${remaining.asCountdown()} remaining"
+                            },
+                    )
+                }
+                TextButton(
+                    onClick = onSkipRest,
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                ) {
+                    Text("Skip")
+                }
+            }
+
+            // ADR-0023: the ninety seconds says what is coming, and lets it be logged from here.
+            // Absent before the first set of the session — there is nothing to be next yet.
+            if (upNext != null) {
+                UpNext(upNext = upNext, exerciseName = exerciseName, unit = unit)
+                Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+                    PrimaryActionButton(
+                        text = "Log set ${upNext.setNumber}",
+                        onClick = onLogNext,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = onAdjust,
+                        modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                    ) {
+                        Text("Adjust")
+                    }
+                }
             }
         }
     }
 }
+
+/**
+ * What the next set will be, and what the same movement was last time (ADR-0023).
+ *
+ * Note what is **not** here: no "of N", because nothing in the app knows how many sets you
+ * intend — [UpNextSet] has no field it could be rendered from. And no comparison at all when
+ * the movement has no earlier session, rather than a zero or a dash pretending to be one
+ * (constitution §2.4).
+ */
+@Composable
+private fun UpNext(
+    upNext: UpNextSet,
+    exerciseName: String?,
+    unit: WeightUnit,
+) {
+    val next = WeightFormatter.format(upNext.prefill.weight?.let { UnitConverter.toKilograms(it, unit) }, unit)
+    Column {
+        Text("Up next", style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = exerciseName ?: upNext.exerciseId.value,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text =
+                buildString {
+                    append("Set ${upNext.setNumber}")
+                    append("   ${upNext.prefill.reps} reps")
+                    append("   ${next.primary}")
+                    next.secondary?.let { append("  ·  $it") }
+                },
+            style = MaterialTheme.typography.titleMedium,
+        )
+        upNext.comparison?.let { last ->
+            val previous = WeightFormatter.format(last.weightKg, unit)
+            Text(
+                text = "Last ${last.performedAt.asDay()}  ·  ${last.reps} reps   ${previous.primary}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+/** The day a set happened, for the rest panel's comparison line. */
+private fun Instant.asDay(): String =
+    DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault()).format(this)
 
 /**
  * The guard on the one tap in the app that cannot be taken back (ADR-0016).
