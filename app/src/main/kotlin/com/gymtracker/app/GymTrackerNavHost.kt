@@ -21,6 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.feature.catalog.BrowseRoute
 import com.gymtracker.feature.catalog.ExerciseDetailRoute
@@ -28,6 +29,8 @@ import com.gymtracker.feature.logging.HistoryRoute
 import com.gymtracker.feature.logging.LoggingRoute
 import com.gymtracker.feature.logging.SessionPresenceViewModel
 import com.gymtracker.feature.logging.WorkoutDetailRoute
+import com.gymtracker.feature.routines.RoutineEditorRoute
+import com.gymtracker.feature.routines.RoutinesRoute
 import kotlinx.serialization.Serializable
 
 /**
@@ -58,6 +61,16 @@ internal data class ExerciseDetail(
     val exerciseId: String,
 )
 
+/** The member's saved routines (US-29, ADR-0020). */
+@Serializable
+internal object Routines
+
+/** One routine, being edited (US-29). A drill-down, so the bar is hidden over it. */
+@Serializable
+internal data class RoutineEditor(
+    val routineId: String,
+)
+
 /** Past workouts (US-06, ADR-0024). */
 @Serializable
 internal object History
@@ -69,16 +82,18 @@ internal data class WorkoutDetail(
 )
 
 /**
- * The three top-level destinations the bottom bar shows (ADR-0024), in the order they appear.
+ * The four top-level destinations the bottom bar shows (ADR-0024), in the order they appear.
  *
- * Routines (ADR-0020) would be a fourth, and is not built; the bar is meant to look sparse
- * rather than ship an empty tab for it.
+ * Routines is the fourth this file said would arrive with ADR-0020, and it sits next to Train
+ * because starting one is how a workout begins when you have a plan. The editor is not here:
+ * it is a drill-down, reached from this tab and exited through the top bar.
  */
 private enum class TopLevelDestination(
     val route: Any,
     val label: String,
 ) {
     TRAIN(Logging, "Train"),
+    ROUTINES(Routines, "Routines"),
     EXERCISES(Browse(pickForSession = false), "Exercises"),
     HISTORY(History, "History"),
 }
@@ -177,6 +192,31 @@ private fun GymTrackerNavGraph(
             )
         }
 
+        composable<Routines> {
+            RoutinesRoute(
+                onEditRoutine = { id -> navController.navigate(RoutineEditor(id.value)) },
+                // Starting a routine puts you in a workout, which lives on Train. A tab switch
+                // rather than a push, for the reason the Logging route's shortcuts document.
+                onWorkoutStarted = { navController.navigateToTab(TopLevelDestination.TRAIN) },
+            )
+        }
+
+        composable<RoutineEditor> { entry ->
+            // Browse leaves its picks on the previous entry's handle, which is this one — the
+            // same mechanism the session uses, with no knowledge of routines in it.
+            val picked by entry.savedStateHandle
+                .getStateFlow(PICKED_EXERCISES, ArrayList<String>())
+                .collectAsStateWithLifecycle()
+
+            RoutineEditorRoute(
+                routineId = RoutineId(entry.toRoute<RoutineEditor>().routineId),
+                onBack = navController::popBackStack,
+                onAddExercise = { navController.navigate(Browse(pickForSession = true)) },
+                pickedExerciseIds = picked,
+                onPicksHandled = { entry.savedStateHandle[PICKED_EXERCISES] = ArrayList<String>() },
+            )
+        }
+
         composable<History> {
             HistoryRoute(onOpenWorkout = { id -> navController.navigate(WorkoutDetail(id.value)) })
         }
@@ -256,6 +296,7 @@ private fun NavBackStackEntry?.showsBottomBar(hasActiveSession: Boolean): Boolea
     return when {
         destination.hasRoute<Logging>() -> !hasActiveSession
         destination.hasRoute<Browse>() -> !entry.toRoute<Browse>().pickForSession
+        destination.hasRoute<Routines>() -> true
         destination.hasRoute<History>() -> true
         else -> false
     }
@@ -267,6 +308,7 @@ private fun NavBackStackEntry?.topLevelDestinationOrNull(): TopLevelDestination?
     return when {
         destination.hasRoute<Logging>() -> TopLevelDestination.TRAIN
         destination.hasRoute<Browse>() -> TopLevelDestination.EXERCISES
+        destination.hasRoute<Routines>() -> TopLevelDestination.ROUTINES
         destination.hasRoute<History>() -> TopLevelDestination.HISTORY
         else -> null
     }
