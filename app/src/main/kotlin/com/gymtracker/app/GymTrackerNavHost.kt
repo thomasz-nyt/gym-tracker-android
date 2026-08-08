@@ -145,8 +145,15 @@ private fun GymTrackerNavGraph(
                 .collectAsStateWithLifecycle()
 
             LoggingRoute(
-                onBrowseCatalog = { navController.navigate(Browse(pickForSession = false)) },
-                onOpenHistory = { navController.navigate(History) },
+                // Home's two shortcuts lead to places that are *also* tabs, so they switch
+                // tabs rather than pushing. Pushing a top-level destination onto Train's stack
+                // is what shipped the dead Train tab: the bar's popUpTo(start) { saveState }
+                // saved the pushed entry on the way out and restoreState put it straight back,
+                // so tapping Train from history restored history. See TabNavigationTest.
+                onBrowseCatalog = { navController.navigateToTab(TopLevelDestination.EXERCISES) },
+                onOpenHistory = { navController.navigateToTab(TopLevelDestination.HISTORY) },
+                // Not a tab: this is Browse in its picking mode (US-02a), reached from a running
+                // session and genuinely a drill-down, so it stays a push.
                 onAddExercise = { navController.navigate(Browse(pickForSession = true)) },
                 pickedExerciseIds = picked,
                 onPicksHandled = { entry.savedStateHandle[PICKED_EXERCISES] = ArrayList<String>() },
