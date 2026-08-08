@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,8 +30,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.gymtracker.core.designsystem.component.SecondaryActionButton
+import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -54,6 +59,47 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
+ * One past workout in full (US-06b), as a destination of its own (ADR-0024).
+ *
+ * Reads through the same [HistoryViewModel] class [HistoryRoute] uses, but its own instance:
+ * each is scoped to its own place in the back stack, and this one is told which session to load
+ * through [sessionId] rather than through a shared "opened workout" flag.
+ */
+@Composable
+fun WorkoutDetailRoute(
+    sessionId: SessionId,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: HistoryViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(sessionId) { viewModel.openWorkout(sessionId) }
+
+    val detail = state.detail
+    if (detail == null) {
+        // Loading, or the workout was deleted from under the screen (US-06a) — either way
+        // there is nothing to show yet, and no dead end to offer: the bar and back still work.
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    WorkoutDetailScreen(
+        onBack = onBack,
+        detail = detail,
+        unit = state.unit,
+        onEditSet = viewModel::onEditPastSet,
+        modifier = modifier,
+    )
+
+    state.setEdit?.let { edit ->
+        SetEditSheet(edit = edit, unit = state.unit, callbacks = viewModel.setEditCallbacks())
+    }
+}
+
+/**
  * One past workout in full (US-06b).
  *
  * History says how much; this says what. Exercises read in the order they were performed,
@@ -65,16 +111,23 @@ import java.util.Locale
  * Sets render one row per [ExerciseSet], each its own tap target for [onEditSet] — the same
  * shape `LoggedSets` in `ActiveSessionScreen.kt` uses, and for the same reason (ADR-0022, US-04's
  * third criterion: correcting a past session's set).
+ *
+ * The dead-end "Back" button is gone (finding 06, ADR-0024), replaced by a real up affordance
+ * rather than by nothing: the bottom bar is hidden on drill-downs, so removing it left an edge
+ * swipe as the only exit. See [DrillDownTopBar].
  */
 @Composable
 internal fun WorkoutDetailScreen(
     detail: SessionDetail,
     unit: WeightUnit,
-    onBack: () -> Unit,
     onEditSet: (PerformedExercise, ExerciseSet) -> Unit = { _, _ -> },
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = { DrillDownTopBar(onBack = onBack) },
+    ) { padding ->
         Column(
             modifier =
                 Modifier
@@ -102,15 +155,6 @@ internal fun WorkoutDetailScreen(
                     }
                 }
             }
-
-            // Full width and bottom-anchored like every other way out of a screen (ADR-0016),
-            // but tonal rather than accented: leaving a past workout is not what you came here
-            // to do.
-            SecondaryActionButton(
-                text = "Back",
-                onClick = onBack,
-                modifier = Modifier.padding(bottom = GymDimens.Gap),
-            )
         }
     }
 }
@@ -345,7 +389,6 @@ private fun WorkoutDetailPreview() {
                         ),
                 ),
             unit = WeightUnit.LB,
-            onBack = {},
         )
     }
 }
