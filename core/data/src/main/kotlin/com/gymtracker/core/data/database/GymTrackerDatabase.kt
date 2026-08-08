@@ -6,6 +6,10 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.gymtracker.core.data.exercise.ExerciseDao
 import com.gymtracker.core.data.exercise.ExerciseEntity
+import com.gymtracker.core.data.routine.RoutineDao
+import com.gymtracker.core.data.routine.RoutineEntity
+import com.gymtracker.core.data.routine.RoutineItemDao
+import com.gymtracker.core.data.routine.RoutineItemEntity
 import com.gymtracker.core.data.session.SessionDao
 import com.gymtracker.core.data.session.SessionEntity
 import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
@@ -20,8 +24,15 @@ import com.gymtracker.core.data.set.SetEntity
  * that need them.
  */
 @Database(
-    entities = [SessionEntity::class, ExerciseEntity::class, SessionExerciseEntity::class, SetEntity::class],
-    version = 6,
+    entities = [
+        SessionEntity::class,
+        ExerciseEntity::class,
+        SessionExerciseEntity::class,
+        SetEntity::class,
+        RoutineEntity::class,
+        RoutineItemEntity::class,
+    ],
+    version = 7,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -32,6 +43,10 @@ abstract class GymTrackerDatabase : RoomDatabase() {
     abstract fun sessionExerciseDao(): SessionExerciseDao
 
     abstract fun setDao(): SetDao
+
+    abstract fun routineDao(): RoutineDao
+
+    abstract fun routineItemDao(): RoutineItemDao
 
     companion object {
         const val NAME = "gym-tracker.db"
@@ -44,6 +59,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V4_SETS = 4
         private const val V5_STARTER_EXERCISES = 5
         private const val V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT = 6
+        private const val V7_ROUTINES = 7
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -167,6 +183,66 @@ abstract class GymTrackerDatabase : RoomDatabase() {
             object : Migration(V5_STARTER_EXERCISES, V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("DELETE FROM `exercises`")
+                }
+            }
+
+        /**
+         * Adds `routines` and `routine_items` (US-29, ADR-0020). Additive.
+         *
+         * `sessions`, `session_exercises` and `sets` are untouched — a routine relates to a
+         * session only by having been copied into it, and a copy leaves no column behind.
+         * That is what lets a device upgrade mid-workout without noticing.
+         *
+         * Note what these tables do not have: no weight, rep or set column anywhere. ADR-0020
+         * buys the routine concept by storing a shape rather than a prescription, and the
+         * schema is where that promise is actually kept.
+         */
+        val MIGRATION_6_7 =
+            object : Migration(V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT, V7_ROUTINES) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `routines` (
+                            `id` TEXT NOT NULL,
+                            `user_id` TEXT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `position` INTEGER NOT NULL,
+                            `created_at` INTEGER NOT NULL,
+                            `updated_at` INTEGER NOT NULL,
+                            `sync_state` TEXT NOT NULL,
+                            PRIMARY KEY(`id`)
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_routines_user_id_position` " +
+                            "ON `routines` (`user_id`, `position`)",
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `routine_items` (
+                            `id` TEXT NOT NULL,
+                            `routine_id` TEXT NOT NULL,
+                            `exercise_id` TEXT NOT NULL,
+                            `position` INTEGER NOT NULL,
+                            `updated_at` INTEGER NOT NULL,
+                            `sync_state` TEXT NOT NULL,
+                            PRIMARY KEY(`id`),
+                            FOREIGN KEY(`routine_id`) REFERENCES `routines`(`id`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE,
+                            FOREIGN KEY(`exercise_id`) REFERENCES `exercises`(`id`)
+                                ON UPDATE NO ACTION ON DELETE NO ACTION
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_routine_items_routine_id_position` " +
+                            "ON `routine_items` (`routine_id`, `position`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_routine_items_exercise_id` " +
+                            "ON `routine_items` (`exercise_id`)",
+                    )
                 }
             }
     }

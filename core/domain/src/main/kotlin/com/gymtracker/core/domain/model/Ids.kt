@@ -23,3 +23,15 @@ value class SessionId(
 value class SessionExerciseId(
     val value: String,
 )
+
+/** Identifies a saved routine — a name and an order, never a prescription (ADR-0020). */
+@JvmInline
+value class RoutineId(
+    val value: String,
+)
+
+/** Identifies one movement's place in a routine. */
+@JvmInline
+value class RoutineItemId(
+    val value: String,
+)

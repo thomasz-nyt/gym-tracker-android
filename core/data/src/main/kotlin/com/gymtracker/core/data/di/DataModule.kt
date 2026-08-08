@@ -14,6 +14,10 @@ import com.gymtracker.core.data.guided.DataStoreGuidedPlanStore
 import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
+import com.gymtracker.core.data.routine.RoomRoutineItemRepository
+import com.gymtracker.core.data.routine.RoomRoutineRepository
+import com.gymtracker.core.data.routine.RoutineDao
+import com.gymtracker.core.data.routine.RoutineItemDao
 import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.session.SessionDao
 import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
@@ -25,11 +29,22 @@ import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
+import com.gymtracker.core.domain.model.RoutineId
+import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
+import com.gymtracker.core.domain.routine.AddExerciseToRoutine
+import com.gymtracker.core.domain.routine.CreateRoutine
+import com.gymtracker.core.domain.routine.DeleteRoutine
+import com.gymtracker.core.domain.routine.MoveExerciseInRoutine
+import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
+import com.gymtracker.core.domain.routine.RenameRoutine
+import com.gymtracker.core.domain.routine.RoutineItemRepository
+import com.gymtracker.core.domain.routine.RoutineRepository
+import com.gymtracker.core.domain.routine.StartSessionFromRoutine
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.RestoreSession
@@ -79,6 +94,7 @@ object DataModule {
                 GymTrackerDatabase.MIGRATION_3_4,
                 GymTrackerDatabase.MIGRATION_4_5,
                 GymTrackerDatabase.MIGRATION_5_6,
+                GymTrackerDatabase.MIGRATION_6_7,
             ).build()
 
     @Provides
@@ -92,6 +108,41 @@ object DataModule {
 
     @Provides
     fun setDao(database: GymTrackerDatabase): SetDao = database.setDao()
+
+    @Provides
+    fun routineDao(database: GymTrackerDatabase): RoutineDao = database.routineDao()
+
+    @Provides
+    fun routineItemDao(database: GymTrackerDatabase): RoutineItemDao = database.routineItemDao()
+
+    @Provides
+    fun createRoutine(routines: RoutineRepository): CreateRoutine =
+        CreateRoutine(routines) { RoutineId(UUID.randomUUID().toString()) }
+
+    @Provides
+    fun addExerciseToRoutine(items: RoutineItemRepository): AddExerciseToRoutine =
+        AddExerciseToRoutine(items) { RoutineItemId(UUID.randomUUID().toString()) }
+
+    @Provides
+    fun removeExerciseFromRoutine(items: RoutineItemRepository): RemoveExerciseFromRoutine =
+        RemoveExerciseFromRoutine(items)
+
+    @Provides
+    fun moveExerciseInRoutine(items: RoutineItemRepository): MoveExerciseInRoutine = MoveExerciseInRoutine(items)
+
+    @Provides
+    fun renameRoutine(routines: RoutineRepository): RenameRoutine = RenameRoutine(routines)
+
+    @Provides
+    fun deleteRoutine(routines: RoutineRepository): DeleteRoutine = DeleteRoutine(routines)
+
+    @Provides
+    fun startSessionFromRoutine(
+        routines: RoutineRepository,
+        items: RoutineItemRepository,
+        startSession: StartSession,
+        addExerciseToSession: AddExerciseToSession,
+    ): StartSessionFromRoutine = StartSessionFromRoutine(routines, items, startSession, addExerciseToSession)
 
     @Provides
     fun logSet(
@@ -246,6 +297,12 @@ abstract class DataBindings {
 
     @Binds
     abstract fun warmUpTimerStore(impl: DataStoreWarmUpTimerStore): WarmUpTimerStore
+
+    @Binds
+    abstract fun routines(impl: RoomRoutineRepository): RoutineRepository
+
+    @Binds
+    abstract fun routineItems(impl: RoomRoutineItemRepository): RoutineItemRepository
 
     @Binds
     abstract fun guidedPlanStore(impl: DataStoreGuidedPlanStore): GuidedPlanStore
