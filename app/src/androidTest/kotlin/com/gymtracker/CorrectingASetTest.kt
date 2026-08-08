@@ -139,7 +139,7 @@ class CorrectingASetTest {
             // The whole point of ADR-0022: set 2 is individually addressable even though it is
             // identical to set 1.
             compose.onNodeWithContentDescription("Edit set 2").performClick()
-            compose.waitForIdle()
+            awaitEditorOpen()
 
             compose.onNodeWithText("Save changes").assertIsDisplayed()
             compose.onNodeWithContentDescription("Increase Reps").performClick()
@@ -168,7 +168,7 @@ class CorrectingASetTest {
             )
 
             compose.onNodeWithContentDescription("Edit set 1").performClick()
-            compose.waitForIdle()
+            awaitEditorOpen()
             compose.onNodeWithText(DELETE).performClick()
             awaitEditorClosed()
 
@@ -192,6 +192,21 @@ class CorrectingASetTest {
     private fun awaitSetsOnScreen() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithContentDescription("Edit set 1").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /**
+     * Waits for the editor to appear, for the same reason [awaitEditorClosed] waits for it to
+     * go: `SetEditController.open` reads the unit preference in a coroutine before it sets the
+     * state the sheet renders from, and `waitForIdle` synchronises Compose, not a suspend read.
+     *
+     * This suite has not failed on it — a DataStore read is quicker than the Room query that
+     * made `TwoTapSetLoggingTest` flaky — but it is the same race, and "has not lost the
+     * coin toss yet" is not a property worth relying on.
+     */
+    private fun awaitEditorOpen() {
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Save changes").fetchSemanticsNodes().isNotEmpty()
         }
     }
 
