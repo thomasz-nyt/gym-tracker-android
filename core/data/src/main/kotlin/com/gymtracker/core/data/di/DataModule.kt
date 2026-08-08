@@ -57,6 +57,7 @@ import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.DeleteSet
+import com.gymtracker.core.domain.set.LastPerformanceOf
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
@@ -167,6 +168,9 @@ object DataModule {
 
     @Provides
     fun prefillFromLastSet(sets: SetRepository): PrefillFromLastSet = PrefillFromLastSet(sets)
+
+    @Provides
+    fun lastPerformanceOf(sets: SetRepository): LastPerformanceOf = LastPerformanceOf(sets)
 
     @Provides
     fun addExerciseToSession(sessionExercises: SessionExerciseRepository): AddExerciseToSession =
