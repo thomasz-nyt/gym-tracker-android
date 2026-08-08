@@ -108,12 +108,13 @@ does not contain and a Storage bucket M2 has not built — see ADR-0014.
 - [x] Exercise detail: body-part tags, numbered instructions, bundled photo where one exists
 - [x] YouTube **search** link-out, labelled as a search (external browser, no SDK, no account)
 - [x] `Equipment.UNSPECIFIED`, so the filter stops calling unrecorded equipment "other"
-- [ ] Navigation Compose replaces state-derived routing (ADR-0013). **Partly done:** the
-      graph covers home/session, browse and detail, and the exercise search is a destination
-      rather than an overlay. Three screens are still selected by state inside the logging
-      route: history, the workout detail reached from it (US-06b), and the guided flow
-      (US-05a). The guided one is deliberate and is not a candidate for the graph — see
-      ADR-0017; the other two are the remaining work here.
+- [x] Navigation Compose replaces state-derived routing (ADR-0013). History and the workout
+      detail reached from it (US-06b) are destinations now too, each with its own
+      `HistoryViewModel` (ADR-0024) — the last two of the six screens this checkbox covers.
+      Bottom navigation (Train, Exercises, History) ties the three top-level places together,
+      hidden while a workout is running. What is left out of the graph is left on purpose: the
+      guided flow (US-05a) stays outside it for the reason ADR-0017 gives, and set entry, the
+      set editor and the stale-session prompt stay dialogs per ADR-0013 itself.
 
 **Exit:** in airplane mode, standing at an unfamiliar machine, you can narrow the catalog
 by body part and equipment and confirm the machine from its photo or its numbered steps.

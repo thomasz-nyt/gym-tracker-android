@@ -36,7 +36,7 @@ fun PrimaryActionButton(
 }
 
 /**
- * An action worth a full-width target but not the accent: "Past workouts", "Done".
+ * An action worth a full-width target but not the accent: "Past workouts", "Browse exercises".
  *
  * Tonal rather than outlined so it still reads as a button at arm's length — a hairline border
  * is the first thing to disappear in bad light.

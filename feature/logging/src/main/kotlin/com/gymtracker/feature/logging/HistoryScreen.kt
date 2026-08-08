@@ -19,12 +19,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.gymtracker.core.designsystem.component.SecondaryActionButton
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -39,10 +42,43 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
+ * Past workouts, as a destination of its own (ADR-0024, US-06).
+ *
+ * Reads through its own [HistoryViewModel] rather than `ActiveSessionViewModel` — the split
+ * ADR-0017 asked for, once history stopped being a flag on the session screen and became a
+ * place you navigate to.
+ *
+ * Nothing is read until this route is actually entered, the same property the flag-based
+ * screen had: history is a side trip, and the core loop should not pay for it.
+ */
+@Composable
+fun HistoryRoute(
+    onOpenWorkout: (SessionId) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: HistoryViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { viewModel.open() }
+
+    HistoryScreen(
+        state = HistoryState(sessions = state.sessions, canUndo = state.canUndo),
+        unit = state.unit,
+        onDelete = viewModel::delete,
+        onUndo = viewModel::undo,
+        onOpenWorkout = onOpenWorkout,
+        modifier = modifier,
+    )
+}
+
+/**
  * Workout history (US-06), and deleting from it (US-06a).
  *
  * Only finished workouts are here. The session in progress is on the other screen, which is
  * what makes it impossible to delete the one you are standing in the middle of.
+ *
+ * There is no "Done" here (finding 06 of the redesign audit, ADR-0024): the bottom bar and the
+ * system back gesture are the way out, like every other Android screen.
  */
 @Composable
 internal fun HistoryScreen(
@@ -50,7 +86,6 @@ internal fun HistoryScreen(
     unit: WeightUnit,
     onDelete: (SessionId) -> Unit,
     onUndo: () -> Unit,
-    onDone: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenWorkout: (SessionId) -> Unit = {},
 ) {
@@ -91,14 +126,6 @@ internal fun HistoryScreen(
             if (state.canUndo) {
                 UndoBar(onUndo)
             }
-
-            // Full width and bottom-anchored like every other way out of a screen (ADR-0016),
-            // but tonal rather than accented: leaving history is not what you came here to do.
-            SecondaryActionButton(
-                text = "Done",
-                onClick = onDone,
-                modifier = Modifier.padding(bottom = HISTORY_GAP),
-            )
         }
     }
 }
@@ -242,7 +269,6 @@ private fun HistoryPreview() {
             unit = WeightUnit.LB,
             onDelete = {},
             onUndo = {},
-            onDone = {},
         )
     }
 }

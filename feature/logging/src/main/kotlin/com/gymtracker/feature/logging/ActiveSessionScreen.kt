@@ -64,8 +64,6 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.UpNextSet
-import com.gymtracker.core.domain.session.PerformedExercise
-import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.units.UnitConverter
@@ -89,11 +87,12 @@ import java.util.Locale
  * start destination is this screen precisely so that property survives; navigation decides
  * where *back* goes, not what you resume into.
  *
- * Picking an exercise is a destination now (US-12): "Add exercise" navigates to the shared
- * browse screen, which hands its picks back through [pickedExerciseIds]. Three screens are
- * still selected by state inside this route — history, the workout opened from it (US-06b),
- * and the guided flow (US-05a). The first two are the remainder of ADR-0013; the third stays
- * here on purpose, for the reason ADR-0017 gives.
+ * Picking an exercise is a destination (US-12): "Add exercise" navigates to the shared browse
+ * screen, which hands its picks back through [pickedExerciseIds]. History and the workout
+ * detail reached from it are destinations of their own now too (ADR-0024, US-06b), so
+ * [onOpenHistory] is a plain navigation callback here rather than a call into this screen's
+ * ViewModel. Only the guided flow (US-05a) is still selected by state inside this route, on
+ * purpose, for the reason ADR-0017 gives.
  *
  * @param pickedExerciseIds the exercises chosen on the browse screen, in the order they were
  *   picked, appended to the session once and then cleared through [onPicksHandled]. A list
@@ -102,6 +101,7 @@ import java.util.Locale
 @Composable
 fun LoggingRoute(
     onBrowseCatalog: () -> Unit = {},
+    onOpenHistory: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     pickedExerciseIds: List<String> = emptyList(),
     onPicksHandled: () -> Unit = {},
@@ -133,13 +133,8 @@ fun LoggingRoute(
         onUndoRemoval = viewModel.removal::undo,
         guided = viewModel.guidedActions(),
         onSkipRest = viewModel.rest::skip,
-        onOpenHistory = viewModel.history::open,
+        onOpenHistory = onOpenHistory,
         onBrowseCatalog = onBrowseCatalog,
-        onCloseHistory = viewModel.history::close,
-        onDeleteWorkout = viewModel.history::delete,
-        onUndoDelete = viewModel.history::undo,
-        onOpenWorkout = viewModel.history::openWorkout,
-        onCloseWorkout = viewModel.history::closeWorkout,
         setEntry = viewModel.setEntryCallbacks(),
         onEditSet = { row, set ->
             viewModel.setEdit.open(set, row.exercise?.name ?: row.sessionExercise.exerciseId.value)
@@ -147,12 +142,6 @@ fun LoggingRoute(
         setEdit = viewModel.setEditCallbacks(),
         onUndoSetDelete = viewModel.setEdit::undo,
         onLogNextSet = viewModel::onLogNextSet,
-        onEditPastSet = { performed, set ->
-            viewModel.setEdit.open(
-                set,
-                performed.exercise?.name ?: performed.sessionExercise.exerciseId.value,
-            )
-        },
         onAddExercise = onAddExercise,
         modifier = modifier,
     )
@@ -235,109 +224,43 @@ internal fun LoggingScreen(
     onSkipRest: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onBrowseCatalog: () -> Unit = {},
-    onCloseHistory: () -> Unit = {},
-    onDeleteWorkout: (SessionId) -> Unit = {},
-    onUndoDelete: () -> Unit = {},
-    onOpenWorkout: (SessionId) -> Unit = {},
-    onCloseWorkout: () -> Unit = {},
     setEntry: SetEntryCallbacks = SetEntryCallbacks.Inert,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit = { _, _ -> },
     setEdit: SetEditCallbacks = SetEditCallbacks.Inert,
     onUndoSetDelete: () -> Unit = {},
     onLogNextSet: (UpNextSet) -> Unit = {},
-    // Opens the editor on a set from a past workout (US-04's third criterion, ADR-0022).
-    onEditPastSet: (PerformedExercise, ExerciseSet) -> Unit = { _, _ -> },
     onAddExercise: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val running = state.guided.running
-    val openWorkout = state.history.detail
 
-    // Which full-screen thing is showing (ADR-0013 keeps these out of the navigation graph
-    // deliberately — see ADR-0017 for the guided one).
-    when {
+    // Which full-screen thing is showing. History and the workout detail are navigation
+    // destinations of their own now (ADR-0024); only the guided flow is still selected by state
+    // here, deliberately, for the reason ADR-0017 gives.
+    if (running != null) {
         // A lens over the already-logged rows, so leaving it loses nothing (US-05a).
-        running != null ->
-            GuidedRoute(running = running, state = state, guided = guided, modifier = modifier)
-
-        // Before the list, because a workout is only ever open while history is (US-06b).
-        openWorkout != null ->
-            PastWorkoutDetail(
-                detail = openWorkout,
-                state = state,
-                onCloseWorkout = onCloseWorkout,
-                onEditPastSet = onEditPastSet,
-                setEdit = setEdit,
-                modifier = modifier,
-            )
-
-        state.history.isOpen -> {
-            // Back leaves history rather than the app — it is a side trip from the session
-            // screen, not a second entry point.
-            BackHandler(onBack = onCloseHistory)
-            HistoryScreen(
-                state = state.history,
-                unit = state.unit,
-                onDelete = onDeleteWorkout,
-                onUndo = onUndoDelete,
-                onDone = onCloseHistory,
-                onOpenWorkout = onOpenWorkout,
-                modifier = modifier,
-            )
-        }
-
-        else ->
-            SessionScreen(
-                state = state,
-                onStartWorkout = onStartWorkout,
-                onResolveStale = onResolveStale,
-                onFinishWorkout = onFinishWorkout,
-                onAddSet = onAddSet,
-                onRemoveExercise = onRemoveExercise,
-                onUndoRemoval = onUndoRemoval,
-                guided = guided,
-                onSkipRest = onSkipRest,
-                onOpenHistory = onOpenHistory,
-                onBrowseCatalog = onBrowseCatalog,
-                setEntry = setEntry,
-                onEditSet = onEditSet,
-                setEdit = setEdit,
-                onUndoSetDelete = onUndoSetDelete,
-                onLogNextSet = onLogNextSet,
-                onAddExercise = onAddExercise,
-                modifier = modifier,
-            )
-    }
-}
-
-/**
- * A past workout (US-06b), plus the same set editor the active session uses.
- *
- * Split out of [LoggingScreen] rather than left inline: the editor is hosted here rather than
- * inside [WorkoutDetailScreen] itself, because it is the same sheet over the same
- * `SetEditController` the active session opens — a set is corrected through one editor no
- * matter which screen it was tapped from (ADR-0022, US-04's third criterion).
- */
-@Composable
-private fun PastWorkoutDetail(
-    detail: SessionDetail,
-    state: SessionUiState,
-    onCloseWorkout: () -> Unit,
-    onEditPastSet: (PerformedExercise, ExerciseSet) -> Unit,
-    setEdit: SetEditCallbacks,
-    modifier: Modifier = Modifier,
-) {
-    // Back leaves the workout, not history behind it (US-06b).
-    BackHandler(onBack = onCloseWorkout)
-    WorkoutDetailScreen(
-        detail = detail,
-        unit = state.unit,
-        onBack = onCloseWorkout,
-        onEditSet = onEditPastSet,
-        modifier = modifier,
-    )
-    state.setEdit?.let { edit ->
-        SetEditSheet(edit = edit, unit = state.unit, callbacks = setEdit)
+        GuidedRoute(running = running, state = state, guided = guided, modifier = modifier)
+    } else {
+        SessionScreen(
+            state = state,
+            onStartWorkout = onStartWorkout,
+            onResolveStale = onResolveStale,
+            onFinishWorkout = onFinishWorkout,
+            onAddSet = onAddSet,
+            onRemoveExercise = onRemoveExercise,
+            onUndoRemoval = onUndoRemoval,
+            guided = guided,
+            onSkipRest = onSkipRest,
+            onOpenHistory = onOpenHistory,
+            onBrowseCatalog = onBrowseCatalog,
+            setEntry = setEntry,
+            onEditSet = onEditSet,
+            setEdit = setEdit,
+            onUndoSetDelete = onUndoSetDelete,
+            onLogNextSet = onLogNextSet,
+            onAddExercise = onAddExercise,
+            modifier = modifier,
+        )
     }
 }
 
@@ -1090,10 +1013,14 @@ private fun SetEntrySheet(
  *   means destructive — red is the accent now — with a structural one: a destructive control
  *   never shares a surface with a save, and is outlined rather than filled. So delete is not on
  *   the set row, not on the card next to "Add set", and is the only outlined thing in the sheet.
+ *
+ * Internal rather than private: [WorkoutDetailScreen]'s route uses this same sheet for a set
+ * from a past workout (ADR-0022, US-04's third criterion) — one editor regardless of which
+ * screen a set was tapped from.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SetEditSheet(
+internal fun SetEditSheet(
     edit: SetEdit,
     unit: WeightUnit,
     callbacks: SetEditCallbacks,

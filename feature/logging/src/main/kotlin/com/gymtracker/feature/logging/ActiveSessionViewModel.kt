@@ -15,15 +15,11 @@ import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.UpNextSet
-import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.EndSession
-import com.gymtracker.core.domain.session.RestoreSession
-import com.gymtracker.core.domain.session.SessionHistory
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
-import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -79,8 +75,6 @@ data class SessionUiState(
     val restRemaining: Duration? = null,
     /** What the rest panel says is coming, or null before anything is logged (ADR-0023). */
     val upNext: UpNextSet? = null,
-    /** History, and the workout deleted from it that can still be put back (US-06, US-06a). */
-    val history: HistoryState = HistoryState(),
     /** Whether the exercise just removed from the session can still be put back (US-02c). */
     val canUndoRemoval: Boolean = false,
     /** The exercise being walked through, if any (US-05a). */
@@ -113,15 +107,14 @@ private data class ScreenExtras(
 )
 
 /**
- * The screens reached *from* the session — history, the undo of a removal, the guided flow.
- * Grouped for the same reason, and just as much not a concept.
+ * The undo of a removal, and the guided flow — grouped only because `combine` needs a fixed
+ * shape, and just as much not a concept.
  *
- * Two grouping records on one screen is the signal ADR-0017 named: this ViewModel now drives
- * the session, history, the workout detail, set entry, removal and the guided flow. The next
- * thing added here should split it rather than add a third.
+ * This used to also carry history and the workout detail. ADR-0017 named this class "the second
+ * grouping record on this screen" and said the next thing added should split the ViewModel
+ * rather than pile on; ADR-0024 is that split — [HistoryViewModel] now owns both.
  */
 private data class SideTrips(
-    val history: HistoryState,
     val canUndoRemoval: Boolean,
     val guided: GuidedState,
 )
@@ -144,10 +137,6 @@ class ActiveSessionViewModel
         private val startSession: StartSession,
         private val addExerciseToSession: AddExerciseToSession,
         private val endSession: EndSession,
-        sessionHistory: SessionHistory,
-        workoutDetail: WorkoutDetail,
-        deleteSession: DeleteSession,
-        restoreSession: RestoreSession,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
         private val determineUpNextSet: DetermineUpNextSet,
@@ -159,17 +148,6 @@ class ActiveSessionViewModel
     ) : ViewModel() {
         /** The rest between sets lives in its own state holder; see [RestController]. */
         val rest = RestController(restTimer, restTimerStore, viewModelScope)
-
-        /** History and deleting from it live in their own state holder; see [HistoryController]. */
-        val history =
-            HistoryController(
-                history = sessionHistory,
-                workoutDetail = workoutDetail,
-                deleteSession = deleteSession,
-                restoreSession = restoreSession,
-                currentMember = currentMember,
-                scope = viewModelScope,
-            )
 
         /** Removing an exercise lives in its own state holder; see [ExerciseRemovalController]. */
         val removal =
@@ -302,8 +280,8 @@ class ActiveSessionViewModel
                 ) { unit, entry, panel, edit, canUndoSetDelete ->
                     ScreenExtras(unit, entry, panel, edit, canUndoSetDelete)
                 },
-                combine(history.state, removal.canUndo, guided.state) { past, canUndoRemoval, guidedState ->
-                    SideTrips(past, canUndoRemoval, guidedState)
+                combine(removal.canUndo, guided.state) { canUndoRemoval, guidedState ->
+                    SideTrips(canUndoRemoval, guidedState)
                 },
             ) { session, prompt, inSession, extras, sideTrips ->
                 SessionUiState(
@@ -317,7 +295,6 @@ class ActiveSessionViewModel
                     canUndoSetDelete = extras.canUndoSetDelete,
                     restRemaining = extras.rest.remaining,
                     upNext = extras.rest.upNext,
-                    history = sideTrips.history,
                     canUndoRemoval = sideTrips.canUndoRemoval,
                     guided = sideTrips.guided,
                 )

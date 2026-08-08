@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.gymtracker.core.designsystem.component.SecondaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.CatalogFilter
@@ -57,8 +56,9 @@ import com.gymtracker.core.domain.model.ExerciseId
  *   old state-derived routing could not express.
  * @param pickForSession true when tapping adds to the workout in progress. The screen then
  *   stays put and counts what it added, so picking three exercises is one visit rather than
- *   three (US-02a). False is the look-something-up path, where a tap opens a detail screen
- *   and leaving is what should happen.
+ *   three (US-02a), and [onBack] is how that visit ends — the "Done · N added" button. False is
+ *   the look-something-up path (a tab of its own now, ADR-0024), where there is no dead-end
+ *   button any more: the bar and the system back gesture are the way out.
  */
 @Composable
 fun BrowseRoute(
@@ -145,16 +145,6 @@ internal fun BrowseScreen(
                     timesAdded = state::timesAdded,
                     onChosen = onChosen,
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                )
-            }
-
-            // When picking, the floating button above is the way back and this would be a
-            // second one saying the same thing.
-            if (!pickForSession) {
-                SecondaryActionButton(
-                    text = "Done",
-                    onClick = onBack,
-                    modifier = Modifier.padding(bottom = GAP),
                 )
             }
         }

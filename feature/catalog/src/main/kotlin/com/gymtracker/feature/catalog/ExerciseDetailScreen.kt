@@ -33,7 +33,6 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.gymtracker.core.designsystem.component.SecondaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.YouTubeSearch
@@ -49,11 +48,13 @@ import com.gymtracker.core.domain.model.ExerciseId
  * first launch with nothing to cache first. The one exception is the YouTube search
  * (US-14), which is the only thing here that needs the network and which nothing else
  * depends on.
+ *
+ * There is no "Done" here (finding 06 of the redesign audit, ADR-0024): the bottom bar and the
+ * system back gesture are the way out, like every other Android screen.
  */
 @Composable
 fun ExerciseDetailRoute(
     exerciseId: ExerciseId,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CatalogViewModel = hiltViewModel(),
 ) {
@@ -65,7 +66,6 @@ fun ExerciseDetailRoute(
         onWatchSearch = { url ->
             context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         },
-        onBack = onBack,
         modifier = modifier,
     )
 }
@@ -74,7 +74,6 @@ fun ExerciseDetailRoute(
 internal fun ExerciseDetailScreen(
     exercise: Exercise?,
     onWatchSearch: (String) -> Unit,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
@@ -95,7 +94,8 @@ internal fun ExerciseDetailScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = DETAIL_PADDING)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = DETAIL_PADDING),
             verticalArrangement = Arrangement.spacedBy(DETAIL_GAP),
         ) {
             Text(
@@ -119,12 +119,6 @@ internal fun ExerciseDetailScreen(
                     Text("Search YouTube for this exercise")
                 }
             }
-
-            SecondaryActionButton(
-                text = "Done",
-                onClick = onBack,
-                modifier = Modifier.padding(bottom = DETAIL_PADDING),
-            )
         }
     }
 }
@@ -221,7 +215,6 @@ private fun DetailPreview() {
                     source = "free-exercise-db",
                 ),
             onWatchSearch = {},
-            onBack = {},
         )
     }
 }

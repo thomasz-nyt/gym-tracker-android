@@ -43,10 +43,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * Past workouts: what one contained (US-06b), and deleting one with undo (US-06a).
+ * Past workouts: what one contained (US-06b), deleting one with undo (US-06a), and finishing a
+ * workout into history (US-06).
  *
- * Split out of `ActiveSessionViewModelTest` when it outgrew detekt's size limit. The fakes are
- * shared, in `LoggingFakes.kt`.
+ * [HistoryViewModel] carries the first two now (ADR-0024) — split out of `ActiveSessionViewModel`
+ * exactly as the comment on that class said the next addition should. Finishing a workout is
+ * still `ActiveSessionViewModel`'s: it never went through `HistoryController`, it only makes a
+ * session `HistoryViewModel` can then list. Both builders below share one set of fakes, the same
+ * way two screens would share one on-disk database.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkoutHistoryTest {
@@ -115,7 +119,22 @@ class WorkoutHistoryTest {
             sessionExercises.cascadeDelete(id)
         }
 
-    private fun viewModel(repository: FakeSessions) =
+    /** [HistoryViewModel]: US-06a and US-06b live here now. */
+    private fun historyViewModel(repository: FakeSessions) =
+        HistoryViewModel(
+            sessionHistory = SessionHistory(repository, sessionExercises, sets),
+            workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+            deleteSession = DeleteSession(repository, sessionExercises, sets),
+            restoreSession = RestoreSession(repository, sessionExercises, sets),
+            currentMember = FakeCurrentMember(member),
+            updateSet = UpdateSet(sets),
+            deleteSet = DeleteSet(sets),
+            restoreSet = RestoreSet(sets),
+            unitPreference = units,
+        )
+
+    /** [ActiveSessionViewModel]: still drives the session itself, including finishing it. */
+    private fun activeSessionViewModel(repository: FakeSessions) =
         ActiveSessionViewModel(
             sessions = repository,
             sessionExercises = sessionExercises,
@@ -131,10 +150,6 @@ class WorkoutHistoryTest {
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),
-            sessionHistory = SessionHistory(repository, sessionExercises, sets),
-            workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
-            deleteSession = DeleteSession(repository, sessionExercises, sets),
-            restoreSession = RestoreSession(repository, sessionExercises, sets),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
             restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
             determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
@@ -150,13 +165,13 @@ class WorkoutHistoryTest {
         runTest {
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
             seedWorkout(SessionId("last-week"), weights = listOf(60.0, 60.0))
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
+            val viewModel = historyViewModel(repository)
+            viewModel.open()
 
-            viewModel.history.openWorkout(SessionId("last-week"))
+            viewModel.openWorkout(SessionId("last-week"))
 
             viewModel.uiState.test {
-                val detail = checkNotNull(expectMostRecentItem().history.detail)
+                val detail = checkNotNull(expectMostRecentItem().detail)
                 val performed = detail.exercises.single()
                 assertEquals("Bench Press", performed.exercise?.name)
                 assertEquals(2, performed.sets.size)
@@ -175,12 +190,12 @@ class WorkoutHistoryTest {
             // should pay for neither.
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
             seedWorkout(SessionId("last-week"), weights = listOf(60.0))
-            val viewModel = viewModel(repository)
+            val viewModel = historyViewModel(repository)
 
-            viewModel.history.open()
+            viewModel.open()
 
             viewModel.uiState.test {
-                assertNull(expectMostRecentItem().history.detail)
+                assertNull(expectMostRecentItem().detail)
             }
         }
 
@@ -189,16 +204,16 @@ class WorkoutHistoryTest {
         runTest {
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
             seedWorkout(SessionId("last-week"), weights = listOf(60.0))
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
-            viewModel.history.openWorkout(SessionId("last-week"))
+            val viewModel = historyViewModel(repository)
+            viewModel.open()
+            viewModel.openWorkout(SessionId("last-week"))
 
-            viewModel.history.closeWorkout()
+            viewModel.closeWorkout()
 
             viewModel.uiState.test {
-                val history = expectMostRecentItem().history
-                assertNull(history.detail)
-                assertEquals(true, history.isOpen)
+                val state = expectMostRecentItem()
+                assertNull(state.detail)
+                assertEquals(true, state.isOpen)
             }
         }
 
@@ -209,15 +224,15 @@ class WorkoutHistoryTest {
         runTest {
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
             seedWorkout(SessionId("last-week"), weights = listOf(60.0))
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
+            val viewModel = historyViewModel(repository)
+            viewModel.open()
 
-            viewModel.history.delete(SessionId("last-week"))
+            viewModel.delete(SessionId("last-week"))
 
             viewModel.uiState.test {
-                val history = expectMostRecentItem().history
-                assertEquals(emptyList(), history.sessions)
-                assertEquals(true, history.canUndo)
+                val state = expectMostRecentItem()
+                assertEquals(emptyList(), state.sessions)
+                assertEquals(true, state.canUndo)
             }
             assertEquals(emptyList(), repository.all)
             assertEquals(emptyList(), sets.all, "the sets went with it")
@@ -228,17 +243,17 @@ class WorkoutHistoryTest {
         runTest {
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
             seedWorkout(SessionId("last-week"), weights = listOf(60.0, 62.5))
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
-            viewModel.history.delete(SessionId("last-week"))
+            val viewModel = historyViewModel(repository)
+            viewModel.open()
+            viewModel.delete(SessionId("last-week"))
 
-            viewModel.history.undo()
+            viewModel.undo()
 
             viewModel.uiState.test {
-                val history = expectMostRecentItem().history
-                assertEquals(listOf(SessionId("last-week")), history.sessions.map { it.session.id })
-                assertEquals(2, history.sessions.single().setCount)
-                assertEquals(false, history.canUndo, "there is nothing left to undo")
+                val state = expectMostRecentItem()
+                assertEquals(listOf(SessionId("last-week")), state.sessions.map { it.session.id })
+                assertEquals(2, state.sessions.single().setCount)
+                assertEquals(false, state.canUndo, "there is nothing left to undo")
             }
         }
 
@@ -247,14 +262,14 @@ class WorkoutHistoryTest {
         runTest {
             // US-04's window, reused for US-06a so the two destructive actions behave alike.
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
-            viewModel.history.delete(SessionId("last-week"))
+            val viewModel = historyViewModel(repository)
+            viewModel.open()
+            viewModel.delete(SessionId("last-week"))
 
             advanceTimeBy(Duration.ofSeconds(5).toMillis() + 1)
 
             viewModel.uiState.test {
-                assertEquals(false, expectMostRecentItem().history.canUndo)
+                assertEquals(false, expectMostRecentItem().canUndo)
             }
         }
 
@@ -262,12 +277,12 @@ class WorkoutHistoryTest {
     fun `undo after the window has passed does nothing`() =
         runTest {
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
-            viewModel.history.delete(SessionId("last-week"))
+            val viewModel = historyViewModel(repository)
+            viewModel.open()
+            viewModel.delete(SessionId("last-week"))
             advanceTimeBy(Duration.ofSeconds(5).toMillis() + 1)
 
-            viewModel.history.undo()
+            viewModel.undo()
 
             assertEquals(emptyList(), repository.all, "the delete stands")
         }
@@ -276,37 +291,24 @@ class WorkoutHistoryTest {
     fun `deleting the workout holding my last set changes what the next set prefills with`() =
         runTest {
             // US-06a's last criterion. The prefill reads the database, so a deleted set cannot
-            // come back through it — which is the whole point of deleting test data.
+            // come back through it — which is the whole point of deleting test data. History and
+            // the active session are two different ViewModels now (ADR-0024), sharing the same
+            // fakes exactly as two screens would share one on-disk database.
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))), session("today"))
             seedWorkout(SessionId("last-week"), weights = listOf(61.23))
             sets.lastFor[ExerciseId("bench")] = "seed-0"
-            val viewModel = viewModel(repository)
-            viewModel.history.open()
+            val history = historyViewModel(repository)
+            val activeSession = activeSessionViewModel(repository)
+            history.open()
 
-            viewModel.history.delete(SessionId("last-week"))
-            viewModel.history.close()
-            viewModel.onExerciseChosen(ExerciseId("bench"))
+            history.delete(SessionId("last-week"))
+            activeSession.onExerciseChosen(ExerciseId("bench"))
 
-            viewModel.uiState.test {
+            activeSession.uiState.test {
                 val row = expectMostRecentItem().exercises.single()
-                viewModel.setEntry.open(row)
+                activeSession.setEntry.open(row)
 
                 assertEquals("", expectMostRecentItem().setEntry?.weight, "the deleted set is gone for good")
-            }
-        }
-
-    @Test
-    fun `closing history returns to the session screen`() =
-        runTest {
-            val viewModel = viewModel(sessionsOf(session("s1")))
-            viewModel.history.open()
-
-            viewModel.history.close()
-
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(false, state.history.isOpen)
-                assertEquals(SessionId("s1"), state.activeSession?.id)
             }
         }
 
@@ -328,7 +330,7 @@ class WorkoutHistoryTest {
     fun `finishing a workout with sets ends it and returns to home`() =
         runTest {
             val repository = sessionsOf(session("s1"))
-            val viewModel = viewModel(repository)
+            val viewModel = activeSessionViewModel(repository)
             viewModel.onExerciseChosen(ExerciseId("bench"))
 
             viewModel.uiState.test {
@@ -349,7 +351,7 @@ class WorkoutHistoryTest {
     fun `finishing a workout with no sets discards it rather than saving it`() =
         runTest {
             val repository = sessionsOf(session("s1"))
-            val viewModel = viewModel(repository)
+            val viewModel = activeSessionViewModel(repository)
 
             viewModel.onFinishWorkout()
 
@@ -360,7 +362,7 @@ class WorkoutHistoryTest {
     fun `finishing with no session running does nothing`() =
         runTest {
             val repository = sessionsOf()
-            val viewModel = viewModel(repository)
+            val viewModel = activeSessionViewModel(repository)
 
             viewModel.onFinishWorkout()
 
@@ -372,14 +374,14 @@ class WorkoutHistoryTest {
         runTest {
             val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
             seedWorkout(SessionId("last-week"), weights = listOf(60.0, 60.0))
-            val viewModel = viewModel(repository)
+            val viewModel = historyViewModel(repository)
 
-            viewModel.history.open()
+            viewModel.open()
 
             viewModel.uiState.test {
-                val history = expectMostRecentItem().history
-                assertEquals(true, history.isOpen)
-                val row = history.sessions.single()
+                val state = expectMostRecentItem()
+                assertEquals(true, state.isOpen)
+                val row = state.sessions.single()
                 assertEquals(SessionId("last-week"), row.session.id)
                 assertEquals(1, row.exerciseCount)
                 assertEquals(2, row.setCount)
@@ -391,14 +393,14 @@ class WorkoutHistoryTest {
     fun `the workout in progress is not offered for deletion`() =
         runTest {
             val repository = sessionsOf(session("today"), finished("last-week", now.minus(Duration.ofDays(7))))
-            val viewModel = viewModel(repository)
+            val viewModel = historyViewModel(repository)
 
-            viewModel.history.open()
+            viewModel.open()
 
             viewModel.uiState.test {
                 assertEquals(
                     listOf(SessionId("last-week")),
-                    expectMostRecentItem().history.sessions.map { it.session.id },
+                    expectMostRecentItem().sessions.map { it.session.id },
                 )
             }
         }
