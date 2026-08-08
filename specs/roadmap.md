@@ -4,9 +4,12 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M3a**, taken out of order — see that section. M0, M1 and M3 are
-complete; M2 is deliberately postponed so the offline core can be finished before accounts
-and sync arrive, and M3a joins it ahead of M4 for the same reason.
+Current milestone: **M4**. M0, M1, M3 and M3a are complete; M2 is deliberately postponed so
+the offline core can be finished before accounts and sync arrive, and M3a was taken ahead of
+M4 for the same reason.
+
+What is left from the `Redesign.dc.html` audit is **not** all in M4, and is listed at the end
+of this file so it does not get lost between milestones.
 
 ---
 
@@ -141,21 +144,31 @@ no plan" — is the one the rest of that redesign leans on. Taken before M4 for 
 M3 was taken before M2: none of it needs an account, a backend, or a network.
 
 - [x] Warm-up timer that records nothing (US-28, ADR-0021)
-- [ ] `routines` + `routine_items`, additive migration, no change to `sessions`,
+- [x] `routines` + `routine_items`, additive migration (v7), no change to `sessions`,
       `session_exercises` or `sets` (US-29, ADR-0020)
-- [ ] Create, rename, delete a routine; add, remove and reorder its movements
-- [ ] Start a routine — copies its items into `session_exercises`, after which it is an
+- [x] Create, rename, delete a routine; add, remove and reorder its movements
+- [x] Start a routine — copies its items into `session_exercises`, after which it is an
       ordinary session and every M1 story keeps working on it unchanged
-- [ ] Each movement renders its "last time" values from `PrefillFromLastSet`, labelled as
-      history; movements with no history show no numbers (the US-13 absence pattern)
+- [x] Each movement renders its "last time" values, labelled as history; movements with no
+      history show no numbers (the US-13 absence pattern). Read through `LastPerformanceOf`
+      rather than `PrefillFromLastSet` — same row, but a prefill is a number about to be
+      typed and this is one about to be read, so it keeps kilograms and carries the date
 
 The warm-up timer is in this milestone because it came out of the same audit, not because
 it is part of a routine — ADR-0021 is explicit that it is neither a routine step nor a
 session step, and the routine editor does not offer to add one.
 
-**Exit:** Tuesday is Upper A. Starting it puts six movements on the screen in order,
-each showing what you actually lifted last time, and `TwoTapSetLoggingTest` passes
-unedited — which is ADR-0017's own signal that the plan did not cost the core loop.
+**Exit: met 2026-08-08.** Tuesday is Upper A. Starting it puts its movements on the screen
+in order, each showing what was actually lifted last time.
+
+One caveat on the second half of that criterion, recorded rather than glossed: **`TwoTapSetLoggingTest`
+was edited** — but not by this milestone, and not because the plan cost the core loop. It had
+been failing on CI on every PR since #19, where the bottom navigation bar pushed "Add set"
+below the fold on CI's 320x640 emulator; the test tapped a node that was in the tree but
+clipped off screen. The edit adds `performScrollTo()`. The property the criterion is really
+about is intact: neither routines nor the warm-up added an interaction to the two-tap path,
+and both tests still perform exactly two `performClick` calls. See
+`specs/testing-strategy.md` § "Two traps the instrumented suite has already fallen into".
 
 ---
 
@@ -226,3 +239,42 @@ to elicit weight-loss and body-image advice.
 Not started until Android has been in real household use for a month. Port
 `:core:domain` logic to Swift (or extract it to KMP — decide via ADR at that point),
 new SwiftUI layer, HealthKit, and the watchOS companion with `HKWorkoutSession`.
+
+---
+
+## What is left from the `Redesign.dc.html` audit
+
+Tracked here rather than in a milestone, because these do not all belong to one. Written
+2026-08-08, when M3a closed and the audit stopped being the thing currently being built.
+
+**Shipped:** the visual system (ADR-0019), the rest panel and one-tap log (ADR-0023), bottom
+navigation (ADR-0024), the warm-up timer (US-28), routines (US-29).
+
+**Designed, not built, and needing a user story first:**
+
+- **Swap a movement when the machine is taken.** The audit calls this the most common reason
+  a plan breaks, and it now has something to break: a swap should change today's session
+  without touching the routine it came from. Suggestions come from the same body part, ranked
+  by what has actually been used. The design doc leaves one question open — whether a swap
+  made three times should offer to update the routine.
+- **Finish as a summary rather than a confirm dialog.** "Showing the work is a better check
+  than asking *are you sure*." Today `FinishWorkoutDialog` asks. This wants what was logged,
+  and it overlaps M4: a summary is the first place a PR (US-18) would be worth showing.
+- **Supersets.** The design doc scopes them as *a pair, not a group* — two adjacent movements,
+  one rest taken after B, logged as rounds. Three or more would need a different model. Audit
+  finding 07 stands, and nothing has been drawn for it.
+
+**Needs the maintainer's call before it can be written:**
+
+- **+30s on the rest timer.** ADR-0016 deferred it explicitly as a US-05 amendment; it is on
+  the redesign's screens but has never been decided.
+- **An audio cue at 0:10 and 0:00.** For earbuds with the phone in a pocket. US-05 promises a
+  notification only, so this is an amendment rather than a bug.
+
+**Deliberately not designed, and staying that way:**
+
+- The two 5k runs. Constitution §1 puts outdoor training permanently out of scope; that is a
+  constitution amendment, not a screen, and ADR-0021 is the precedent for how such a request
+  gets answered without one.
+- Household and multi-member, which is M2 — the routines model had to settle first, and now
+  has.
