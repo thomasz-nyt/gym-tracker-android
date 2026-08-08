@@ -1,10 +1,13 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -198,8 +201,14 @@ class TwoTapSetLoggingTest {
      * exactly two `performClick` calls before asserting.
      */
     private fun awaitSheetOpen() {
-        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isNotEmpty()
+        try {
+            compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+                compose.onAllNodesWithText("Save set").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            // TEMPORARY DIAGNOSTIC: this reproduces only on CI, so the tree has to come from
+            // CI. Remove once the cause is known.
+            throw AssertionError("sheet never opened. Tree was:\n${compose.onRoot().printToString()}", timeout)
         }
     }
 
