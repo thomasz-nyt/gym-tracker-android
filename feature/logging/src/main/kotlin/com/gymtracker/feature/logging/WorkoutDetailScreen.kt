@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -67,6 +68,7 @@ import java.util.Locale
 @Composable
 fun WorkoutDetailRoute(
     sessionId: SessionId,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
@@ -85,6 +87,7 @@ fun WorkoutDetailRoute(
     }
 
     WorkoutDetailScreen(
+        onBack = onBack,
         detail = detail,
         unit = state.unit,
         onEditSet = viewModel::onEditPastSet,
@@ -109,17 +112,22 @@ fun WorkoutDetailRoute(
  * shape `LoggedSets` in `ActiveSessionScreen.kt` uses, and for the same reason (ADR-0022, US-04's
  * third criterion: correcting a past session's set).
  *
- * There is no "Back" here (finding 06 of the redesign audit, ADR-0024): the bar and the system
- * back gesture are the way out, like every other Android screen.
+ * The dead-end "Back" button is gone (finding 06, ADR-0024), replaced by a real up affordance
+ * rather than by nothing: the bottom bar is hidden on drill-downs, so removing it left an edge
+ * swipe as the only exit. See [DrillDownTopBar].
  */
 @Composable
 internal fun WorkoutDetailScreen(
     detail: SessionDetail,
     unit: WeightUnit,
     onEditSet: (PerformedExercise, ExerciseSet) -> Unit = { _, _ -> },
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = { DrillDownTopBar(onBack = onBack) },
+    ) { padding ->
         Column(
             modifier =
                 Modifier

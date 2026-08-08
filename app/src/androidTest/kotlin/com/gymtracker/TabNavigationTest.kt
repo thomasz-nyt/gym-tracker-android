@@ -102,6 +102,30 @@ class TabNavigationTest {
         compose.onNodeWithText(START).assertIsDisplayed()
     }
 
+    @Test
+    fun aDetailScreenCanBeLeftWithoutTheSystemBackGesture() {
+        // ADR-0024 removed the dead-end "Done" from the drill-downs and left them with no
+        // affordance at all: no bar (they are drill-downs) and no up arrow, so an edge swipe was
+        // the only exit. Finding 06 was about a button that was the *only* way out, not about a
+        // detail screen having a way out at all.
+        awaitHome()
+        compose.onNodeWithText("Browse exercises").performClick()
+        awaitLeftHome()
+
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText(AN_EXERCISE).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onAllNodesWithText(AN_EXERCISE)[0].performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText(BACK).performClick()
+
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText(SEARCH_FIELD).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(SEARCH_FIELD).assertIsDisplayed()
+    }
+
     private fun awaitHome() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText(START).fetchSemanticsNodes().isNotEmpty()
@@ -120,5 +144,12 @@ class TabNavigationTest {
         /** Only ever on the home screen, so it is the signal that Train is what is showing. */
         const val START = "Start workout"
         const val TRAIN_TAB = "Train"
+
+        /** First alphabetically in the seeded catalog, so it is on screen without scrolling. */
+        const val AN_EXERCISE = "Ab Crunch Machine"
+
+        /** Only on the browse screen, so it is the signal that the list is what is showing. */
+        const val SEARCH_FIELD = "Search exercises"
+        const val BACK = "Back"
     }
 }

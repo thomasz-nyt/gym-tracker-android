@@ -171,7 +171,10 @@ private fun GymTrackerNavGraph(
         }
 
         composable<ExerciseDetail> { entry ->
-            ExerciseDetailRoute(exerciseId = ExerciseId(entry.toRoute<ExerciseDetail>().exerciseId))
+            ExerciseDetailRoute(
+                exerciseId = ExerciseId(entry.toRoute<ExerciseDetail>().exerciseId),
+                onBack = navController::popBackStack,
+            )
         }
 
         composable<History> {
@@ -179,7 +182,10 @@ private fun GymTrackerNavGraph(
         }
 
         composable<WorkoutDetail> { entry ->
-            WorkoutDetailRoute(sessionId = SessionId(entry.toRoute<WorkoutDetail>().sessionId))
+            WorkoutDetailRoute(
+                sessionId = SessionId(entry.toRoute<WorkoutDetail>().sessionId),
+                onBack = navController::popBackStack,
+            )
         }
     }
 }
