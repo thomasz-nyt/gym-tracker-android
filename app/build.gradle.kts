@@ -28,6 +28,7 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":feature:catalog"))
     implementation(project(":feature:logging"))
+    implementation(project(":feature:routines"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
