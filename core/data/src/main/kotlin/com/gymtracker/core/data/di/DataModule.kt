@@ -20,6 +20,7 @@ import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
 import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
+import com.gymtracker.core.data.warmup.DataStoreWarmUpTimerStore
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
@@ -47,6 +48,8 @@ import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.set.UpdateSet
+import com.gymtracker.core.domain.warmup.WarmUpTimer
+import com.gymtracker.core.domain.warmup.WarmUpTimerStore
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -104,6 +107,12 @@ object DataModule {
         store: RestTimerStore,
         clock: Clock,
     ): RestTimer = RestTimer(store, clock)
+
+    @Provides
+    fun warmUpTimer(
+        store: WarmUpTimerStore,
+        clock: Clock,
+    ): WarmUpTimer = WarmUpTimer(store, clock)
 
     @Provides
     fun prefillFromLastSet(sets: SetRepository): PrefillFromLastSet = PrefillFromLastSet(sets)
@@ -234,6 +243,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun restTimerStore(impl: DataStoreRestTimerStore): RestTimerStore
+
+    @Binds
+    abstract fun warmUpTimerStore(impl: DataStoreWarmUpTimerStore): WarmUpTimerStore
 
     @Binds
     abstract fun guidedPlanStore(impl: DataStoreGuidedPlanStore): GuidedPlanStore

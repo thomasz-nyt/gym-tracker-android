@@ -4,9 +4,9 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M3**, taken out of order — see that section. M0 and M1 are complete;
-M2 is deliberately postponed so the offline core can be finished before accounts and sync
-arrive.
+Current milestone: **M3a**, taken out of order — see that section. M0, M1 and M3 are
+complete; M2 is deliberately postponed so the offline core can be finished before accounts
+and sync arrive, and M3a joins it ahead of M4 for the same reason.
 
 ---
 
@@ -129,6 +129,33 @@ Deferred to M2, where the backend they need exists:
 
 - Stock media mirrored into Supabase Storage, and any GIF or video playback (ADR-0014)
 - US-15, family-recorded clips for a household
+
+---
+
+## M3a — Routines, and the warm-up that is not one
+
+Stories: US-28, US-29.
+
+Added 2026-08-08 out of the `Redesign.dc.html` audit, whose finding 01 — "a session has
+no plan" — is the one the rest of that redesign leans on. Taken before M4 for the reason
+M3 was taken before M2: none of it needs an account, a backend, or a network.
+
+- [x] Warm-up timer that records nothing (US-28, ADR-0021)
+- [ ] `routines` + `routine_items`, additive migration, no change to `sessions`,
+      `session_exercises` or `sets` (US-29, ADR-0020)
+- [ ] Create, rename, delete a routine; add, remove and reorder its movements
+- [ ] Start a routine — copies its items into `session_exercises`, after which it is an
+      ordinary session and every M1 story keeps working on it unchanged
+- [ ] Each movement renders its "last time" values from `PrefillFromLastSet`, labelled as
+      history; movements with no history show no numbers (the US-13 absence pattern)
+
+The warm-up timer is in this milestone because it came out of the same audit, not because
+it is part of a routine — ADR-0021 is explicit that it is neither a routine step nor a
+session step, and the routine editor does not offer to add one.
+
+**Exit:** Tuesday is Upper A. Starting it puts six movements on the screen in order,
+each showing what you actually lifted last time, and `TwoTapSetLoggingTest` passes
+unedited — which is ADR-0017's own signal that the plan did not cost the core loop.
 
 ---
 

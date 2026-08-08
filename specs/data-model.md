@@ -141,6 +141,17 @@ lasts for that exercise and is discarded. Giving it a row would make it a prescr
 which ADR-0009 rejected and ADR-0017 keeps rejecting. The **sets it produces** are ordinary
 rows in `sets`, written one at a time as they are performed.
 
+The warm-up stopwatch (US-28, ADR-0021) is the second of these, and it is excluded for a
+different reason. It is not a prescription; it is a *second kind of thing a session could
+contain*, which constitution §1 forbids by name — "if a feature request would introduce an
+'activity type' abstraction, the answer is no". So the warm-up gets **no row anywhere**: not
+in `session_exercises`, not in `sets`, and no column on `sessions`. What is stored is one
+instant in DataStore — when the running warm-up started — which is what lets the elapsed time
+survive the process being killed, exactly as the rest timer's end instant does (ADR-0010).
+It is discarded when the warm-up stops. Because nothing is recorded, the warm-up cannot
+appear in history, in a session's duration, or in a summary, and §2.4 has nothing to be
+dishonest about.
+
 ### Catalog IDs are deterministic
 
 The bundled catalog (free-exercise-db) is converted at build time by a script in

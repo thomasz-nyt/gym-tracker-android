@@ -242,6 +242,45 @@ that do not exist and one assumed a backend that does not — see ADR-0014 and A
 
 ---
 
+## M3a — Routines, and the warm-up that is not one
+
+Added 2026-08-08, from the `Redesign.dc.html` audit. Taken before M4 for the same
+reason M3 was taken before M2: none of it needs an account or a network.
+
+### US-28 — Warm up without logging it
+See `adr/0021-a-warm-up-timer-that-records-nothing.md`. Constitution §1 forbids an
+"activity type" abstraction, so the eight minutes on the treadmill get a **timer and
+no row**. The ADR says "countdown/stopwatch" and "end-time"; the mock at `2a` says
+"counts up". It is a **stopwatch** — the "end-time" phrasing is mechanism carried
+over from ADR-0010, where storing the end is what makes a count-*down* survive being
+killed. For a count-up timer the instant worth storing is the **start**.
+
+- From an active session I can start a warm-up. It counts up from zero and shows
+  elapsed minutes and seconds.
+- It has no weight field, no rep field, and no exercise attached to it.
+- Killing the app and reopening shows the time that has **actually** elapsed since I
+  started, not zero and not a paused value.
+- Starting a warm-up while one is already running does not reset it.
+- Stopping it clears it. Nothing is written: no `session_exercises` row, no `sets`
+  row, and no change to the session.
+- It never appears in history, never counts toward session duration, and never
+  appears in a session summary. Nothing is logged, so §2.4 has nothing to be
+  dishonest about.
+- It never blocks logging a set. The two-tap path of US-03 is unchanged, and
+  `TwoTapSetLoggingTest` needs no edit.
+- It is reachable from the session, not from a plan: a routine (US-29) cannot
+  contain one.
+
+### US-29 — Routines
+
+Not yet written. See `adr/0020-routines.md`, which is accepted: a routine is a name
+plus an ordered list of catalog exercises, with **no stored targets** — the numbers
+beside each movement are read from history through `PrefillFromLastSet` and labelled
+as what was lifted, never as a prescription. The acceptance criteria are deliberately
+left unwritten until the story is scheduled, rather than invented here.
+
+---
+
 ## M4 — Progress
 
 ### US-16 — Per-exercise trend

@@ -19,6 +19,7 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.WeightUnit
+import com.gymtracker.core.domain.warmup.WarmUpTimerStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -68,6 +69,16 @@ internal class FakeRestTimerStore : RestTimerStore {
 
     override suspend fun markNotificationPermissionAsked() {
         asked.value = true
+    }
+}
+
+internal class FakeWarmUpTimerStore : WarmUpTimerStore {
+    private val startedAt = MutableStateFlow<Instant?>(null)
+
+    override val warmUpStartedAt = startedAt
+
+    override suspend fun setWarmUpStartedAt(instant: Instant?) {
+        startedAt.value = instant
     }
 }
 
