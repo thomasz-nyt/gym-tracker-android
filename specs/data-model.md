@@ -22,6 +22,8 @@ a watch exists.
 @JvmInline value class ExerciseId(val value: String)
 @JvmInline value class SessionId(val value: String)
 @JvmInline value class SessionExerciseId(val value: String)
+@JvmInline value class RoutineId(val value: String)
+@JvmInline value class RoutineItemId(val value: String)
 
 enum class BodyPart { CHEST, BACK, SHOULDERS, BICEPS, TRICEPS, FOREARMS,
                       QUADS, HAMSTRINGS, GLUTES, CALVES, CORE, FULL_BODY }
@@ -80,6 +82,28 @@ data class ExerciseSet(
     val rpe: Double?,             // 5.0..10.0 in 0.5 steps
     val performedAt: Instant,
 )
+
+/**
+ * A saved *shape* — a name and an order (US-29, ADR-0020).
+ *
+ * Note what is absent, and that it is absent on purpose: no sets, no reps, no load.
+ * A routine says which movements and in what order. What you lifted last time is read
+ * from `sets` through PrefillFromLastSet at render time, never stored here.
+ */
+data class Routine(
+    val id: RoutineId,
+    val userId: UserId,
+    val name: String,
+    val position: Int,            // 1-based order in the member's list
+)
+
+/** One movement's place in a routine. It carries no target — see ADR-0020 option 3. */
+data class RoutineItem(
+    val id: RoutineItemId,
+    val routineId: RoutineId,
+    val exerciseId: ExerciseId,
+    val position: Int,            // 1-based order within the routine
+)
 ```
 
 ### Units
@@ -118,8 +142,25 @@ sets(id PK, session_exercise_id FK→session_exercises ON DELETE CASCADE,
      set_index, weight_kg, reps, rpe, performed_at,
      updated_at, sync_state)
 
+routines(id PK, user_id, name, position, created_at,
+         updated_at, sync_state)
+
+routine_items(id PK, routine_id FK→routines ON DELETE CASCADE,
+              exercise_id FK→exercises, position,
+              updated_at, sync_state)
+
 sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
 ```
+
+`routines` and `routine_items` are **additive** (schema v7, US-29): `sessions`, `sets` and
+`session_exercises` are untouched by them. Starting a routine copies its items into
+`session_exercises`, after which the session is an ordinary session and every M1 story keeps
+working on it unchanged. Nothing links a session back to the routine it came from — editing
+today never edits Tuesday, and there is no field a "planned vs actual" comparison could be
+built from, which is deliberate.
+
+Index: `routine_items(routine_id, position)` for reading a routine in order, and
+`routines(user_id, position)` for the member's list.
 
 Indexes: `session_exercises(exercise_id)` and
 `sets(session_exercise_id, performed_at DESC)` — together these back the prefill
@@ -140,6 +181,14 @@ does not have one. A guided target is the sets-by-reps typed when the exercise w
 lasts for that exercise and is discarded. Giving it a row would make it a prescription entity —
 which ADR-0009 rejected and ADR-0017 keeps rejecting. The **sets it produces** are ordinary
 rows in `sets`, written one at a time as they are performed.
+
+A routine (US-29) does **not** contradict this, and the distinction is the whole of ADR-0020.
+A routine stores a name and an ordered list of exercise ids — no sets, no reps, no load. A
+list of names is not a value, so it cannot be dishonest, and "no prescription entity" survives
+intact: only ADR-0017's "nothing outlives the workout" is amended. The numbers the routine
+screens show beside each movement come from `sets` through `PrefillFromLastSet` and are
+labelled as what was lifted (`Last Tue · 100 lb × 8`), never as what to lift. **A stored
+target is still not a table**, and the routine editor has no control that would create one.
 
 The warm-up stopwatch (US-28, ADR-0021) is the second of these, and it is excluded for a
 different reason. It is not a prescription; it is a *second kind of thing a session could

@@ -272,12 +272,33 @@ killed. For a count-up timer the instant worth storing is the **start**.
   contain one.
 
 ### US-29 — Routines
+See `adr/0020-routines.md`. A routine is a **name and an ordered list of exercises**,
+and nothing else. It answers audit finding 01 — "Tuesday is Upper A" — while conceding
+nothing on constitution §2.4, because a list of names is not a value and cannot be
+dishonest.
 
-Not yet written. See `adr/0020-routines.md`, which is accepted: a routine is a name
-plus an ordered list of catalog exercises, with **no stored targets** — the numbers
-beside each movement are read from history through `PrefillFromLastSet` and labelled
-as what was lifted, never as a prescription. The acceptance criteria are deliberately
-left unwritten until the story is scheduled, rather than invented here.
+- I can create a routine, give it a name, and add catalog exercises to it. The same
+  exercise may appear twice, as it may in a session (US-02).
+- I can rename it, remove a movement, reorder the movements, and delete the routine.
+  Deleting it removes its items and touches no session, past or present.
+- Starting a routine creates a session and copies its movements into it **in order**.
+  From that moment it is an ordinary session: US-02a/b/c, US-03, US-04 and US-05a all
+  work on it unchanged, and editing today never edits the routine.
+- Each movement shows what I **actually lifted** last time, read from history and
+  labelled as history (`Last Tue · 100 lb × 8`) — never as a target. A movement with
+  no history shows its name and no numbers, the US-13 absence pattern.
+- **There is no target to edit.** The editor offers a name, an order, add, and remove.
+  It has no sets, reps, or load field, and it does not offer to add a warm-up (US-28).
+- Starting a workout without a routine still works exactly as it does today. A routine
+  is an additional path, never a required one.
+- The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited**. ADR-0017
+  names that as the signal this went wrong if it does not.
+- Routines are device-local until M2, like everything else.
+
+**Deliberately excluded, from ADR-0020's own "where this diverges from the mocks":**
+planning a progression in advance ("next Tuesday I want 105"). Option 3 cannot express
+it. If it turns out to matter it returns as its own story about a *single* next-session
+target, which is a much smaller thing to get right than a general prescription model.
 
 ---
 
