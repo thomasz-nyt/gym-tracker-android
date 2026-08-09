@@ -106,7 +106,7 @@ mistake; there was no way to take one back out.
 - I can dismiss or skip it. It never blocks logging the next set.
 
 ### US-05a — Be walked through an exercise
-Added 2026-08-02. See `adr/0016-guided-exercise-flow.md`, which revisits the
+Added 2026-08-02. See `adr/0017-guided-exercise-flow.md`, which revisits the
 prescription option ADR-0009 rejected. "Rep" in the original request means *set*.
 - Given an exercise in the active session, I can start it. Weight, reps and a sets
   count are prefilled exactly as in US-03, and confirming begins the exercise.

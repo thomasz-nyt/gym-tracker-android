@@ -20,8 +20,8 @@ import com.gymtracker.core.data.set.SetEntity
 /**
  * The local database, which is the source of truth for the UI (constitution §2).
  *
- * `session_exercises`, `sets` and `sync_queue` from `data-model.md` arrive with the stories
- * that need them.
+ * `sync_queue` from `data-model.md` arrives with M2, the story that needs it. Every other table
+ * `data-model.md` describes for M0–M3a is already an entity below.
  */
 @Database(
     entities = [
