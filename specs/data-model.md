@@ -147,6 +147,7 @@ routines(id PK, user_id, name, position, created_at,
 
 routine_items(id PK, routine_id FK→routines ON DELETE CASCADE,
               exercise_id FK→exercises, position,
+              target_sets NULL, target_reps NULL, target_weight_kg NULL,
               updated_at, sync_state)
 
 sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
@@ -156,8 +157,24 @@ sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
 `session_exercises` are untouched by them. Starting a routine copies its items into
 `session_exercises`, after which the session is an ordinary session and every M1 story keeps
 working on it unchanged. Nothing links a session back to the routine it came from — editing
-today never edits Tuesday, and there is no field a "planned vs actual" comparison could be
-built from, which is deliberate.
+today never edits Tuesday.
+
+**Targets (schema v8, US-30, ADR-0027).** The three nullable `target_*` columns above are new,
+and `session_exercises` gains the same three, which `StartSessionFromRoutine` fills in as it
+copies. That duplication is the point: the session carries its own snapshot of what was planned,
+so there is still **no foreign key back to the routine and nothing to join on**, and editing the
+routine next week cannot rewrite what last Tuesday was planned to be. ADR-0027 rejected the
+join-back implementation for exactly that reason.
+
+The sentence this paragraph replaces said there was no field a "planned vs actual" comparison
+could be built from. That is no longer true, and ADR-0027 is explicit that it is the real cost
+of the decision: a comparison is now *expressible*, and what stops it being dishonest is a
+labelling rule and its tests rather than a missing column.
+
+**`sets` still has no target column, and must not gain one.** A logged set records what
+happened; the target lives on the *appearance* of the exercise. Every derived number — volume
+(US-17), the trend (US-16), Epley, personal records (US-18) — reads `sets` alone, so a planned
+load that was never lifted can never become a record.
 
 Index: `routine_items(routine_id, position)` for reading a routine in order, and
 `routines(user_id, position)` for the member's list.
