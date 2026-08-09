@@ -145,7 +145,7 @@ private fun TrendChart(
     val plotted = trend.points.mapNotNull { point -> series.valueOf(point)?.let { point to it } }
 
     if (plotted.size < 2) {
-        NotEnoughYet("Not enough ${series.label.lowercase(Locale.getDefault())} data to draw a trend yet.")
+        NotEnoughYet("Not enough ${series.inSentence} data to draw a trend yet.")
         return
     }
 
