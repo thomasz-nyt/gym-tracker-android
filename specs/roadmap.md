@@ -209,7 +209,8 @@ no volume figure and no personal record has moved as a result. `TwoTapSetLogging
 
 ## M4 — Progress and charts
 
-Stories: US-16 … US-19
+Stories: US-16 … US-19, plus US-31, added 2026-08-09 out of the `Redesign.dc.html` audit
+because it is the first place US-18's records are shown anywhere in the app.
 
 - [x] Estimated 1RM (Epley), volume, and top-set trend per exercise
 - [x] Weekly volume by body part (US-17). One block per week, one labelled bar per muscle,
@@ -217,13 +218,17 @@ Stories: US-16 … US-19
       achromatic ground, and the obvious rendering — a stacked column per week, one hue per
       muscle — needs twelve hues the palette does not have. Reached from History; the window is
       a fixed eight weeks until the selector below is built
-- [ ] PR detection and history — **unblocked 2026-08-09**, half done. ADR-0025 settled what a
+- [ ] PR detection and history — **unblocked 2026-08-09**, in progress. ADR-0025 settled what a
       record is (heaviest load at a given rep count), and `PersonalRecordsOf` /
-      `DetectPersonalRecord` landed in #29 with 17 tests. What is left is the UI: the inline
-      announcement on save, and the per-exercise record list
+      `DetectPersonalRecord` landed in #29 with 17 tests. US-31 is the first UI surface for it —
+      a session's records shown on its finish summary. Still missing: the inline announcement on
+      save, and a standing per-exercise record list
 - [x] Empty and sparse-data states designed, not accidental (US-19)
 - [ ] Time range selector. Split from the line above, which it had been sharing: the states are
       done and the selector is not, so one checkbox could not tell the truth about both
+- [ ] Finish as a summary, not a confirm dialog (US-31). The confirm dialog itself is
+      unchanged — only what happens after confirming, which is where the summary and any
+      records set that session are shown
 
 **US-18 was answered on 2026-08-09** after three sessions deferred it — see ADR-0025. A record
 is the heaviest load ever lifted **at a given rep count**, so every record is a set that
@@ -299,6 +304,14 @@ Tracked here rather than in a milestone, because these do not all belong to one.
 **Shipped:** the visual system (ADR-0019), the rest panel and one-tap log (ADR-0023), bottom
 navigation (ADR-0024), the warm-up timer (US-28), routines (US-29).
 
+**In progress:**
+
+- **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a
+  better check than asking *are you sure*." The confirm dialog itself is kept — the maintainer
+  chose the lower-risk reading of that sentence over removing it outright — and what comes
+  after confirming is replaced with a summary, which is also the first place a PR (US-18) is
+  shown anywhere in the app.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
@@ -306,9 +319,6 @@ navigation (ADR-0024), the warm-up timer (US-28), routines (US-29).
   without touching the routine it came from. Suggestions come from the same body part, ranked
   by what has actually been used. The design doc leaves one question open — whether a swap
   made three times should offer to update the routine.
-- **Finish as a summary rather than a confirm dialog.** "Showing the work is a better check
-  than asking *are you sure*." Today `FinishWorkoutDialog` asks. This wants what was logged,
-  and it overlaps M4: a summary is the first place a PR (US-18) would be worth showing.
 - **Supersets.** The design doc scopes them as *a pair, not a group* — two adjacent movements,
   one rest taken after B, logged as rounds. Three or more would need a different model. Audit
   finding 07 stands, and nothing has been drawn for it.

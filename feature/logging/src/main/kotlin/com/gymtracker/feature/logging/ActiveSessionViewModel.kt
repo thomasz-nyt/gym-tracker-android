@@ -12,14 +12,18 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.progress.PersonalRecord
+import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.EndSession
+import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -79,7 +83,29 @@ data class SessionUiState(
     val canUndoRemoval: Boolean = false,
     /** The exercise being walked through, if any (US-05a). */
     val guided: GuidedState = GuidedState(),
+    /** What is showing over the just-finished session, if anything (US-31). */
+    val finish: FinishFlow? = null,
 )
+
+/**
+ * What is on screen between confirming "Finish workout" and returning to the session list
+ * (US-31). [InProgress] exists to close a race, not to be a loading spinner in its own right:
+ * it is set *before* [EndSession] is called, synchronously, so the session's `active` flow going
+ * null can never be observed with nothing yet queued to replace it — which would otherwise flash
+ * home for a frame before the summary is ready.
+ */
+sealed interface FinishFlow {
+    data object InProgress : FinishFlow
+
+    /**
+     * @property records every personal record the session set, already deduplicated to the best
+     *   per (exercise, reps) by [PersonalRecordsAchievedIn] — never every intermediate one.
+     */
+    data class Ready(
+        val detail: SessionDetail,
+        val records: List<PersonalRecord>,
+    ) : FinishFlow
+}
 
 /**
  * The rest, as ADR-0023 made it: a countdown and the set it is counting down to. They travel
@@ -136,7 +162,9 @@ class ActiveSessionViewModel
         private val currentMember: CurrentMember,
         private val startSession: StartSession,
         private val addExerciseToSession: AddExerciseToSession,
-        private val endSession: EndSession,
+        endSession: EndSession,
+        workoutDetail: WorkoutDetail,
+        personalRecordsAchievedIn: PersonalRecordsAchievedIn,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
         private val determineUpNextSet: DetermineUpNextSet,
@@ -175,6 +203,17 @@ class ActiveSessionViewModel
                 deleteSet = deleteSet,
                 restoreSet = restoreSet,
                 unitPreference = unitPreference,
+                scope = viewModelScope,
+            )
+
+        /** Ending the session lives in its own state holder; see [FinishController]. */
+        val finish =
+            FinishController(
+                sessions = sessions,
+                currentMember = currentMember,
+                endSession = endSession,
+                workoutDetail = workoutDetail,
+                personalRecordsAchievedIn = personalRecordsAchievedIn,
                 scope = viewModelScope,
             )
 
@@ -266,7 +305,14 @@ class ActiveSessionViewModel
                 )
             }
 
-        val uiState: StateFlow<SessionUiState> =
+        /**
+         * The screen state everything but [finish] drives. A `combine` of five is already at
+         * the arity `kotlinx.coroutines.flow.combine` offers without an array-indexed lambda, so
+         * [finish] is layered on with a second, outer `combine` below rather than squeezed into
+         * one of the existing grouping records — it is not a screen extra or a side trip, and
+         * ADR-0017 already asked this class not to pile unrelated concerns onto those.
+         */
+        private val sessionState: Flow<SessionUiState> =
             combine(
                 activeSession,
                 stalePrompt,
@@ -298,7 +344,11 @@ class ActiveSessionViewModel
                     canUndoRemoval = sideTrips.canUndoRemoval,
                     guided = sideTrips.guided,
                 )
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
+            }
+
+        val uiState: StateFlow<SessionUiState> =
+            combine(sessionState, finish.flow) { state, finishing -> state.copy(finish = finishing) }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
         init {
             checkForAbandonedSession()
@@ -333,19 +383,6 @@ class ActiveSessionViewModel
 
         fun onStartWorkout() {
             viewModelScope.launch { startSession(currentMember.id()) }
-        }
-
-        /**
-         * Ends the session and returns the member to home (US-06).
-         *
-         * The session is read from the repository rather than from `uiState`, for the same
-         * reason [onExerciseChosen] does: the database is the source of truth (§2).
-         */
-        fun onFinishWorkout() {
-            viewModelScope.launch {
-                val session = sessions.findActiveSession(currentMember.id()) ?: return@launch
-                endSession(session.id)
-            }
         }
 
         /**

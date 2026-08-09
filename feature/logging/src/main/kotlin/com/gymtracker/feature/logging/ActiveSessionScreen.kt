@@ -128,7 +128,8 @@ fun LoggingRoute(
     LoggingScreen(
         state = state,
         onStartWorkout = viewModel::onStartWorkout,
-        onFinishWorkout = viewModel::onFinishWorkout,
+        onFinishWorkout = viewModel.finish::confirm,
+        onFinishSummaryDismissed = viewModel.finish::dismiss,
         onResolveStale = viewModel::onResolveStale,
         onAddSet = viewModel.setEntry::open,
         onRemoveExercise = viewModel.removal::remove,
@@ -242,6 +243,7 @@ internal fun LoggingScreen(
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
     onFinishWorkout: () -> Unit = {},
+    onFinishSummaryDismissed: () -> Unit = {},
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onRemoveExercise: (SessionExerciseId) -> Unit = {},
     onUndoRemoval: () -> Unit = {},
@@ -261,8 +263,8 @@ internal fun LoggingScreen(
     val running = state.guided.running
 
     // Which full-screen thing is showing. History and the workout detail are navigation
-    // destinations of their own now (ADR-0024); only the guided flow is still selected by state
-    // here, deliberately, for the reason ADR-0017 gives.
+    // destinations of their own now (ADR-0024); only the guided flow and the finish summary
+    // (US-31) are still selected by state here, deliberately, for the reason ADR-0017 gives.
     if (running != null) {
         // A lens over the already-logged rows, so leaving it loses nothing (US-05a).
         GuidedRoute(running = running, state = state, guided = guided, modifier = modifier)
@@ -272,6 +274,7 @@ internal fun LoggingScreen(
             onStartWorkout = onStartWorkout,
             onResolveStale = onResolveStale,
             onFinishWorkout = onFinishWorkout,
+            onFinishSummaryDismissed = onFinishSummaryDismissed,
             onAddSet = onAddSet,
             onRemoveExercise = onRemoveExercise,
             onUndoRemoval = onUndoRemoval,
@@ -319,6 +322,7 @@ private fun SessionScreen(
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
     onFinishWorkout: () -> Unit,
+    onFinishSummaryDismissed: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onUndoRemoval: () -> Unit,
@@ -351,6 +355,7 @@ private fun SessionScreen(
             onLogNextSet = onLogNextSet,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
+            onFinishSummaryDismissed = onFinishSummaryDismissed,
             warmUp = warmUp,
             modifier = Modifier.padding(padding),
         )
@@ -366,8 +371,14 @@ private fun SessionScreen(
 }
 
 /**
- * Which of the three session states is on screen. Derived from the database rather than from
+ * Which of the four session states is on screen. Derived from the database rather than from
  * a back stack, which is what makes "reopen and you are back in your session" survive a kill.
+ *
+ * [SessionUiState.finish] is checked first, above even [SessionUiState.isLoading]: once
+ * "Finish workout" is confirmed, [ActiveSessionViewModel.onFinishWorkout] sets it before ending
+ * the session, specifically so this branch wins the moment `activeSession` goes null — the
+ * alternative is a frame of the empty "start a workout" screen before the summary appears
+ * (US-31).
  */
 @Composable
 private fun SessionBody(
@@ -385,6 +396,7 @@ private fun SessionBody(
     onLogNextSet: (UpNextSet) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
+    onFinishSummaryDismissed: () -> Unit,
     warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
@@ -393,6 +405,14 @@ private fun SessionBody(
         contentAlignment = Alignment.Center,
     ) {
         when {
+            state.finish is FinishFlow.Ready ->
+                FinishSummaryScreen(
+                    detail = state.finish.detail,
+                    records = state.finish.records,
+                    unit = state.unit,
+                    onDone = onFinishSummaryDismissed,
+                )
+            state.finish != null -> CircularProgressIndicator()
             state.isLoading -> CircularProgressIndicator()
             state.activeSession != null ->
                 ActiveSession(

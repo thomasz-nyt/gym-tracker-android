@@ -369,6 +369,36 @@ than invent it.
   empty grid or a zero line.
 - With a single data point, no trend line is drawn and no trend is claimed.
 
+### US-31 — Finish as a summary
+Added 2026-08-09, from the `Redesign.dc.html` audit's finding *"showing the work is a
+better check than asking are you sure."* Today ending a workout shows only a yes/no
+confirm. This replaces what happens **after** confirming with a summary of what was
+logged — and is the first place a personal record (US-18) is shown anywhere in the app,
+now that its detection logic exists.
+
+- **The confirm dialog is unchanged.** Tapping "Finish workout" still asks "Finish this
+  workout? [Keep going] [Finish workout]" exactly as it does today. Only what happens
+  after confirming is new — this story does not touch the ask-first step, a deliberate
+  choice over the audit's more literal reading, made by the maintainer on 2026-08-09.
+- Confirming shows a summary: duration, exercise count, set count, and total volume —
+  the same figures history already computes (`SessionSummary`), so the two can never
+  disagree.
+- Any personal record set during the session is shown, one line per record: the
+  exercise, the rep count, and the load — using US-18's existing detection rule
+  unchanged (ADR-0025). No new definition of a record is invented here.
+- **When a rep count is beaten more than once in one session, only the best is shown.**
+  100 kg then 105 kg for 5 reps in the same workout is one record, not two — the member
+  cares about the number they left with, not each intermediate step.
+- **A session with no records shows no PR section at all** — absence rather than a "no
+  records this time" line, the same pattern US-13 already uses for a movement with no
+  history.
+- A session discarded for having no sets (US-06's existing `Discarded` case) shows no
+  summary. There is nothing to summarize, and the screen returns to home exactly as it
+  does today.
+- **This does not close US-18.** The inline announcement at the moment a record is set,
+  and a standing per-exercise list of records with dates, are both still unbuilt. This
+  is a third, additional place a record is shown, not a replacement for either.
+
 ---
 
 ## M5 — Health Connect (optional)
