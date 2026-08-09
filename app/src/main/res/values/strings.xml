@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Gym Tracker</string>
+    <!--
+      The launcher label. Short on purpose: it sits under an icon on a home screen, and
+      "Gym Tracker" wrapped onto two lines there.
+    -->
+    <string name="app_name">REP</string>
+
+    <!-- The launcher icon's background. Named rather than inlined so the adaptive icon's
+         two layers cannot drift apart. -->
+    <color name="ic_launcher_background">#1B2220</color>
 </resources>

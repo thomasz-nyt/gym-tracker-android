@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon only, with no PNG fallback and no `mipmap-<dpi>` variants.
+
+  `minSdk` is 26, which is exactly the release adaptive icons arrived in, so every device this
+  app can be installed on understands this file. A set of rasterised fallbacks would be dead
+  weight in the APK that nothing could ever load.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
