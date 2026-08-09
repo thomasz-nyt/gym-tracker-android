@@ -20,3 +20,6 @@ supabase/.temp/
 
 # OS
 .DS_Store
+
+# Local device-data snapshots from tools/devdata.sh. Not a backup — see that script.
+dev-data*.tar
