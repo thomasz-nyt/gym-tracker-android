@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -41,6 +42,18 @@ enum class TrendSeries(
     TOP_SET("Top set"),
     VOLUME("Volume"),
     ;
+
+    /**
+     * [label] as it reads mid-sentence, for "not enough _top set_ data yet".
+     *
+     * Lowercased with [Locale.ROOT], deliberately, and **not** with the member's locale. These
+     * are fixed English strings the app ships, not localized content, so folding their case by
+     * the device's locale is the classic Turkish-i bug waiting to happen. It is also what
+     * Android Lint's `NonObservableLocale` was flagging when it read `Locale.getDefault()` here:
+     * a composable that reads the default locale does not observe it, so it would not recompose
+     * if the member changed language.
+     */
+    val inSentence: String get() = label.lowercase(Locale.ROOT)
 
     /** The value this series reads off a point, or null when the day carried no load. */
     fun valueOf(point: ExerciseTrendPoint): Double? =
