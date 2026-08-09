@@ -5,10 +5,14 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.progress.DetectPersonalRecord
+import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
+import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -90,6 +94,14 @@ class SetEntryStepperTest {
                 addExerciseToSession =
                     AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
                 endSession = EndSession(repository, sets, clock),
+                workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+                personalRecordsAchievedIn =
+                    PersonalRecordsAchievedIn(
+                        DetectPersonalRecord(
+                            PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
+                            ZoneOffset.UTC,
+                        ),
+                    ),
                 removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
                 restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
                 determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),

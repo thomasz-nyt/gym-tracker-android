@@ -8,6 +8,9 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.progress.DetectPersonalRecord
+import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
+import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.DeleteSession
@@ -150,6 +153,14 @@ class WorkoutHistoryTest {
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),
+            workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+            personalRecordsAchievedIn =
+                PersonalRecordsAchievedIn(
+                    DetectPersonalRecord(
+                        PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
+                        ZoneOffset.UTC,
+                    ),
+                ),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
             restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
             determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
@@ -340,7 +351,7 @@ class WorkoutHistoryTest {
                 viewModel.setEntry.confirm()
                 expectMostRecentItem()
 
-                viewModel.onFinishWorkout()
+                viewModel.finish.confirm()
 
                 assertNull(expectMostRecentItem().activeSession, "US-06 returns me to home")
             }
@@ -353,7 +364,7 @@ class WorkoutHistoryTest {
             val repository = sessionsOf(session("s1"))
             val viewModel = activeSessionViewModel(repository)
 
-            viewModel.onFinishWorkout()
+            viewModel.finish.confirm()
 
             assertEquals(emptyList(), repository.all, "US-06: an empty session is not history")
         }
@@ -364,7 +375,7 @@ class WorkoutHistoryTest {
             val repository = sessionsOf()
             val viewModel = activeSessionViewModel(repository)
 
-            viewModel.onFinishWorkout()
+            viewModel.finish.confirm()
 
             assertEquals(emptyList(), repository.all)
         }

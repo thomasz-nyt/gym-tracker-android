@@ -8,11 +8,15 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.progress.DetectPersonalRecord
+import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
+import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
 import com.gymtracker.core.domain.sessionexercise.RestoreExerciseToSession
@@ -110,6 +114,14 @@ class ActiveSessionViewModelTest {
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),
+            workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+            personalRecordsAchievedIn =
+                PersonalRecordsAchievedIn(
+                    DetectPersonalRecord(
+                        PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
+                        ZoneOffset.UTC,
+                    ),
+                ),
             removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
             restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
             determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
@@ -628,5 +640,82 @@ class ActiveSessionViewModelTest {
             viewModel.rest.skip()
 
             assertNull(restStore.restEndsAt.first())
+        }
+
+    // ---- US-31: finish as a summary ----
+
+    @Test
+    fun `finishing a session with sets reaches the summary, with any record it set`() =
+        runTest {
+            // History: bench 100x5 in a past, already-finished session.
+            val historyAppearance = inSession("hist")
+            sets.seed(ExerciseSet("hist-set", historyAppearance, 1, 100.0, 5, null, now.minusSeconds(86400)))
+
+            val repository =
+                FakeSessions(
+                    listOf(
+                        session("hist", startedAt = now.minusSeconds(90000), endedAt = now.minusSeconds(86400)),
+                        session("s1"),
+                    ),
+                )
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val today = sessionExercises.all.single { it.sessionId == SessionId("s1") }
+            sets.seed(ExerciseSet("today-set", today.id, 1, 102.5, 5, null, now))
+
+            viewModel.finish.confirm()
+
+            viewModel.uiState.test {
+                val finish = expectMostRecentItem().finish
+                check(finish is FinishFlow.Ready) { "expected Ready, got $finish" }
+                assertEquals(1, finish.detail.summary.exerciseCount)
+                assertEquals(1, finish.detail.summary.setCount)
+                assertEquals(512.5, finish.detail.summary.volumeKg)
+                assertEquals(102.5, finish.records.single().weightKg)
+                assertEquals(5, finish.records.single().reps)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `finishing an empty session shows no summary, matching today's discard`() =
+        runTest {
+            // US-06: a session with no sets is discarded, not saved. Nothing to summarize.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+
+            viewModel.finish.confirm()
+
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().finish)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(emptyList(), repository.all)
+        }
+
+    @Test
+    fun `dismissing the summary clears it`() =
+        runTest {
+            val historyAppearance = inSession("hist")
+            sets.seed(ExerciseSet("hist-set", historyAppearance, 1, 60.0, 8, null, now.minusSeconds(86400)))
+            val repository =
+                FakeSessions(
+                    listOf(
+                        session("hist", startedAt = now.minusSeconds(90000), endedAt = now.minusSeconds(86400)),
+                        session("s1"),
+                    ),
+                )
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val today = sessionExercises.all.single { it.sessionId == SessionId("s1") }
+            sets.seed(ExerciseSet("today-set", today.id, 1, 60.0, 8, null, now))
+            viewModel.finish.confirm()
+
+            viewModel.finish.dismiss()
+
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().finish)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }
