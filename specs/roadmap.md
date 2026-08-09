@@ -176,10 +176,23 @@ and both tests still perform exactly two `performClick` calls. See
 
 Stories: US-16 … US-19
 
-- [ ] Estimated 1RM (Epley), volume, and top-set trend per exercise
-- [ ] Weekly volume by body part
-- [ ] PR detection and history
-- [ ] Time range selector; empty and sparse-data states designed, not accidental
+- [x] Estimated 1RM (Epley), volume, and top-set trend per exercise
+- [x] Weekly volume by body part (US-17). One block per week, one labelled bar per muscle,
+      all bars on one scale. **Not a charting-library chart:** ADR-0019 leaves one accent on an
+      achromatic ground, and the obvious rendering — a stacked column per week, one hue per
+      muscle — needs twelve hues the palette does not have. Reached from History; the window is
+      a fixed eight weeks until the selector below is built
+- [ ] PR detection and history — **blocked**, see US-18 below
+- [x] Empty and sparse-data states designed, not accidental (US-19)
+- [ ] Time range selector. Split from the line above, which it had been sharing: the states are
+      done and the selector is not, so one checkbox could not tell the truth about both
+
+**US-18 is blocked on the maintainer, and no code should be written for it until it is
+answered.** A PR based on the *estimated* 1RM would announce a record for a lift nobody
+performed, which sits badly against constitution §2.4. Basing it on the heaviest set actually
+lifted is the honest reading, but it discards information — a 100x8 is a better performance than
+a 105x1 for most purposes. This is an acceptance criterion, so `CLAUDE.md` says ask rather than
+guess.
 
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.

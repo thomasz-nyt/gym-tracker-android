@@ -31,6 +31,7 @@ import com.gymtracker.feature.logging.LoggingRoute
 import com.gymtracker.feature.logging.SessionPresenceViewModel
 import com.gymtracker.feature.logging.WorkoutDetailRoute
 import com.gymtracker.feature.progress.ExerciseProgressRoute
+import com.gymtracker.feature.progress.WeeklyVolumeRoute
 import com.gymtracker.feature.routines.RoutineEditorRoute
 import com.gymtracker.feature.routines.RoutinesRoute
 import kotlinx.serialization.Serializable
@@ -78,6 +79,21 @@ internal data class RoutineEditor(
 internal data class ExerciseProgress(
     val exerciseId: String,
 )
+
+/**
+ * Weekly volume by muscle (US-17). A drill-down from History.
+ *
+ * ADR-0024 says the History tab "becomes Progress and gains its charts when M4 lands". M4 has
+ * not landed — PR detection (US-18) is still blocked on the maintainer, and the range selector
+ * is unbuilt — so the tab keeps its honest name for now and this hangs off it. Renaming it is
+ * the last thing M4 does, not the first.
+ *
+ * A destination of its own rather than a panel inside the history screen, for the reason
+ * `ExerciseProgress` is one: `:feature:logging` would otherwise have to depend on
+ * `:feature:progress`.
+ */
+@Serializable
+internal object WeeklyVolume
 
 /** Past workouts (US-06, ADR-0024). */
 @Serializable
@@ -211,7 +227,14 @@ private fun GymTrackerNavGraph(
         }
 
         composable<History> {
-            HistoryRoute(onOpenWorkout = { id -> navController.navigate(WorkoutDetail(id.value)) })
+            HistoryRoute(
+                onOpenWorkout = { id -> navController.navigate(WorkoutDetail(id.value)) },
+                onSeeWeeklyVolume = { navController.navigate(WeeklyVolume) },
+            )
+        }
+
+        composable<WeeklyVolume> {
+            WeeklyVolumeRoute(onBack = navController::popBackStack)
         }
 
         composable<WorkoutDetail> { entry ->
