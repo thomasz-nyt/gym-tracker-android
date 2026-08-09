@@ -62,7 +62,7 @@ The last five were added 2026-08-02 from a real session on the gym floor, the sa
 way US-06a and ADR-0011 arrived. They are ergonomics on the core loop, not new
 scope: none of them adds a table or a migration. A sixth idea from that session —
 sensor-based rep counting — is **not** here on purpose; it is deferred in
-`adr/0017-sensor-assisted-rep-counting.md` because constitution §2.4 forbids
+`adr/0018-sensor-assisted-rep-counting.md` because constitution §2.4 forbids
 logging an inferred value.
 
 US-02a was written against the in-session search and had to be rebuilt when M3

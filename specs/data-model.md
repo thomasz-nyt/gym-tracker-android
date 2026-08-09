@@ -97,7 +97,10 @@ data class Routine(
     val position: Int,            // 1-based order in the member's list
 )
 
-/** One movement's place in a routine. It carries no target — see ADR-0020 option 3. */
+/**
+ * One movement's place in a routine. Carried no target as of schema v7 (ADR-0020 option 3);
+ * ADR-0027 (US-30, schema v8) adds one — see the "Targets" note below the Room schema.
+ */
 data class RoutineItem(
     val id: RoutineItemId,
     val routineId: RoutineId,
@@ -136,6 +139,7 @@ sessions(id PK, user_id, gym_name, started_at, ended_at,
 
 session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
                   exercise_id FK→exercises, position,
+                  target_sets NULL, target_reps NULL, target_weight_kg NULL,
                   updated_at, sync_state)
 
 sets(id PK, session_exercise_id FK→session_exercises ON DELETE CASCADE,

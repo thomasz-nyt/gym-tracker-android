@@ -23,7 +23,12 @@ For every unit of work:
 1. **Restate** the user story ID (e.g. `US-03`) and its acceptance criteria.
 2. **Write the test(s) first.** Run them. Show that they fail for the right reason.
 3. **Implement the minimum** to make them pass.
-4. **Run the full check**: `./gradlew ktlintCheck detekt testDebugUnitTest`.
+4. **Run the full check**: `./gradlew ktlintCheck detekt :core:domain:test testDebugUnitTest :app:lintDebug`.
+   All four gates, not a subset — `:core:domain:test` is the JUnit 5 suite, which
+   `testDebugUnitTest` (JUnit 4/Robolectric) does not run, and `:app:lintDebug` is the only
+   check that reads the merged manifest against compiled classes. Its absence here is exactly
+   how PR #27 merged with CI red: this line ran clean locally while a real Android Lint error
+   sat on `main` until PR #30 fixed it. See `specs/testing-strategy.md` § CI gates.
 5. **Refactor** with tests green.
 6. **Commit** with `feat(US-03): ...` / `test(US-03): ...` / `refactor(US-03): ...`.
 
