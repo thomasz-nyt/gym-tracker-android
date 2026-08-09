@@ -313,8 +313,25 @@ target, which is a much smaller thing to get right than a general prescription m
 - Weekly training volume grouped by primary muscle group, for a chosen range.
 
 ### US-18 — Personal records
+See `adr/0025-what-counts-as-a-personal-record.md`. A PR is **the heaviest load ever
+lifted for a given exercise at a given rep count** — so bench at 5 reps and bench at 8
+reps keep separate records, and every record is a set that actually happened. The rule
+was the maintainer's call on 2026-08-08, after three sessions deferred the story rather
+than invent it.
+
 - A PR is detected on save and shown inline at the moment it happens.
 - A PR list per exercise with dates.
+- The **first** time a rep count is performed is not a record: a record requires a
+  previous load at the same (exercise, reps) to beat. "You have not done this before" is
+  a fact, not an achievement, and celebrating it makes the first workout wall-to-wall
+  banners.
+- **Equalling a record is not beating it.** Strictly greater, so repeating the same
+  working weight every week does not fire a banner every week.
+- **Bodyweight sets set no records.** There is no load to compare, and reading a missing
+  weight as zero would tie every bodyweight set for last place forever (constitution
+  §2.4, and the rule `ExerciseTrendOf` already applies).
+- Detection must not delay the set being committed or the entry sheet closing.
+  Constitution §2.1 makes the two-tap loop sacred, and this runs on the save path.
 
 ### US-19 — Honest empty states
 - With no data, charts show a clear "not enough data yet" state rather than an

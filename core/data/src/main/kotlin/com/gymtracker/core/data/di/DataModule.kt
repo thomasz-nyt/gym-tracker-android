@@ -33,7 +33,9 @@ import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.progress.DetectPersonalRecord
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
+import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.progress.WeeklyVolumeByBodyPart
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
@@ -193,6 +195,20 @@ object DataModule {
         sets: SetRepository,
         zone: ZoneId,
     ): ExerciseTrendOf = ExerciseTrendOf(sessions, sessionExercises, sets, zone)
+
+    @Provides
+    fun personalRecordsOf(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        zone: ZoneId,
+    ): PersonalRecordsOf = PersonalRecordsOf(sessions, sessionExercises, sets, zone)
+
+    @Provides
+    fun detectPersonalRecord(
+        recordsOf: PersonalRecordsOf,
+        zone: ZoneId,
+    ): DetectPersonalRecord = DetectPersonalRecord(recordsOf, zone)
 
     @Provides
     fun weeklyVolumeByBodyPart(
