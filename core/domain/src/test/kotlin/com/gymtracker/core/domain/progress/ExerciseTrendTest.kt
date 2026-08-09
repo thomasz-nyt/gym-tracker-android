@@ -70,6 +70,24 @@ class ExerciseTrendTest {
         return sessionId
     }
 
+    /** A session at a precise instant, for ordering that a date alone cannot express. */
+    private suspend fun sessionAt(
+        sessionId: SessionId,
+        startedAt: Instant,
+        vararg lifts: Pair<Double?, Int>,
+    ) {
+        sessions.startSession(
+            WorkoutSession(sessionId, alice, null, startedAt, startedAt.plusSeconds(3600), null),
+        )
+        val appearance = SessionExerciseId("se-${nextAppearance++}")
+        val row = SessionExercise(appearance, sessionId, bench, 1)
+        sessionExercises.add(row)
+        sets.belongsTo(row)
+        lifts.forEachIndexed { index, (weight, reps) ->
+            sets.add(ExerciseSet("set-${nextSet++}", appearance, index + 1, weight, reps, null, startedAt))
+        }
+    }
+
     /** Loads a shared fixture into the fakes, wiring each set to its appearance as SQL would. */
     private suspend fun load(fixture: TestData.Fixture) {
         fixture.sessions.forEach { sessions.startSession(it) }
@@ -183,6 +201,27 @@ class ExerciseTrendTest {
                 listOf("2026-07-22", "2026-07-29", "2026-08-05").map(LocalDate::parse),
                 trend.points.map { it.performedOn },
                 "a chart reads left to right in time",
+            )
+        }
+
+    @Test
+    fun `two sessions on the same day read oldest first`() =
+        runTest {
+            // Found on a device, not here: sorting by date alone is stable, so two workouts on
+            // one day kept the repository's newest-first order and the chart sloped *down*
+            // through a session where the load went up. A point is a session, so the order has
+            // to be the instant, not the day.
+            val morning = SessionId("morning")
+            val evening = SessionId("evening")
+            sessionAt(morning, Instant.parse("2026-08-01T09:00:00Z"), 70.0 to 12)
+            sessionAt(evening, Instant.parse("2026-08-01T18:00:00Z"), 80.0 to 12)
+
+            val trend = trendOf(bench, alice) as ExerciseTrend.Series
+
+            assertEquals(
+                listOf(70.0, 80.0),
+                trend.points.map { it.topSetKg },
+                "the morning session comes first, however the repository returned them",
             )
         }
 

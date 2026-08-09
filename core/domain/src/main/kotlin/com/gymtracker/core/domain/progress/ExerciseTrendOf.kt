@@ -18,9 +18,11 @@ import java.time.ZoneId
  * day that is not over.
  *
  * **A point is a session, not a date.** Two workouts in one day are two points, because two
- * workouts are what happened; merging them would report a day nobody trained that way. Two
- * *appearances of the same exercise* within one session are one point, because that is one
- * day's work on that movement (US-02 allows the same exercise twice).
+ * workouts are what happened; merging them would report a day nobody trained that way. They
+ * are therefore ordered by the *instant* a session started rather than by its date — ordering
+ * by date is stable, so same-day sessions kept the repository's newest-first order and the
+ * chart ran backwards through them. Two *appearances of the same exercise* within one session
+ * are one point, because that is one day's work on that movement (US-02 allows it twice).
  *
  * @param zone the member's zone, for turning an instant into the day they would call it.
  */
@@ -63,6 +65,10 @@ class ExerciseTrendOf(
         val setsByAppearance = sets.observeForSessions(sessionIds).first().groupBy { it.sessionExerciseId }
 
         return finished
+            // By the instant, not the day. Two workouts on one date are two points, and
+            // sorting on the date alone is stable — so they kept whatever order the repository
+            // returned, which is newest first, and the chart ran backwards through them.
+            .sortedBy { it.startedAt }
             .mapNotNull { session ->
                 val performed =
                     appearancesBySession[session.id]
@@ -71,7 +77,7 @@ class ExerciseTrendOf(
                 // An exercise added and never performed is not a point: drawing it would put a
                 // zero on the chart for a day nothing was lifted (§2.4).
                 performed.takeIf { it.isNotEmpty() }?.toPoint(session.startedAt.atZone(zone).toLocalDate())
-            }.sortedBy { it.performedOn }
+            }
     }
 
     /**

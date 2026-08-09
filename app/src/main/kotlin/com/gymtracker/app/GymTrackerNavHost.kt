@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +30,7 @@ import com.gymtracker.feature.logging.HistoryRoute
 import com.gymtracker.feature.logging.LoggingRoute
 import com.gymtracker.feature.logging.SessionPresenceViewModel
 import com.gymtracker.feature.logging.WorkoutDetailRoute
+import com.gymtracker.feature.progress.ExerciseProgressRoute
 import com.gymtracker.feature.routines.RoutineEditorRoute
 import com.gymtracker.feature.routines.RoutinesRoute
 import kotlinx.serialization.Serializable
@@ -69,6 +71,12 @@ internal object Routines
 @Serializable
 internal data class RoutineEditor(
     val routineId: String,
+)
+
+/** One exercise's progress over time (US-16). A drill-down from its detail screen. */
+@Serializable
+internal data class ExerciseProgress(
+    val exerciseId: String,
 )
 
 /** Past workouts (US-06, ADR-0024). */
@@ -175,22 +183,7 @@ private fun GymTrackerNavGraph(
             )
         }
 
-        composable<Browse> { entry ->
-            val pickForSession = entry.toRoute<Browse>().pickForSession
-
-            BrowseRoute(
-                pickForSession = pickForSession,
-                onChosen = { id -> navController.onExerciseChosenInBrowse(pickForSession, id) },
-                onBack = navController::popBackStack,
-            )
-        }
-
-        composable<ExerciseDetail> { entry ->
-            ExerciseDetailRoute(
-                exerciseId = ExerciseId(entry.toRoute<ExerciseDetail>().exerciseId),
-                onBack = navController::popBackStack,
-            )
-        }
+        catalogDestinations(navController)
 
         composable<Routines> {
             RoutinesRoute(
@@ -227,6 +220,40 @@ private fun GymTrackerNavGraph(
                 onBack = navController::popBackStack,
             )
         }
+    }
+}
+
+/**
+ * Browsing the catalog, one exercise's detail, and its progress (US-12, US-13, US-16).
+ *
+ * Split out of [GymTrackerNavGraph] for the reason that function was split out of
+ * [GymTrackerNavHost]: the graph is a list, and a list that outgrows a screen stops reading
+ * as one.
+ */
+private fun NavGraphBuilder.catalogDestinations(navController: NavHostController) {
+    composable<Browse> { entry ->
+        val pickForSession = entry.toRoute<Browse>().pickForSession
+
+        BrowseRoute(
+            pickForSession = pickForSession,
+            onChosen = { id -> navController.onExerciseChosenInBrowse(pickForSession, id) },
+            onBack = navController::popBackStack,
+        )
+    }
+
+    composable<ExerciseDetail> { entry ->
+        ExerciseDetailRoute(
+            exerciseId = ExerciseId(entry.toRoute<ExerciseDetail>().exerciseId),
+            onBack = navController::popBackStack,
+            onSeeProgress = { id -> navController.navigate(ExerciseProgress(id.value)) },
+        )
+    }
+
+    composable<ExerciseProgress> { entry ->
+        ExerciseProgressRoute(
+            exerciseId = ExerciseId(entry.toRoute<ExerciseProgress>().exerciseId),
+            onBack = navController::popBackStack,
+        )
     }
 }
 
