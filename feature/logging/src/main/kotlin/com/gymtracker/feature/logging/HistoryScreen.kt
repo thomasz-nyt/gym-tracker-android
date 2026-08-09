@@ -55,6 +55,7 @@ import java.util.Locale
 fun HistoryRoute(
     onOpenWorkout: (SessionId) -> Unit,
     modifier: Modifier = Modifier,
+    onSeeWeeklyVolume: () -> Unit = {},
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -67,6 +68,7 @@ fun HistoryRoute(
         onDelete = viewModel::delete,
         onUndo = viewModel::undo,
         onOpenWorkout = onOpenWorkout,
+        onSeeWeeklyVolume = onSeeWeeklyVolume,
         modifier = modifier,
     )
 }
@@ -88,6 +90,7 @@ internal fun HistoryScreen(
     onUndo: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenWorkout: (SessionId) -> Unit = {},
+    onSeeWeeklyVolume: () -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
         Column(
@@ -103,6 +106,16 @@ internal fun HistoryScreen(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(top = HISTORY_PADDING),
             )
+
+            // The way to US-17's chart. A text button rather than a card: this screen's subject
+            // is the list below it, and ADR-0016 allows one primary role per screen — which on
+            // this screen is opening a workout, not leaving for a chart.
+            TextButton(
+                onClick = onSeeWeeklyVolume,
+                modifier = Modifier.sizeIn(minHeight = MIN_HISTORY_TARGET),
+            ) {
+                Text("Weekly volume by muscle")
+            }
 
             if (state.sessions.isEmpty()) {
                 Text(
