@@ -4,9 +4,13 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M4**. M0, M1, M3 and M3a are complete; M2 is deliberately postponed so
-the offline core can be finished before accounts and sync arrive, and M3a was taken ahead of
-M4 for the same reason.
+Current milestones: **M4**, and **M3b** alongside it. M0, M1, M3 and M3a are complete; M2 is
+deliberately postponed so the offline core can be finished before accounts and sync arrive, and
+M3a was taken ahead of M4 for the same reason.
+
+M3b breaks the "milestones are sequential" rule at the top of this file, and does so knowingly:
+it is routines work that touches no table M4 reads, so running it beside M4 risks nothing that
+sequencing would protect. Said out loud rather than left for someone to notice.
 
 What is left from the `Redesign.dc.html` audit is **not** all in M4, and is listed at the end
 of this file so it does not get lost between milestones.
@@ -172,6 +176,37 @@ and both tests still perform exactly two `performClick` calls. See
 
 ---
 
+## M3b — Targets in a routine
+
+Story: US-30. See `adr/0027-routines-store-targets.md`.
+
+Added 2026-08-09, and it is the same kind of arrival as M3a: not new scope invented by the
+agent, but a limitation the maintainer hit while using the thing that shipped. ADR-0020 named
+this exact loss two days earlier and set the condition for revisiting it; the condition was met.
+
+**Runs alongside M4 rather than blocking it.** M4 is charts and reads only `sets`; this is
+routines and touches `routine_items` and `session_exercises`. They do not overlap, and the one
+place they could — a target leaking into a chart or a PR — is forbidden by the story and by
+ADR-0027 rather than managed by sequencing.
+
+- [x] ADR-0027 and US-30 written, and `data-model.md` updated, **before** any code
+- [ ] Migration v8: three nullable `target_*` columns on `routine_items` **and** on
+      `session_exercises`. Additive; `sessions` and `sets` untouched
+- [ ] `RoutineItem` and `SessionExercise` carry a target; a use case sets and clears one
+- [ ] `StartSessionFromRoutine` copies targets across with the movements, so the session holds
+      its own snapshot and there is still nothing to join back to the routine
+- [ ] The routine editor can enter, edit and clear a target. **Replaces** the structural test in
+      `RoutineEditorViewModelTest` that currently asserts no target field exists — replaced by a
+      test of the new invariant, never simply deleted
+- [ ] A target prefills set entry; with none, US-03's prefill from history is unchanged
+- [ ] Targets render labelled as targets, beside history rather than merged into it
+
+**Exit:** a routine created on the sofa arrives at the gym carrying its numbers, and no chart,
+no volume figure and no personal record has moved as a result. `TwoTapSetLoggingTest` passes
+**unedited** — ADR-0017 and ADR-0020 both name that as the signal this went wrong.
+
+---
+
 ## M4 — Progress and charts
 
 Stories: US-16 … US-19
@@ -182,17 +217,18 @@ Stories: US-16 … US-19
       achromatic ground, and the obvious rendering — a stacked column per week, one hue per
       muscle — needs twelve hues the palette does not have. Reached from History; the window is
       a fixed eight weeks until the selector below is built
-- [ ] PR detection and history — **blocked**, see US-18 below
+- [ ] PR detection and history — **unblocked 2026-08-09**, half done. ADR-0025 settled what a
+      record is (heaviest load at a given rep count), and `PersonalRecordsOf` /
+      `DetectPersonalRecord` landed in #29 with 17 tests. What is left is the UI: the inline
+      announcement on save, and the per-exercise record list
 - [x] Empty and sparse-data states designed, not accidental (US-19)
 - [ ] Time range selector. Split from the line above, which it had been sharing: the states are
       done and the selector is not, so one checkbox could not tell the truth about both
 
-**US-18 is blocked on the maintainer, and no code should be written for it until it is
-answered.** A PR based on the *estimated* 1RM would announce a record for a lift nobody
-performed, which sits badly against constitution §2.4. Basing it on the heaviest set actually
-lifted is the honest reading, but it discards information — a 100x8 is a better performance than
-a 105x1 for most purposes. This is an acceptance criterion, so `CLAUDE.md` says ask rather than
-guess.
+**US-18 was answered on 2026-08-09** after three sessions deferred it — see ADR-0025. A record
+is the heaviest load ever lifted **at a given rep count**, so every record is a set that
+actually happened and a 100x8 sets one without having to beat a 105x1. The estimated-1RM
+reading was rejected: it would announce a record for a weight nobody has lifted.
 
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.

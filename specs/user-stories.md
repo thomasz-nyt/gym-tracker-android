@@ -300,6 +300,37 @@ planning a progression in advance ("next Tuesday I want 105"). Option 3 cannot e
 it. If it turns out to matter it returns as its own story about a *single* next-session
 target, which is a much smaller thing to get right than a general prescription model.
 
+**Superseded on 2026-08-09 by US-30.** It turned out to matter. The bullet above saying
+"there is no target to edit" is no longer true; every other bullet still is.
+
+### US-30 — Targets in a routine
+See `adr/0027-routines-store-targets.md`, which supersedes ADR-0020 on this point and
+only this point. The maintainer was offered the narrower single-next-session target the
+paragraph above proposes and **declined it**: a plan that erases itself is not the saved
+plan they wanted.
+
+- I can give a movement in a routine a **target**: sets, reps and load. Each is optional
+  on its own — "3 × 8, load unrecorded" is a plan, and so is a movement with no numbers,
+  which is what every routine has today.
+- I can edit a target and clear it. Editing one movement's target changes no other
+  movement, and no session.
+- Starting the routine **copies the targets into the session** along with the movements.
+  Editing the routine afterwards does not change a session already started, and editing
+  the session still never edits the routine (US-29, unchanged).
+- With a target present, "Add set" prefills from it. With none, it prefills from my last
+  performed set exactly as it does today (US-03).
+- **A target is always rendered as a target**, visibly distinct from a performed number,
+  and never substituted for one. Where both exist, both are shown — `Target 3 × 8 · 105 kg`
+  and `Last Tue · 100 kg × 8` — never reconciled into a single figure.
+- A movement with no target shows no target, rather than zeroes or a dash (the US-13
+  absence pattern).
+- **No target is ever written to `sets`.** What is logged is what I confirmed.
+- **No derived number reads a target.** Volume (US-17), the trend (US-16), Epley, and
+  personal records (US-18) all read `sets` alone. A planned 105 I never lifted must
+  never become a PR.
+- The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited**. A prefill
+  is a prefill whatever its source.
+
 ---
 
 ## M4 — Progress
