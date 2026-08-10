@@ -40,6 +40,9 @@ fun DrillDownTopBar(
         navigationIcon = {
             TextButton(
                 onClick = onBack,
+                // TextButton reads CornerFull rather than the shape scale (Shape.kt's
+                // documented trap), so without this it stays a stadium regardless of GymShapes.
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
             ) {
                 Text("Back", style = MaterialTheme.typography.labelLarge)

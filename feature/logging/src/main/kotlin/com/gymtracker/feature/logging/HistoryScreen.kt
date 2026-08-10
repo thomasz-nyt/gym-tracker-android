@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -25,9 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -98,13 +98,13 @@ internal fun HistoryScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = HISTORY_PADDING),
-            verticalArrangement = Arrangement.spacedBy(HISTORY_GAP),
+                    .padding(horizontal = GymDimens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         ) {
             Text(
                 text = "Past workouts",
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = HISTORY_PADDING),
+                modifier = Modifier.padding(top = GymDimens.ScreenPadding),
             )
 
             // The way to US-17's chart. A text button rather than a card: this screen's subject
@@ -112,7 +112,7 @@ internal fun HistoryScreen(
             // this screen is opening a workout, not leaving for a chart.
             TextButton(
                 onClick = onSeeWeeklyVolume,
-                modifier = Modifier.sizeIn(minHeight = MIN_HISTORY_TARGET),
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
             ) {
                 Text("Weekly volume by muscle")
             }
@@ -159,7 +159,7 @@ private fun WorkoutList(
                 // its own, so opening cannot be mistaken for deleting.
                 modifier =
                     Modifier
-                        .sizeIn(minHeight = MIN_HISTORY_TARGET)
+                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
                         .clickable { onOpen(summary.session.id) },
                 headlineContent = {
                     Text(
@@ -180,13 +180,13 @@ private fun WorkoutList(
                     TextButton(
                         onClick = { onDelete(summary.session.id) },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.sizeIn(minHeight = MIN_HISTORY_TARGET),
+                        modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
                     ) {
                         Text("Delete")
                     }
                 },
             )
-            HorizontalDivider()
+            GymDivider()
         }
     }
 }
@@ -199,14 +199,14 @@ private fun UndoBar(onUndo: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = HISTORY_GAP),
+            modifier = Modifier.padding(horizontal = GymDimens.Gap),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Workout deleted", style = MaterialTheme.typography.bodyMedium)
             TextButton(
                 onClick = onUndo,
-                modifier = Modifier.sizeIn(minHeight = MIN_HISTORY_TARGET),
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
             ) {
                 Text("Undo")
             }
@@ -246,9 +246,6 @@ private fun Instant.asWorkoutDate(): String = WORKOUT_DATE.format(atZone(ZoneId.
 private val WORKOUT_DATE = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())
 
 private const val MINUTES_PER_HOUR = 60L
-private val HISTORY_PADDING = 24.dp
-private val HISTORY_GAP = 12.dp
-private val MIN_HISTORY_TARGET = 48.dp
 
 @Preview
 @Composable

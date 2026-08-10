@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,7 +27,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.CatalogFilter
@@ -271,7 +269,7 @@ private fun Results(
                         .sizeIn(minHeight = ROW_HEIGHT)
                         .clickable { onChosen(exercise.id) },
             )
-            HorizontalDivider()
+            GymDivider()
         }
     }
 }
@@ -295,7 +293,6 @@ internal fun ExerciseThumbnail(imageAsset: String?) {
         modifier =
             Modifier
                 .size(THUMBNAIL)
-                .clip(RoundedCornerShape(THUMBNAIL_CORNER))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -317,7 +314,6 @@ private val CHIP_GAP = GymDimens.TightGap
 private val MIN_TOUCH_TARGET = GymDimens.MinTouchTarget
 private val THUMBNAIL = GymDimens.Thumbnail
 private val ROW_HEIGHT = 88.dp
-private val THUMBNAIL_CORNER = 8.dp
 
 /** Enough for the extended FAB plus its margin, so the last result clears it. */
 private val FAB_CLEARANCE = 88.dp

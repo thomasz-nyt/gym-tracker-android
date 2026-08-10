@@ -11,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -90,7 +89,7 @@ private fun RecordsSection(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
         Text(text = "New personal records", style = MaterialTheme.typography.titleMedium)
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(RECORD_ROW_GAP)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
             items(records, key = { "${it.exerciseId.value}-${it.reps}" }) { record ->
                 Text(
                     text = record.describe(names[record.exerciseId], unit),
@@ -141,7 +140,6 @@ private fun Duration.asLength(): String {
 }
 
 private const val MINUTES_IN_HOUR = 60L
-private val RECORD_ROW_GAP = 4.dp
 
 private const val PREVIEW_DURATION_MINUTES = 47L
 private const val PREVIEW_WEIGHT_KG = 102.5

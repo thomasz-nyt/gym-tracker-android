@@ -304,6 +304,24 @@ Tracked here rather than in a milestone, because these do not all belong to one.
 **Shipped:** the visual system (ADR-0019), the rest panel and one-tap log (ADR-0023), bottom
 navigation (ADR-0024), the warm-up timer (US-28), routines (US-29).
 
+ADR-0019 shipped in `6b2671d` with a handful of compliance gaps that survived review: three
+`.clip(RoundedCornerShape(...))` calls rounding catalog and workout-detail photos against the
+"every radius is 0" rule; `StepperField`'s step buttons and `DrillDownTopBar`'s back button
+reading `CornerFull` unfixed (the exact trap `Shape.kt` documents); dividers at Material's 1dp
+hairline rather than a thickness that survives gym lighting; button labels centred rather than
+flush left; `outlineVariant`, `background`, `secondary` and the extreme `surfaceContainer*` roles
+un-gated by `GymColorSchemeTest`; and "numbers carry weight 800" (ADR-0019's own text) never
+applied anywhere. Closed 2026-08-09, plus a `NumeralText` component (bolds digit runs via
+`AnnotatedString` spans, decoupled from button-label uppercasing which cannot be done safely —
+see `GymButtons.kt`'s `ButtonLabel` doc comment — without risking `TwoTapSetLoggingTest`'s
+case-sensitive `onNodeWithText` matches). The nav-bar selected-item pill is **not** closed:
+confirmed via the compiled `material3-api.jar` that `NavigationBarItem` still exposes no `shape`
+parameter and its indicator token (`ShapeKeyTokens.CornerFull`) resolves to a hardcoded
+`CircleShape`, never one of `Shapes`'s five roles. Fixing it means reimplementing
+`NavigationBarItem` from primitives, which is a custom widget — out of bounds per the redesign
+brief's own constraints. Revisit if Material3 ever adds the hook, or if a custom widget is
+explicitly authorised.
+
 **In progress:**
 
 - **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a
