@@ -190,14 +190,17 @@ place they could — a target leaking into a chart or a PR — is forbidden by t
 ADR-0027 rather than managed by sequencing.
 
 - [x] ADR-0027 and US-30 written, and `data-model.md` updated, **before** any code
-- [ ] Migration v8: three nullable `target_*` columns on `routine_items` **and** on
-      `session_exercises`. Additive; `sessions` and `sets` untouched
-- [ ] `RoutineItem` and `SessionExercise` carry a target; a use case sets and clears one
-- [ ] `StartSessionFromRoutine` copies targets across with the movements, so the session holds
-      its own snapshot and there is still nothing to join back to the routine
+- [x] Migration v8: three nullable `target_*` columns on `routine_items` **and** on
+      `session_exercises`. Additive; `sessions` and `sets` untouched. Closed 2026-08-09
+- [x] `RoutineItem` and `SessionExercise` carry a target; a use case sets and clears one
+      (`SetRoutineItemTarget`). Closed 2026-08-09
+- [x] `StartSessionFromRoutine` copies targets across with the movements, so the session holds
+      its own snapshot and there is still nothing to join back to the routine. Closed 2026-08-09
 - [ ] The routine editor can enter, edit and clear a target. **Replaces** the structural test in
       `RoutineEditorViewModelTest` that currently asserts no target field exists — replaced by a
-      test of the new invariant, never simply deleted
+      test of the new invariant, never simply deleted. **Not built.** The three boxes above are
+      the domain and schema; this box and the two below are UI and are their own PRs by
+      ADR-0027's own split ("this is more than one PR")
 - [ ] A target prefills set entry; with none, US-03's prefill from history is unchanged
 - [ ] Targets render labelled as targets, beside history rather than merged into it
 

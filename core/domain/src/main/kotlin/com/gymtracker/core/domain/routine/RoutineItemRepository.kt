@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.Flow
  * The movements inside a routine (US-29, ADR-0020).
  *
  * A separate repository from [RoutineRepository] because `routine_items` is a separate table,
- * which is how `sets` and `session_exercises` are split too. There is no target here, and no
- * method that could write one.
+ * which is how `sets` and `session_exercises` are split too.
+ *
+ * [updateItem] arrived with US-30 (ADR-0027) for [RoutineItem.target] specifically — it is not
+ * a general-purpose row editor. `exerciseId` and `position` have their own, narrower use cases
+ * ([removeItem], [setItemPositions]) and go through those instead.
  */
 interface RoutineItemRepository {
     /** One routine's movements, ordered by position. */
@@ -21,6 +24,12 @@ interface RoutineItemRepository {
 
     /** Appends [item]. Callers get its position from [nextItemPosition]. */
     suspend fun addItem(item: RoutineItem)
+
+    /**
+     * Writes [item] back in full (US-30). In practice this only ever changes [RoutineItem
+     * .target] — see [com.gymtracker.core.domain.routine.SetRoutineItemTarget], the one caller.
+     */
+    suspend fun updateItem(item: RoutineItem)
 
     /**
      * Removes one movement.

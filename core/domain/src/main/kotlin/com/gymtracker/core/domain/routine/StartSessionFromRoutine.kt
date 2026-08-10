@@ -7,17 +7,23 @@ import com.gymtracker.core.domain.session.StartSessionResult
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 
 /**
- * Starts Tuesday's routine as an ordinary session (US-29, ADR-0020).
+ * Starts Tuesday's routine as an ordinary session (US-29, ADR-0020; targets: US-30, ADR-0027).
  *
- * The copy is the whole mechanism, and it is one-way. The routine's movements are appended to
- * a fresh session in order, and from that instant nothing connects the two: no foreign key, no
- * field on `sessions` or `session_exercises`, nothing to join on. Every M1 story — US-02a/b/c,
- * US-03, US-04, US-05a — therefore works on the result unchanged, because the result is not a
- * special kind of session.
+ * The copy is the whole mechanism, and it is one-way. The routine's movements — and each
+ * movement's target, if it has one — are appended to a fresh session in order, and from that
+ * instant nothing connects the two: no foreign key, no field naming a routine on `sessions` or
+ * `session_exercises`, nothing to join on. Every M1 story — US-02a/b/c, US-03, US-04, US-05a —
+ * therefore works on the result unchanged, because the result is not a special kind of session.
  *
- * That is also what keeps constitution §2.4 satisfied. With no link back to the plan, no screen
- * can ever render "planned versus actual", so an authored number can never end up beside a
- * lifted one.
+ * A copied target is a snapshot, not a pointer: editing the routine's target next week does not
+ * reach back into a session already started, and editing today's session still never edits the
+ * routine (ADR-0020's rule, unchanged by ADR-0027).
+ *
+ * With no link back to the plan, no screen can join a session to its routine — the structural
+ * half of constitution §2.4 that ADR-0020 bought. ADR-0027 spends the other half of that
+ * guarantee deliberately (a target now travels into the session), and replaces it with a
+ * labelling rule instead: a target is always rendered as a target, never merged with what
+ * `sets` says was actually lifted.
  */
 class StartSessionFromRoutine(
     private val routines: RoutineRepository,
@@ -44,7 +50,9 @@ class StartSessionFromRoutine(
         if (result is StartSessionResult.Started) {
             // In sequence, never concurrently: AddExerciseToSession takes its position from
             // MAX(position) + 1, so parallel appends would read the same maximum and collide.
-            movements.forEach { addExerciseToSession(result.session.id, it.exerciseId) }
+            movements.forEach {
+                addExerciseToSession(result.session.id, it.exerciseId, it.target)
+            }
         }
         return result
     }

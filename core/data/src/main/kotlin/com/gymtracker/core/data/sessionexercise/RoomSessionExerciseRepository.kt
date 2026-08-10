@@ -33,6 +33,9 @@ class RoomSessionExerciseRepository
                     position = sessionExercise.position,
                     updatedAt = Instant.now().toEpochMilli(),
                     syncState = SYNC_STATE_PENDING,
+                    targetSets = sessionExercise.target?.sets,
+                    targetReps = sessionExercise.target?.reps,
+                    targetWeightKg = sessionExercise.target?.weightKg,
                 ),
             )
         }

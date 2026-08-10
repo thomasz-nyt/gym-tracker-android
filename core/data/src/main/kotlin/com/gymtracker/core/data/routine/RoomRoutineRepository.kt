@@ -66,16 +66,11 @@ class RoomRoutineItemRepository
             dao.itemsOf(routineId.value).map { it.toDomain() }
 
         override suspend fun addItem(item: RoutineItem) {
-            dao.insert(
-                RoutineItemEntity(
-                    id = item.id.value,
-                    routineId = item.routineId.value,
-                    exerciseId = item.exerciseId.value,
-                    position = item.position,
-                    updatedAt = Instant.now().toEpochMilli(),
-                    syncState = SYNC_STATE_PENDING,
-                ),
-            )
+            dao.insert(item.toEntity())
+        }
+
+        override suspend fun updateItem(item: RoutineItem) {
+            dao.update(item.toEntity())
         }
 
         override suspend fun removeItem(id: RoutineItemId) {

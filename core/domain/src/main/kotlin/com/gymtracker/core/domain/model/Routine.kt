@@ -3,14 +3,12 @@ package com.gymtracker.core.domain.model
 /**
  * A saved shape: a name, and an order (US-29, ADR-0020).
  *
- * Read the absences here as the design. There is no sets count, no rep count and no load,
- * because a routine says *which movements, in what order* and nothing about what to lift.
- * The numbers the routine screens put beside each movement come from `sets` through
- * `PrefillFromLastSet` — they are what someone actually lifted, labelled as history.
- *
- * That is what keeps ADR-0009's and ADR-0017's rejection of a prescription entity intact
- * while still answering the audit's finding 01. A list of names is not a value, so
- * constitution §2.4 has nothing to be dishonest about.
+ * The routine itself still carries no number — its identity is *which movements, in what
+ * order*. What each movement plans for is [RoutineItem.target] (US-30, ADR-0027), which is
+ * where "no sets count, no rep count, no load" used to sit before the maintainer asked for it
+ * back. See that ADR for why moving the absence from the routine's items to the routine object
+ * itself keeps constitution §2.4 answerable: a target is still labelled as a target everywhere
+ * it renders, never merged with what `sets` says was actually lifted.
  */
 data class Routine(
     val id: RoutineId,
@@ -23,9 +21,12 @@ data class Routine(
 /**
  * One movement's place in a [Routine].
  *
- * Carries no target, deliberately — see [Routine]. The same exercise may appear twice, as it
- * may in a session (US-02), and each appearance is its own row so they can be reordered and
- * removed separately.
+ * [target] arrived with US-30 (ADR-0027), superseding the "carries no target, deliberately"
+ * rule this class's KDoc used to state — see that ADR for what was given up to allow it, and
+ * the labelling rule that replaces it: a target is always rendered as a target, never merged
+ * with what [SessionExercise] shows as history. The same exercise may appear twice, as it may
+ * in a session (US-02), and each appearance is its own row so they can be reordered, removed
+ * and targeted separately.
  */
 data class RoutineItem(
     val id: RoutineItemId,
@@ -33,4 +34,5 @@ data class RoutineItem(
     val exerciseId: ExerciseId,
     /** 1-based order within the routine. */
     val position: Int,
+    val target: MovementTarget? = null,
 )

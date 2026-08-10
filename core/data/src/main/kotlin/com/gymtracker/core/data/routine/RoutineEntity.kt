@@ -6,12 +6,15 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.gymtracker.core.data.exercise.ExerciseEntity
+import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItem
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.UserId
+import java.time.Instant
 
 /**
  * The `routines` table from `data-model.md` (US-29, ADR-0020).
@@ -37,8 +40,9 @@ data class RoutineEntity(
 /**
  * The `routine_items` table.
  *
- * There is no weight, rep or set column, and that is the ADR-0020 decision expressed in the
- * schema: with nowhere to store a target, no screen can grow one by accident.
+ * `target_sets`, `target_reps` and `target_weight_kg` arrived at v8 (US-30, ADR-0027),
+ * superseding ADR-0020's "nowhere to store a target" — each is independently nullable, so a
+ * movement can have all, some, or none of the three set.
  */
 @Entity(
     tableName = "routine_items",
@@ -64,6 +68,9 @@ data class RoutineItemEntity(
     @ColumnInfo(name = "position") val position: Int,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "sync_state") val syncState: String,
+    @ColumnInfo(name = "target_sets") val targetSets: Int? = null,
+    @ColumnInfo(name = "target_reps") val targetReps: Int? = null,
+    @ColumnInfo(name = "target_weight_kg") val targetWeightKg: Double? = null,
 )
 
 internal fun RoutineEntity.toDomain(): Routine =
@@ -80,4 +87,35 @@ internal fun RoutineItemEntity.toDomain(): RoutineItem =
         routineId = RoutineId(routineId),
         exerciseId = ExerciseId(exerciseId),
         position = position,
+        target = toTarget(),
     )
+
+/**
+ * Used by both `addItem` and `updateItem` (US-30): the same row shape whether it is being
+ * inserted for the first time or written back after [SetRoutineItemTarget][com.gymtracker.core
+ * .domain.routine.SetRoutineItemTarget] changed its target.
+ */
+internal fun RoutineItem.toEntity(updatedAt: Long = Instant.now().toEpochMilli()): RoutineItemEntity =
+    RoutineItemEntity(
+        id = id.value,
+        routineId = routineId.value,
+        exerciseId = exerciseId.value,
+        position = position,
+        updatedAt = updatedAt,
+        syncState = SYNC_STATE_PENDING,
+        targetSets = target?.sets,
+        targetReps = target?.reps,
+        targetWeightKg = target?.weightKg,
+    )
+
+/**
+ * Reconstructs a [MovementTarget], or null if every column is null — the row carries no plan,
+ * not a plan of all-nulls (US-13's absence pattern, kept even though the domain type could
+ * technically represent both).
+ */
+internal fun RoutineItemEntity.toTarget(): MovementTarget? =
+    if (targetSets == null && targetReps == null && targetWeightKg == null) {
+        null
+    } else {
+        MovementTarget(sets = targetSets, reps = targetReps, weightKg = targetWeightKg)
+    }

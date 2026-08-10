@@ -1,6 +1,7 @@
 package com.gymtracker.core.domain.routine
 
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -150,6 +151,36 @@ class StartSessionFromRoutineTest {
                 items.itemsOf(routine).map { it.exerciseId },
                 "Tuesday is unchanged by what happened on Tuesday",
             )
+        }
+
+    @Test
+    fun `a movement's target is copied into the session alongside it`() =
+        runTest {
+            val routine = createRoutine(alice, "Upper A").id
+            val benchItem = addToRoutine(routine, bench)
+            val target = MovementTarget(sets = 3, reps = 8, weightKg = 47.6)
+            items.updateItem(benchItem.copy(target = target))
+            addToRoutine(routine, squat)
+
+            val started = startFromRoutine(routine, alice) as StartSessionResult.Started
+
+            val copied = sessionExercises.forSession(started.session.id)
+            assertEquals(target, copied.first { it.exerciseId == bench }.target)
+            assertNull(copied.first { it.exerciseId == squat }.target, "squat had no target to copy")
+        }
+
+    @Test
+    fun `editing the routine's target afterwards does not edit the copy in the session`() =
+        runTest {
+            val routine = createRoutine(alice, "Upper A").id
+            val benchItem = addToRoutine(routine, bench)
+            items.updateItem(benchItem.copy(target = MovementTarget(3, 8, 47.6)))
+
+            val started = startFromRoutine(routine, alice) as StartSessionResult.Started
+            items.updateItem(items.itemsOf(routine).single().copy(target = MovementTarget(4, 6, 60.0)))
+
+            val copied = sessionExercises.forSession(started.session.id).single()
+            assertEquals(MovementTarget(3, 8, 47.6), copied.target, "the session keeps its own snapshot")
         }
 
     @Test

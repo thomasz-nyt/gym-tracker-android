@@ -12,6 +12,8 @@ import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
+import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -214,6 +216,51 @@ class SessionExerciseTest {
     fun `finding an exercise that is not there returns null`() =
         runTest {
             assertEquals(null, sessionExercises.find(SessionExerciseId("never-existed")))
+        }
+
+    @Test
+    fun `a copied target round-trips through Room`() =
+        runTest {
+            // US-30 (ADR-0027): StartSessionFromRoutine writes the target when it copies the
+            // movement in; this asserts Room actually keeps what was written.
+            val session = startSession("s1")
+            val target = MovementTarget(sets = 3, reps = 8, weightKg = 47.6)
+
+            sessionExercises.add(
+                SessionExercise(
+                    id = SessionExerciseId("se1"),
+                    sessionId = session,
+                    exerciseId = ExerciseId("bench"),
+                    position = 1,
+                    target = target,
+                ),
+            )
+
+            assertEquals(
+                target,
+                sessionExercises
+                    .observeForSession(session)
+                    .first()
+                    .single()
+                    .target,
+            )
+        }
+
+    @Test
+    fun `an exercise added without a target round-trips as null`() =
+        runTest {
+            val session = startSession("s1")
+
+            addExercise()(session, ExerciseId("bench"))
+
+            assertEquals(
+                null,
+                sessionExercises
+                    .observeForSession(session)
+                    .first()
+                    .single()
+                    .target,
+            )
         }
 
     @Test

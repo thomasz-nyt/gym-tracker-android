@@ -102,6 +102,7 @@ object DataModule {
                 GymTrackerDatabase.MIGRATION_4_5,
                 GymTrackerDatabase.MIGRATION_5_6,
                 GymTrackerDatabase.MIGRATION_6_7,
+                GymTrackerDatabase.MIGRATION_7_8,
             ).build()
 
     @Provides

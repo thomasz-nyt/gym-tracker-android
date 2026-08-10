@@ -32,7 +32,7 @@ import com.gymtracker.core.data.set.SetEntity
         RoutineEntity::class,
         RoutineItemEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -60,6 +60,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V5_STARTER_EXERCISES = 5
         private const val V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT = 6
         private const val V7_ROUTINES = 7
+        private const val V8_TARGETS = 8
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -243,6 +244,27 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                         "CREATE INDEX IF NOT EXISTS `index_routine_items_exercise_id` " +
                             "ON `routine_items` (`exercise_id`)",
                     )
+                }
+            }
+
+        /**
+         * Adds a target to `routine_items` and `session_exercises` (US-30, ADR-0027).
+         *
+         * Three nullable columns on each — `sessions` and `sets` are explicitly untouched,
+         * which is the ADR's central bargain: a target is a snapshot copied at
+         * `StartSessionFromRoutine` time, never a live pointer back to the routine, so a device
+         * upgrading mid-workout keeps every row it already had, with no target on any of them
+         * until one is set.
+         */
+        val MIGRATION_7_8 =
+            object : Migration(V7_ROUTINES, V8_TARGETS) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_sets` INTEGER")
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_reps` INTEGER")
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_weight_kg` REAL")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_sets` INTEGER")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_reps` INTEGER")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_weight_kg` REAL")
                 }
             }
     }
