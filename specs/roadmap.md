@@ -216,17 +216,23 @@ missing string: nothing recorded *which* routine a session came from, so nothing
 say so.
 
 - [x] ADR-0028 and US-32 written, and `data-model.md` updated, **before** any code
-- [ ] Migration v8 → v9: `sessions.routine_name` and `sessions.routine_id`, both nullable.
+- [x] Migration v8 → v9: `sessions.routine_name` and `sessions.routine_id`, both nullable.
       Additive; `sets`, `session_exercises` and `routine_items` untouched — this migration
-      is scoped to exactly what ADR-0028 claims and nothing US-30 already added
-- [ ] `WorkoutSession` carries a `RoutineOrigin?`; `StartSessionFromRoutine` writes it once,
-      at start, and nothing reads it back through a repository
+      is scoped to exactly what ADR-0028 claims and nothing US-30 already added.
+      Closed 2026-08-10
+- [x] `WorkoutSession` carries a `RoutineOrigin?`; `StartSessionFromRoutine` writes it once,
+      at start, and nothing reads it back through a repository. Closed 2026-08-10
 - [ ] History and the finish summary lead with the routine's name, falling back to
-      `Freestyle`
-- [ ] The four enforcement mechanisms ADR-0028 names are tests, not comments: the id's type,
+      `Freestyle`. **Not built** — the schema and domain are ready; wiring the two screens
+      is its own PR
+- [x] The four enforcement mechanisms ADR-0028 names are tests, not comments: the id's type,
       the structural test replacing `StartSessionFromRoutineTest`'s current tripwire, a
-      DAO/schema test that no query or foreign key joins `sessions` to `routines`, and
-      confirmation that nothing in US-30's target pipeline changed
+      schema test that `sessions` has no foreign key to `routines` (its intended DAO-level
+      form — reflecting over `@Query` annotations — turned out to be unworkable:
+      `androidx.room.Query`'s retention is `CLASS`, not `RUNTIME`, confirmed against the
+      compiled `room-common` jar, so the check reads the CREATE TABLE SQL Room actually built
+      instead), and confirmation that nothing in US-30's target pipeline changed. Closed
+      2026-08-10
 
 **Exit:** a session started from a routine shows that routine's name in History and the
 finish summary, a session started without one shows `Freestyle`, and renaming or deleting a
