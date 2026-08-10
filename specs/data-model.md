@@ -55,6 +55,7 @@ data class WorkoutSession(
     val startedAt: Instant,
     val endedAt: Instant?,
     val metrics: SessionMetrics?, // null unless a health source provided them
+    val routine: RoutineOrigin?,  // schema v9, US-32, ADR-0028 — see the note below the Room schema
 )
 
 /** All fields nullable. Absence is a first-class state, never zero. */
@@ -65,12 +66,36 @@ data class SessionMetrics(
     val source: String?,          // "health_connect" | "healthkit"
 )
 
+/**
+ * A session's routine, written once at start and never read back through a repository
+ * (US-32, ADR-0028). [id] is a bare `String`, deliberately not [RoutineId]: resolving it back
+ * to a routine — `routines.find(RoutineId(id))` — takes a deliberate, greppable wrap that
+ * isn't there today, which is most of what keeps this provenance rather than a live pointer.
+ */
+data class RoutineOrigin(
+    val id: String,
+    val name: String,
+)
+
+/**
+ * Sets, reps and load for one movement (US-30, ADR-0027) — a [RoutineItem]'s plan for it, or
+ * the snapshot a [SessionExercise] copied when the session started. Each field independently
+ * nullable. Never written to `sets`, and never read by anything that computes a derived
+ * number — volume, the trend, Epley and personal records all read `sets` alone.
+ */
+data class MovementTarget(
+    val sets: Int?,
+    val reps: Int?,
+    val weightKg: Double?,
+)
+
 /** An exercise as it appears in one session. The same exercise may appear twice. */
 data class SessionExercise(
     val id: SessionExerciseId,
     val sessionId: SessionId,
     val exerciseId: ExerciseId,
     val position: Int,            // 1-based order within the session
+    val target: MovementTarget?,  // schema v8, US-30, ADR-0027 — copied from RoutineItem at start
 )
 
 data class ExerciseSet(
@@ -106,6 +131,7 @@ data class RoutineItem(
     val routineId: RoutineId,
     val exerciseId: ExerciseId,
     val position: Int,            // 1-based order within the routine
+    val target: MovementTarget?,  // schema v8, US-30, ADR-0027
 )
 ```
 
@@ -135,7 +161,8 @@ exercises(id PK, name, aliases_json, primary_json, secondary_json, equipment,
 
 sessions(id PK, user_id, gym_name, started_at, ended_at,
          avg_hr, max_hr, active_kcal, metrics_source,
-         updated_at, sync_state)
+         updated_at, sync_state,
+         routine_name NULL, routine_id NULL)
 
 session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
                   exercise_id FK→exercises, position,
@@ -160,8 +187,9 @@ sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
 `routines` and `routine_items` are **additive** (schema v7, US-29): `sessions`, `sets` and
 `session_exercises` are untouched by them. Starting a routine copies its items into
 `session_exercises`, after which the session is an ordinary session and every M1 story keeps
-working on it unchanged. Nothing links a session back to the routine it came from — editing
-today never edits Tuesday.
+working on it unchanged. As of schema v9 (see the routine-provenance note below), a session
+carries a copy of the routine's name and id — but still no foreign key, and no query joins
+`sessions` back to `routines`. Editing today never edits Tuesday.
 
 **Targets (schema v8, US-30, ADR-0027).** The three nullable `target_*` columns above are new,
 and `session_exercises` gains the same three, which `StartSessionFromRoutine` fills in as it
@@ -179,6 +207,18 @@ labelling rule and its tests rather than a missing column.
 happened; the target lives on the *appearance* of the exercise. Every derived number — volume
 (US-17), the trend (US-16), Epley, personal records (US-18) — reads `sets` alone, so a planned
 load that was never lifted can never become a record.
+
+**Routine provenance (schema v9, US-32, ADR-0028).** `sessions.routine_name` and
+`sessions.routine_id` are new, both written once by `StartSessionFromRoutine` and never
+updated afterward. `routine_name` is what History and the finish summary render — "Upper A ·
+Tue 4 Aug" instead of a bare date — and it stays what it says even if the routine is later
+renamed or deleted, the same snapshot rule ADR-0027's targets follow. `routine_id` is written
+at the same moment but **read by nothing yet**: no query joins `sessions` to `routines`, and
+no screen resolves a display value through it. It exists so a later story (a per-routine
+"done N times" count, "last run of this routine" in the finish summary) does not have to
+leave a permanent gap for every session logged before that story lands — the column cannot be
+backfilled once the fact is gone. Both columns are nullable; a session not started from a
+routine carries neither, and renders as "Freestyle."
 
 Index: `routine_items(routine_id, position)` for reading a routine in order, and
 `routines(user_id, position)` for the member's list.

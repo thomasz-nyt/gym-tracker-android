@@ -303,6 +303,13 @@ target, which is a much smaller thing to get right than a general prescription m
 **Superseded on 2026-08-09 by US-30.** It turned out to matter. The bullet above saying
 "there is no target to edit" is no longer true; every other bullet still is.
 
+**Amended on 2026-08-09 by US-32.** "Starting a routine creates a session… From that
+moment it is an ordinary session" is no longer the whole story: the session now carries
+the routine's name and id as dead provenance, written once at start. It is still true that
+editing the session never edits the routine, and the session is still ordinary in every
+other respect — nothing reads the provenance back into the workout while it is in
+progress. See `adr/0028-a-session-remembers-its-routine.md`.
+
 ### US-30 — Targets in a routine
 See `adr/0027-routines-store-targets.md`, which supersedes ADR-0020 on this point and
 only this point. The maintainer was offered the narrower single-next-session target the
@@ -330,6 +337,27 @@ plan they wanted.
   never become a PR.
 - The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited**. A prefill
   is a prefill whatever its source.
+
+### US-32 — A session remembers the routine it was started from
+See `adr/0028-a-session-remembers-its-routine.md`. History reads "Sun 9 Aug, 13:53" today;
+a session started from a routine has no way to say "Upper A" instead. This gives it one,
+without reopening the join ADR-0020 and ADR-0027 both declined.
+
+- Starting a routine records the routine's **name** on the session, copied once at start.
+- History and the finish summary lead with the routine's name — `Upper A · Tue 4 Aug` —
+  falling back to `Freestyle` when the session was not started from a routine.
+- Renaming or deleting the routine afterwards does not change what an already-started
+  session says it was called. The name is a copy, made once, the same way US-30's targets
+  are.
+- A session also carries the routine's **id**, written at the same moment as the name, but
+  **read by nothing yet.** No screen resolves it, no query joins on it, and no derived
+  number depends on it existing. It exists so that a future story (a "done N times" count,
+  a "last run of this routine" comparison) does not have to leave a gap for every session
+  logged before that story is written — the id cannot be added retroactively, because
+  there is nothing to reconstruct it from.
+- Sessions logged before this shipped show `Freestyle`, honestly: there is no routine to
+  recover, so the absence is shown as an absence (US-13's pattern), not guessed at.
+- The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited**.
 
 ---
 

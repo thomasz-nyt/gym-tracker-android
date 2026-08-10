@@ -208,6 +208,30 @@ ADR-0027 rather than managed by sequencing.
 no volume figure and no personal record has moved as a result. `TwoTapSetLoggingTest` passes
 **unedited** — ADR-0017 and ADR-0020 both name that as the signal this went wrong.
 
+### US-32 — A session remembers the routine it was started from
+
+Story: US-32. See `adr/0028-a-session-remembers-its-routine.md`. Added 2026-08-09, the same
+day as M3b, once History's "Sun 9 Aug, 13:53" turned out to be a real gap and not just a
+missing string: nothing recorded *which* routine a session came from, so nothing could ever
+say so.
+
+- [x] ADR-0028 and US-32 written, and `data-model.md` updated, **before** any code
+- [ ] Migration v8 → v9: `sessions.routine_name` and `sessions.routine_id`, both nullable.
+      Additive; `sets`, `session_exercises` and `routine_items` untouched — this migration
+      is scoped to exactly what ADR-0028 claims and nothing US-30 already added
+- [ ] `WorkoutSession` carries a `RoutineOrigin?`; `StartSessionFromRoutine` writes it once,
+      at start, and nothing reads it back through a repository
+- [ ] History and the finish summary lead with the routine's name, falling back to
+      `Freestyle`
+- [ ] The four enforcement mechanisms ADR-0028 names are tests, not comments: the id's type,
+      the structural test replacing `StartSessionFromRoutineTest`'s current tripwire, a
+      DAO/schema test that no query or foreign key joins `sessions` to `routines`, and
+      confirmation that nothing in US-30's target pipeline changed
+
+**Exit:** a session started from a routine shows that routine's name in History and the
+finish summary, a session started without one shows `Freestyle`, and renaming or deleting a
+routine afterward changes neither. `TwoTapSetLoggingTest` passes **unedited**.
+
 ---
 
 ## M4 — Progress and charts
@@ -229,9 +253,11 @@ because it is the first place US-18's records are shown anywhere in the app.
 - [x] Empty and sparse-data states designed, not accidental (US-19)
 - [ ] Time range selector. Split from the line above, which it had been sharing: the states are
       done and the selector is not, so one checkbox could not tell the truth about both
-- [ ] Finish as a summary, not a confirm dialog (US-31). The confirm dialog itself is
+- [x] Finish as a summary, not a confirm dialog (US-31). The confirm dialog itself is
       unchanged — only what happens after confirming, which is where the summary and any
-      records set that session are shown
+      records set that session are shown. Shipped in `87e975c` (PR #35); this box was left
+      unchecked in that commit, against `CLAUDE.md`'s own definition of done. Ticked here
+      2026-08-09 rather than silently, since the gap sat on `main` for a while
 
 **US-18 was answered on 2026-08-09** after three sessions deferred it — see ADR-0025. A record
 is the heaviest load ever lifted **at a given rep count**, so every record is a set that
