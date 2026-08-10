@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
@@ -162,13 +163,28 @@ private fun WorkoutList(
                         .sizeIn(minHeight = GymDimens.MinTouchTarget)
                         .clickable { onOpen(summary.session.id) },
                 headlineContent = {
+                    // US-32 (ADR-0028): the routine this session was started from leads the
+                    // row, falling back to "Freestyle" for an ordinary "Start workout". Never
+                    // resolved through routine_id — this reads the name copied onto the
+                    // session at start, so a rename or delete afterward cannot change it.
                     Text(
-                        text = summary.session.startedAt.asWorkoutDate(),
+                        text = summary.session.routine?.name ?: "Freestyle",
                         style = MaterialTheme.typography.titleMedium,
                     )
                 },
                 supportingContent = {
-                    Text(summary.describe(unit), style = MaterialTheme.typography.bodyMedium)
+                    Column {
+                        Text(
+                            text = summary.session.startedAt.asWorkoutDate(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = summary.describe(unit),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
                 trailingContent = {
                     // ADR-0019 replaced ADR-0016's "red means destructive" with a structural
@@ -261,17 +277,33 @@ private fun HistoryPreview() {
                             SessionSummary(
                                 session =
                                     WorkoutSession(
-                                        id = SessionId("preview"),
+                                        id = SessionId("preview-routine"),
                                         userId = UserId("preview"),
                                         gymName = null,
                                         startedAt = started,
                                         endedAt = started.plus(Duration.ofMinutes(72)),
                                         metrics = null,
+                                        routine = RoutineOrigin(id = "r1", name = "Upper A"),
                                     ),
                                 exerciseCount = 5,
                                 setCount = 18,
                                 volumeKg = 4120.0,
                                 bodyweightSetCount = 3,
+                            ),
+                            SessionSummary(
+                                session =
+                                    WorkoutSession(
+                                        id = SessionId("preview-freestyle"),
+                                        userId = UserId("preview"),
+                                        gymName = null,
+                                        startedAt = started.minus(Duration.ofDays(1)),
+                                        endedAt = started.minus(Duration.ofDays(1)).plus(Duration.ofMinutes(40)),
+                                        metrics = null,
+                                    ),
+                                exerciseCount = 3,
+                                setCount = 9,
+                                volumeKg = 1980.0,
+                                bodyweightSetCount = 0,
                             ),
                         ),
                     canUndo = true,

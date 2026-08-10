@@ -222,9 +222,15 @@ say so.
       Closed 2026-08-10
 - [x] `WorkoutSession` carries a `RoutineOrigin?`; `StartSessionFromRoutine` writes it once,
       at start, and nothing reads it back through a repository. Closed 2026-08-10
-- [ ] History and the finish summary lead with the routine's name, falling back to
-      `Freestyle`. **Not built** — the schema and domain are ready; wiring the two screens
-      is its own PR
+- [x] History and the finish summary lead with the routine's name, falling back to
+      `Freestyle`. Closed 2026-08-10, verified live on device: created a routine, started it,
+      logged a set, finished, and confirmed both the finish summary and the History row show
+      the routine's name — not the bare date the audit's finding 01 complained about. Also
+      fixed `SessionSummary.exerciseCount`, which counted every appearance a routine copied
+      in whether or not it was ever touched — a routine-started session could read "3
+      exercises" for one actually performed. It now counts only appearances with at least one
+      set, and `HistoryScreen`'s and `FinishSummaryScreen`'s bodyweight-count segments, which
+      had drifted apart, were brought back in sync
 - [x] The four enforcement mechanisms ADR-0028 names are tests, not comments: the id's type,
       the structural test replacing `StartSessionFromRoutineTest`'s current tripwire, a
       schema test that `sessions` has no foreign key to `routines` (its intended DAO-level

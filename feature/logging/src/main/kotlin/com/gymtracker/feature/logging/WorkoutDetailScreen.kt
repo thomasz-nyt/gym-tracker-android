@@ -177,6 +177,12 @@ private fun WorkoutHeader(
                     append("${summary.exerciseCount} ${"exercise".orPlural(summary.exerciseCount)}")
                     append("  ·  ${summary.setCount} ${"set".orPlural(summary.setCount)}")
                     WeightFormatter.formatVolume(summary.volumeKg, unit)?.let { append("  ·  $it") }
+                    // Matches HistoryScreen's describe(), which this duplicates on purpose
+                    // (see this file's own doc comment on why) — the two had drifted apart
+                    // on exactly this segment before US-32.
+                    if (summary.bodyweightSetCount > 0) {
+                        append("  ·  ${summary.bodyweightSetCount} bodyweight")
+                    }
                 },
             style = MaterialTheme.typography.bodyMedium,
         )
