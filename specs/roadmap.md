@@ -276,6 +276,24 @@ is the heaviest load ever lifted **at a given rep count**, so every record is a 
 actually happened and a 100x8 sets one without having to beat a 105x1. The estimated-1RM
 reading was rejected: it would announce a record for a weight nobody has lifted.
 
+### US-33 — Progress replaces History
+
+Added 2026-08-10. See `user-stories.md`'s US-33 for the full story, including the deliberate
+call to rename ahead of the range selector below.
+
+- [x] Tab and screen title renamed History → Progress; "Past workouts" demoted to a section
+      heading above the unchanged session list. Closed 2026-08-10
+- [x] Top section: est. 1RM + 8-week delta for the exercise most recently actually trained
+      (`MostRecentlyTrainedExercise`, new — an appearance a routine copied in but never
+      performed is skipped in favour of one that was). No lift switcher; tapping opens the
+      existing per-exercise trend screen (US-16) unchanged. Closed 2026-08-10
+- [x] "Weekly volume by muscle" restyled as a labelled row in the top section, replacing the
+      bare `TextButton`; same destination. Closed 2026-08-10
+- [ ] **Deferred, not built:** a "PR" badge on session rows. `PersonalRecordsAchievedIn` reads
+      the member's entire session history per row it is asked about — fine for
+      `FinishSummaryScreen`'s one row, not for every visible row of a 200-session list. Needs
+      a purpose-built O(sets) read, not a call to the existing use case per row
+
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.
 

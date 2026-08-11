@@ -427,6 +427,53 @@ now that its detection logic exists.
   and a standing per-exercise list of records with dates, are both still unbuilt. This
   is a third, additional place a record is shown, not a replacement for either.
 
+### US-33 — Progress replaces History
+Added 2026-08-10, from the `Redesign.dc.html` audit's section 5. History was already a
+finished list (US-06); this gives the same screen a reason to open it beyond "what did I
+do" — "am I getting stronger" — and renames the tab to say so.
+
+`GymTrackerNavHost.kt`'s own comment on the `WeeklyVolume` destination named the trigger
+for this rename in advance: "the tab becomes Progress and gains its charts when M4
+lands," gated on PR detection (US-18) and a time range selector. US-18 shipped
+2026-08-09 (ADR-0025); the range selector has not, and remains its own unchecked item in
+`roadmap.md`. The maintainer chose to rename now rather than wait for it — this section
+records that as a deliberate call, not an oversight.
+
+- The tab's label changes from **History** to **Progress**, in the bottom bar and as the
+  screen's own title. What was the screen's title, "Past workouts," becomes a section
+  heading above the session list rather than disappearing — the list itself, its
+  ordering, and US-06a's delete-and-undo are all unchanged.
+- Above that list, a new top section leads with **one lift's estimated 1RM**: the
+  current estimate, and the change over the last 8 weeks, using US-16's existing Epley
+  estimate and `ExerciseTrendOf`. No new estimation rule is invented.
+- **The lift is chosen without asking**, at open time: the exercise most recently
+  actually trained, meaning the first appearance (by position) in the newest finished
+  session that has at least one set logged against it. An appearance a routine copied in
+  but the member never reached (US-29) is skipped in favour of one that was performed.
+  If the newest session has nothing performed in it at all, the section says so (US-19)
+  rather than reaching back through older sessions for something to show — the section
+  answers "since you last trained," not "the last time you trained something."
+- **There is no lift switcher on this tab in this pass.** Tapping the section opens the
+  same per-exercise trend screen US-16 already has, for that same exercise, with its
+  existing series toggle and chart. Featuring a *different* lift here is reached the way
+  it always has been — Exercises → an exercise's detail → "See progress" — not a new
+  control on Progress. Revisit if that turns out to matter enough to ask for.
+- **"Weekly volume by muscle" (US-17) becomes a labelled row in this section**, styled
+  as a row rather than a bare link, in place of the `TextButton` History carried. The
+  destination it opens is unchanged.
+- **A "PR" badge on session rows is explicitly deferred, not built here.** The audit
+  asked for one on rows containing a personal record. The only existing way to ask "did
+  this session set a record" is `PersonalRecordsAchievedIn`, which was built for
+  `FinishSummaryScreen` — one session, evaluated once, right after it happened — and
+  reads the member's *entire* session history to answer that for even one row: for
+  a badge on every visible row of a 200-session list, that is O(rows × total history),
+  not O(rows). Doing this honestly needs a purpose-built read — e.g., one pass over
+  every set in time order, per (exercise, reps), marking the session that first reached
+  each new maximum — which is a real algorithm with its own correctness questions ADR-0025
+  had to answer once already, not a one-line addition to this story.
+- The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited** — nothing
+  here touches the session screen.
+
 ---
 
 ## M5 — Health Connect (optional)

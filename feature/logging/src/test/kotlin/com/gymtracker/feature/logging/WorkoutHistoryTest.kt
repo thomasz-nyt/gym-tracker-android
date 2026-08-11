@@ -9,6 +9,8 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.progress.DetectPersonalRecord
+import com.gymtracker.core.domain.progress.ExerciseTrendOf
+import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
@@ -134,6 +136,9 @@ class WorkoutHistoryTest {
             deleteSet = DeleteSet(sets),
             restoreSet = RestoreSet(sets),
             unitPreference = units,
+            mostRecentlyTrainedExercise = MostRecentlyTrainedExercise(repository, sessionExercises, sets),
+            exerciseTrendOf = ExerciseTrendOf(repository, sessionExercises, sets, ZoneOffset.UTC),
+            catalog = catalog,
         )
 
     /** [ActiveSessionViewModel]: still drives the session itself, including finishing it. */
@@ -334,6 +339,50 @@ class WorkoutHistoryTest {
             sets.add(ExerciseSet("seed-$index", appearance.id, index + 1, weight, 10, null, now))
         }
     }
+
+    // ---- US-33: the Progress tab's top section ----------------------------------------------
+
+    @Test
+    fun `the top section leads with the most recently trained exercise`() =
+        runTest {
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0))
+            val viewModel = historyViewModel(repository)
+
+            viewModel.open()
+
+            viewModel.uiState.test {
+                val lift = expectMostRecentItem().topLift as TopLift.Lift
+                assertEquals(ExerciseId("bench"), lift.exerciseId)
+                assertEquals("Bench Press", lift.exerciseName)
+            }
+        }
+
+    @Test
+    fun `with nothing ever logged the top section says so rather than showing a lift`() =
+        runTest {
+            val repository = sessionsOf()
+            val viewModel = historyViewModel(repository)
+
+            viewModel.open()
+
+            viewModel.uiState.test {
+                assertEquals(TopLift.None, expectMostRecentItem().topLift)
+            }
+        }
+
+    @Test
+    fun `nothing is read for the top section until history is actually opened`() =
+        runTest {
+            // The same "side trip should not pay for itself" rule the list already follows.
+            val repository = sessionsOf(finished("last-week", now.minus(Duration.ofDays(7))))
+            seedWorkout(SessionId("last-week"), weights = listOf(60.0))
+            val viewModel = historyViewModel(repository)
+
+            viewModel.uiState.test {
+                assertEquals(TopLift.None, expectMostRecentItem().topLift)
+            }
+        }
 
     // ---- US-06: finishing a workout, and history -------------------------------------------
 

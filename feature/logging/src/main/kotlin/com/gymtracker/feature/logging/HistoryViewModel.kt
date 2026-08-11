@@ -2,10 +2,13 @@ package com.gymtracker.feature.logging
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.progress.ExerciseTrendOf
+import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.RestoreSession
@@ -38,6 +41,8 @@ data class HistoryUiState(
     val setEdit: SetEdit? = null,
     /** Whether the past set just deleted can still be put back. */
     val canUndoSetDelete: Boolean = false,
+    /** The Progress tab's top section (US-33). */
+    val topLift: TopLift = TopLift.None,
 )
 
 /**
@@ -69,6 +74,9 @@ class HistoryViewModel
         updateSet: UpdateSet,
         deleteSet: DeleteSet,
         restoreSet: RestoreSet,
+        mostRecentlyTrainedExercise: MostRecentlyTrainedExercise,
+        exerciseTrendOf: ExerciseTrendOf,
+        catalog: ExerciseCatalog,
         private val unitPreference: UnitPreference,
     ) : ViewModel() {
         /** History and deleting from it; unchanged from when `ActiveSessionViewModel` owned it. */
@@ -76,9 +84,9 @@ class HistoryViewModel
             HistoryController(
                 history = sessionHistory,
                 workoutDetail = workoutDetail,
-                deleteSession = deleteSession,
-                restoreSession = restoreSession,
+                sessionDeletion = SessionDeletion(deleteSession, restoreSession),
                 currentMember = currentMember,
+                topLiftLoader = TopLiftLoader(mostRecentlyTrainedExercise, exerciseTrendOf, catalog),
                 scope = viewModelScope,
             )
 
@@ -107,6 +115,7 @@ class HistoryViewModel
                     unit = unit,
                     setEdit = edit,
                     canUndoSetDelete = canUndoSetDelete,
+                    topLift = historyState.topLift,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), HistoryUiState())
 

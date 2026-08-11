@@ -74,28 +74,32 @@ internal data class RoutineEditor(
     val routineId: String,
 )
 
-/** One exercise's progress over time (US-16). A drill-down from its detail screen. */
+/**
+ * One exercise's progress over time (US-16). A drill-down from its detail screen, and (US-33)
+ * from Progress's top section — the same destination and the same exercise either way.
+ */
 @Serializable
 internal data class ExerciseProgress(
     val exerciseId: String,
 )
 
 /**
- * Weekly volume by muscle (US-17). A drill-down from History.
+ * Weekly volume by muscle (US-17). A drill-down from Progress (née History).
  *
- * ADR-0024 says the History tab "becomes Progress and gains its charts when M4 lands". M4 has
- * not landed — PR detection (US-18) is still blocked on the maintainer, and the range selector
- * is unbuilt — so the tab keeps its honest name for now and this hangs off it. Renaming it is
- * the last thing M4 does, not the first.
+ * ADR-0024 originally said the History tab "becomes Progress and gains its charts when M4
+ * lands," gated on PR detection (US-18) and a time range selector. US-18 shipped 2026-08-09;
+ * the selector has not (see `roadmap.md`'s M4 section) — the maintainer chose to rename ahead
+ * of it anyway (US-33), rather than wait for the whole milestone. That is recorded there as a
+ * deliberate call, not a contradiction of this comment's original condition.
  *
- * A destination of its own rather than a panel inside the history screen, for the reason
+ * A destination of its own rather than a panel inside the Progress screen, for the reason
  * `ExerciseProgress` is one: `:feature:logging` would otherwise have to depend on
  * `:feature:progress`.
  */
 @Serializable
 internal object WeeklyVolume
 
-/** Past workouts (US-06, ADR-0024). */
+/** Past workouts, with a reason to open them beyond "what did I do" (US-06, US-33, ADR-0024). */
 @Serializable
 internal object History
 
@@ -119,7 +123,7 @@ private enum class TopLevelDestination(
     TRAIN(Logging, "Train"),
     ROUTINES(Routines, "Routines"),
     EXERCISES(Browse(pickForSession = false), "Exercises"),
-    HISTORY(History, "History"),
+    HISTORY(History, "Progress"),
 }
 
 /**
@@ -230,6 +234,7 @@ private fun GymTrackerNavGraph(
             HistoryRoute(
                 onOpenWorkout = { id -> navController.navigate(WorkoutDetail(id.value)) },
                 onSeeWeeklyVolume = { navController.navigate(WeeklyVolume) },
+                onSeeExerciseProgress = { id -> navController.navigate(ExerciseProgress(id.value)) },
             )
         }
 

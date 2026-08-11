@@ -1,7 +1,10 @@
 package com.gymtracker.feature.logging
 
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.progress.EightWeekChange
+import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.DeletedSession
 import com.gymtracker.core.domain.session.RestoreSession
@@ -22,7 +25,39 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-/** The history screen's slice of [SessionUiState] (US-06, US-06a, US-06b). */
+/**
+ * US-33's top section: one lift, chosen without asking — see [MostRecentlyTrainedExercise].
+ *
+ * [None] covers every honest reason there is nothing to feature (US-19): nothing ever logged,
+ * the newest session had nothing actually performed in it, or that exercise's one recorded day
+ * was entirely bodyweight and left no estimate to show.
+ */
+sealed interface TopLift {
+    data object None : TopLift
+
+    data class Lift(
+        val exerciseId: ExerciseId,
+        val exerciseName: String,
+        val estimatedOneRepMaxKg: Double,
+        /** Null when history does not reach back 8 weeks — see [EightWeekChange.deltaKg]. */
+        val deltaKg: Double?,
+    ) : TopLift
+}
+
+/**
+ * Deleting a past workout and putting it back (US-06a), bundled so [HistoryController]'s
+ * constructor names one collaborator for the pair instead of two.
+ */
+class SessionDeletion(
+    private val deleteSession: DeleteSession,
+    private val restoreSession: RestoreSession,
+) {
+    suspend fun delete(id: SessionId): DeletedSession? = deleteSession(id)
+
+    suspend fun restore(deleted: DeletedSession) = restoreSession(deleted)
+}
+
+/** The history screen's slice of [SessionUiState] (US-06, US-06a, US-06b, US-33). */
 data class HistoryState(
     val isOpen: Boolean = false,
     /** Finished workouts, newest first. The session in progress is never among them. */
@@ -31,6 +66,7 @@ data class HistoryState(
     val canUndo: Boolean = false,
     /** The workout opened from the list, or null while the list itself is on screen (US-06b). */
     val detail: SessionDetail? = null,
+    val topLift: TopLift = TopLift.None,
 )
 
 /**
@@ -47,9 +83,9 @@ data class HistoryState(
 class HistoryController(
     private val history: SessionHistory,
     private val workoutDetail: WorkoutDetail,
-    private val deleteSession: DeleteSession,
-    private val restoreSession: RestoreSession,
+    private val sessionDeletion: SessionDeletion,
     private val currentMember: CurrentMember,
+    private val topLiftLoader: TopLiftLoader,
     private val scope: CoroutineScope,
 ) {
     private val open = MutableStateFlow(false)
@@ -67,6 +103,21 @@ class HistoryController(
             }
         }
 
+    /**
+     * US-33: read only when the screen opens, the same "side trip should not pay for itself"
+     * rule [entries] already follows — not re-read as the list changes underneath it, since
+     * nothing on this screen can change what was most recently trained while it is up.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val topLift: Flow<TopLift> =
+        open.flatMapLatest { isOpen ->
+            if (!isOpen) {
+                flowOf<TopLift>(TopLift.None)
+            } else {
+                flow { emit(topLiftLoader(currentMember.id())) }
+            }
+        }
+
     /** Nothing is read until a workout is actually opened; the list should not pay for it. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private val detail: Flow<SessionDetail?> =
@@ -79,12 +130,13 @@ class HistoryController(
         }
 
     val state: Flow<HistoryState> =
-        combine(open, entries, undoable, detail) { isOpen, sessions, undo, opened ->
+        combine(open, entries, undoable, detail, topLift) { isOpen, sessions, undo, opened, lift ->
             HistoryState(
                 isOpen = isOpen,
                 sessions = sessions,
                 canUndo = undo != null,
                 detail = opened,
+                topLift = lift,
             )
         }
 
@@ -117,7 +169,7 @@ class HistoryController(
      */
     fun delete(id: SessionId) {
         scope.launch {
-            val deleted = deleteSession(id) ?: return@launch
+            val deleted = sessionDeletion.delete(id) ?: return@launch
             undoable.value = deleted
             expiry?.cancel()
             expiry =
@@ -132,7 +184,7 @@ class HistoryController(
     fun undo() {
         val deleted = undoable.value ?: return
         forget()
-        scope.launch { restoreSession(deleted) }
+        scope.launch { sessionDeletion.restore(deleted) }
     }
 
     private fun forget() {

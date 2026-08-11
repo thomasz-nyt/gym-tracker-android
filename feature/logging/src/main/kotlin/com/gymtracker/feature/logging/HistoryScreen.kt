@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -42,9 +43,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 
 /**
- * Past workouts, as a destination of its own (ADR-0024, US-06).
+ * Progress, as a destination of its own (ADR-0024, US-06, US-33).
  *
  * Reads through its own [HistoryViewModel] rather than `ActiveSessionViewModel` — the split
  * ADR-0017 asked for, once history stopped being a flag on the session screen and became a
@@ -58,6 +60,7 @@ fun HistoryRoute(
     onOpenWorkout: (SessionId) -> Unit,
     modifier: Modifier = Modifier,
     onSeeWeeklyVolume: () -> Unit = {},
+    onSeeExerciseProgress: (ExerciseId) -> Unit = {},
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,21 +68,24 @@ fun HistoryRoute(
     LaunchedEffect(Unit) { viewModel.open() }
 
     HistoryScreen(
-        state = HistoryState(sessions = state.sessions, canUndo = state.canUndo),
+        state = HistoryState(sessions = state.sessions, canUndo = state.canUndo, topLift = state.topLift),
         unit = state.unit,
         onDelete = viewModel::delete,
         onUndo = viewModel::undo,
         onOpenWorkout = onOpenWorkout,
         onSeeWeeklyVolume = onSeeWeeklyVolume,
+        onSeeExerciseProgress = onSeeExerciseProgress,
         modifier = modifier,
     )
 }
 
 /**
- * Workout history (US-06), and deleting from it (US-06a).
+ * Progress (US-33): a reason to open past workouts beyond "what did I do" — the same list
+ * US-06 already built, headed by a top section answering "am I getting stronger."
  *
- * Only finished workouts are here. The session in progress is on the other screen, which is
- * what makes it impossible to delete the one you are standing in the middle of.
+ * Only finished workouts are in the list below. The session in progress is on the other
+ * screen, which is what makes it impossible to delete the one you are standing in the middle
+ * of.
  *
  * There is no "Done" here (finding 06 of the redesign audit, ADR-0024): the bottom bar and the
  * system back gesture are the way out, like every other Android screen.
@@ -93,6 +99,7 @@ internal fun HistoryScreen(
     modifier: Modifier = Modifier,
     onOpenWorkout: (SessionId) -> Unit = {},
     onSeeWeeklyVolume: () -> Unit = {},
+    onSeeExerciseProgress: (ExerciseId) -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
         Column(
@@ -104,20 +111,19 @@ internal fun HistoryScreen(
             verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         ) {
             Text(
-                text = "Past workouts",
+                text = "Progress",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(top = GymDimens.ScreenPadding),
             )
 
-            // The way to US-17's chart. A text button rather than a card: this screen's subject
-            // is the list below it, and ADR-0016 allows one primary role per screen — which on
-            // this screen is opening a workout, not leaving for a chart.
-            TextButton(
-                onClick = onSeeWeeklyVolume,
-                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-            ) {
-                Text("Weekly volume by muscle")
-            }
+            TopSection(
+                topLift = state.topLift,
+                unit = unit,
+                onSeeExerciseProgress = onSeeExerciseProgress,
+                onSeeWeeklyVolume = onSeeWeeklyVolume,
+            )
+
+            Text("Past workouts", style = MaterialTheme.typography.titleMedium)
 
             if (state.sessions.isEmpty()) {
                 Text(
@@ -143,6 +149,111 @@ internal fun HistoryScreen(
             }
         }
     }
+}
+
+/**
+ * US-33's top section: one lift's estimated 1RM, chosen without asking (see
+ * [MostRecentlyTrainedExercise][com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise]),
+ * and the way to US-17's chart — a labelled row now, not the bare [TextButton] this screen
+ * carried before (redesign audit section 5).
+ */
+@Composable
+private fun TopSection(
+    topLift: TopLift,
+    unit: WeightUnit,
+    onSeeExerciseProgress: (ExerciseId) -> Unit,
+    onSeeWeeklyVolume: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+        when (topLift) {
+            TopLift.None ->
+                // US-19: nothing performed recently enough to feature, said plainly.
+                Text(
+                    text = "Finish a few workouts and your progress shows up here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            is TopLift.Lift ->
+                TopLiftCard(
+                    lift = topLift,
+                    unit = unit,
+                    onClick = { onSeeExerciseProgress(topLift.exerciseId) },
+                )
+        }
+
+        WeeklyVolumeRow(onClick = onSeeWeeklyVolume)
+    }
+}
+
+/** "Machine Bench Press · est. 1RM", the number, and how it has moved (US-16, US-33). */
+@Composable
+private fun TopLiftCard(
+    lift: TopLift.Lift,
+    unit: WeightUnit,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
+    ) {
+        Column(
+            modifier = Modifier.padding(GymDimens.Gap),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        ) {
+            Text("${lift.exerciseName} · est. 1RM", style = MaterialTheme.typography.titleSmall)
+
+            val weight = WeightFormatter.format(lift.estimatedOneRepMaxKg, unit)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Text(weight.primary, style = MaterialTheme.typography.titleLarge)
+                weight.secondary?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            lift.deltaKg?.let { delta ->
+                Text(
+                    text = delta.asChangeOver8Weeks(unit),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A row, not a bare link (redesign audit section 5: "not floating red text"). `ListItem` isn't
+ * used here — this row carries no secondary text, and a plain clickable `Surface` avoids the
+ * empty `supportingContent` slot `ListItem` would otherwise reserve.
+ */
+@Composable
+private fun WeeklyVolumeRow(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
+    ) {
+        Text(
+            text = "Weekly volume by muscle",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(GymDimens.Gap),
+        )
+    }
+}
+
+/** "↑ 7 lb in 8 weeks", or "↓" when the estimate has come down since. */
+private fun Double.asChangeOver8Weeks(unit: WeightUnit): String {
+    val arrow = if (this >= 0) "↑" else "↓"
+    val magnitude = WeightFormatter.formatVolume(abs(this), unit).orEmpty()
+    return "$arrow $magnitude in 8 weeks"
 }
 
 /** One row per finished workout, newest first, each with the way to delete it (US-06a). */
@@ -312,7 +423,27 @@ private fun HistoryPreview() {
                             ),
                         ),
                     canUndo = true,
+                    topLift =
+                        TopLift.Lift(
+                            exerciseId = ExerciseId("bench"),
+                            exerciseName = "Machine Bench Press",
+                            estimatedOneRepMaxKg = 56.2,
+                            deltaKg = 3.2,
+                        ),
                 ),
+            unit = WeightUnit.LB,
+            onDelete = {},
+            onUndo = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun HistoryEmptyTopSectionPreview() {
+    GymTrackerTheme {
+        HistoryScreen(
+            state = HistoryState(isOpen = true, sessions = emptyList(), topLift = TopLift.None),
             unit = WeightUnit.LB,
             onDelete = {},
             onUndo = {},
