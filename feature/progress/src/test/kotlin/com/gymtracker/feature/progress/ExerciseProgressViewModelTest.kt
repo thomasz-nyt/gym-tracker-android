@@ -10,6 +10,7 @@ import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.UserId
+import com.gymtracker.core.domain.progress.ExerciseLogOf
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.session.FakeSessionRepository
@@ -72,6 +73,7 @@ class ExerciseProgressViewModelTest {
     private fun viewModel(member: UserId = TestData.PROGRESSING) =
         ExerciseProgressViewModel(
             exerciseTrendOf = ExerciseTrendOf(sessions, sessionExercises, sets, ZoneOffset.UTC),
+            exerciseLogOf = ExerciseLogOf(sessions, sessionExercises, sets, ZoneOffset.UTC),
             catalog = catalog,
             currentMember = FakeCurrentMember(member),
             unitPreference = FakeUnitPreference(),
@@ -183,6 +185,37 @@ class ExerciseProgressViewModelTest {
 
             viewModel.uiState.test {
                 assertEquals(WeightUnit.LB, expectMostRecentItem().unit)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    // ---- US-34: the log below the chart ----
+
+    @Test
+    fun `the log reaches the screen newest first`() =
+        runTest {
+            loadTwelveWeeks()
+            val viewModel = viewModel().also { it.open(TestData.BENCH) }
+
+            viewModel.uiState.test {
+                val log = expectMostRecentItem().log
+                assertEquals(12, log.size)
+                assertTrue(
+                    log.zipWithNext().all { (later, earlier) -> later.performedOn > earlier.performedOn },
+                    "newest first, the opposite direction from the chart",
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a movement never performed reaches the screen with an empty log, not just no chart`() =
+        runTest {
+            loadTwelveWeeks()
+            val viewModel = viewModel().also { it.open(neverPerformed.id) }
+
+            viewModel.uiState.test {
+                assertEquals(emptyList(), expectMostRecentItem().log)
                 cancelAndIgnoreRemainingEvents()
             }
         }

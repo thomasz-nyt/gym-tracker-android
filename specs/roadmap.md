@@ -298,10 +298,11 @@ call to rename ahead of the range selector below.
 
 Added 2026-08-11. See `user-stories.md`'s US-34 for the full story.
 
-- [ ] Session-by-session log below US-16's chart: one row per finished session with at
+- [x] Session-by-session log below US-16's chart: one row per finished session with at
       least one set for the exercise, newest first, showing the session's best set, est.
       1RM, and its individual sets (`ExerciseLogOf`, new — mirrors `ExerciseTrendOf`'s
-      three-read pattern so the two never disagree about which sessions counted)
+      three-read pattern so the two never disagree about which sessions counted).
+      Closed 2026-08-11
 - [ ] **Deferred, not built:** rows are not tappable — neither opening the source workout
       nor a "tap any set to see its exercise's log" entry point elsewhere in the app.
       Reached exactly as US-16 already is: catalog, or Progress's top section

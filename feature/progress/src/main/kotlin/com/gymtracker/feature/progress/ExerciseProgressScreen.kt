@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -26,6 +28,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.progress.ExerciseLogEntry
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendPoint
 import com.gymtracker.core.domain.units.UnitConverter
@@ -84,7 +88,12 @@ internal fun ExerciseProgressScreen(
         topBar = { DrillDownTopBar(onBack = onBack) },
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).padding(GymDimens.ScreenPadding).fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(padding)
+                    .padding(GymDimens.ScreenPadding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         ) {
             Text(state.exerciseName, style = MaterialTheme.typography.titleLarge)
@@ -103,8 +112,54 @@ internal fun ExerciseProgressScreen(
                     )
                 is ExerciseTrend.Series -> TrendChart(trend, state.series, state.unit)
             }
+
+            // US-34: absent rather than shown empty, the same rule NoData's chart follows.
+            if (state.log.isNotEmpty()) {
+                ExerciseLog(state.log, state.unit)
+            }
         }
     }
+}
+
+/**
+ * What was actually done (US-34), one row per session, newest first — the opposite reading
+ * direction from [TrendChart], which reads oldest first.
+ */
+@Composable
+private fun ExerciseLog(
+    log: List<ExerciseLogEntry>,
+    unit: WeightUnit,
+) {
+    Text("Log", style = MaterialTheme.typography.titleMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+        log.forEach { entry -> LogEntryRow(entry, unit) }
+    }
+}
+
+/** One session's date, best set / estimate, and its individual sets. */
+@Composable
+private fun LogEntryRow(
+    entry: ExerciseLogEntry,
+    unit: WeightUnit,
+) {
+    Column {
+        Text(entry.performedOn.readable(), style = MaterialTheme.typography.titleMedium)
+        Text(entry.summary(unit), style = MaterialTheme.typography.bodyMedium)
+        entry.sets.forEach { set ->
+            Text(set.describe(unit), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** "Best 121 lb est. 1RM" or, for a bodyweight-only session, the set count alone. */
+private fun ExerciseLogEntry.summary(unit: WeightUnit): String =
+    estimatedOneRepMaxKg?.let { "Best ${WeightFormatter.format(it, unit).primary} est. 1RM" }
+        ?: "${sets.size} ${if (sets.size == 1) "set" else "sets"}, no load recorded"
+
+/** "8 reps  ·  135 lb" — the same figures a set carries on `WorkoutDetailScreen`, read-only here. */
+private fun ExerciseSet.describe(unit: WeightUnit): String {
+    val weight = WeightFormatter.format(weightKg, unit)
+    return "$reps reps   ${weight.primary}"
 }
 
 /** US-16: "top-set weight and total volume as switchable series". */

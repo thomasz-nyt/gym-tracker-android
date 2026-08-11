@@ -34,6 +34,7 @@ import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.progress.DetectPersonalRecord
+import com.gymtracker.core.domain.progress.ExerciseLogOf
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
@@ -206,6 +207,14 @@ object DataModule {
         sessionExercises: SessionExerciseRepository,
         sets: SetRepository,
     ): MostRecentlyTrainedExercise = MostRecentlyTrainedExercise(sessions, sessionExercises, sets)
+
+    @Provides
+    fun exerciseLogOf(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+        zone: ZoneId,
+    ): ExerciseLogOf = ExerciseLogOf(sessions, sessionExercises, sets, zone)
 
     @Provides
     fun personalRecordsOf(
