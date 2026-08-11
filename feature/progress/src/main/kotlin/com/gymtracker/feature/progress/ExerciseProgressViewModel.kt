@@ -6,6 +6,8 @@ import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.progress.ExerciseLogEntry
+import com.gymtracker.core.domain.progress.ExerciseLogOf
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.progress.ExerciseTrendPoint
@@ -71,6 +73,8 @@ data class ExerciseProgressUiState(
     val trend: ExerciseTrend = ExerciseTrend.NoData,
     val series: TrendSeries = TrendSeries.ESTIMATED_ONE_REP_MAX,
     val unit: WeightUnit = WeightUnit.LB,
+    /** US-34: what was actually done, newest first. Empty when [trend] is [ExerciseTrend.NoData]. */
+    val log: List<ExerciseLogEntry> = emptyList(),
 )
 
 /**
@@ -87,6 +91,7 @@ class ExerciseProgressViewModel
     @Inject
     constructor(
         private val exerciseTrendOf: ExerciseTrendOf,
+        private val exerciseLogOf: ExerciseLogOf,
         private val catalog: ExerciseCatalog,
         private val currentMember: CurrentMember,
         unitPreference: UnitPreference,
@@ -95,7 +100,7 @@ class ExerciseProgressViewModel
         private val chosenSeries = MutableStateFlow(TrendSeries.ESTIMATED_ONE_REP_MAX)
 
         @OptIn(ExperimentalCoroutinesApi::class)
-        private val loaded: Flow<Pair<String, ExerciseTrend>> =
+        private val loaded: Flow<Loaded> =
             charting.filterNotNull().flatMapLatest { exerciseId ->
                 flow {
                     val member = currentMember.id()
@@ -105,18 +110,25 @@ class ExerciseProgressViewModel
                             .first()
                             .firstOrNull { it.id == exerciseId }
                             ?.name
-                    emit((name ?: exerciseId.value) to exerciseTrendOf(exerciseId, member))
+                    emit(
+                        Loaded(
+                            name = name ?: exerciseId.value,
+                            trend = exerciseTrendOf(exerciseId, member),
+                            log = exerciseLogOf(exerciseId, member),
+                        ),
+                    )
                 }
             }
 
         val uiState: StateFlow<ExerciseProgressUiState> =
-            combine(loaded, chosenSeries, unitPreference.observe()) { (name, trend), series, unit ->
+            combine(loaded, chosenSeries, unitPreference.observe()) { loaded, series, unit ->
                 ExerciseProgressUiState(
                     isLoading = false,
-                    exerciseName = name,
-                    trend = trend,
+                    exerciseName = loaded.name,
+                    trend = loaded.trend,
                     series = series,
                     unit = unit,
+                    log = loaded.log,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ExerciseProgressUiState())
 
@@ -139,3 +151,10 @@ class ExerciseProgressViewModel
             const val STOP_TIMEOUT_MILLIS = 5_000L
         }
     }
+
+/** What one exercise-id load fetches together, before [TrendSeries] or unit are folded in. */
+private data class Loaded(
+    val name: String,
+    val trend: ExerciseTrend,
+    val log: List<ExerciseLogEntry>,
+)

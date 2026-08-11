@@ -474,6 +474,36 @@ records that as a deliberate call, not an oversight.
 - The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited** — nothing
   here touches the session screen.
 
+### US-34 — Exercise log
+Added 2026-08-11, from the `Redesign.dc.html` audit's `Exercise log` frame. US-16's
+per-exercise screen answers "am I getting stronger" with a chart; this adds the answer to
+"what did I actually do" for that same movement, on the same screen.
+
+- Below US-16's chart (or its absence state), a log: one row per finished session that has
+  at least one set logged for this exercise, **newest first** — a log reads like history,
+  the opposite direction from the chart, which reads left to right in time.
+- Each row shows the session's date, its best set and estimated 1RM (reusing US-16's
+  existing Epley estimate — no new estimation rule), and the individual sets performed
+  that session (weight, reps), the same figures `WorkoutDetailScreen` already shows for a
+  whole workout, scoped here to one exercise across every workout it appears in.
+- Sets from an appearance a routine copied in but the member never reached are already
+  excluded, because a session with nothing performed for this exercise contributes no row
+  — the same rule `ExerciseTrendOf` applies to the chart, so the two can never disagree
+  about which sessions counted.
+- A bodyweight set shows its reps with no weight and contributes nothing to that row's
+  best set or estimate, per constitution §2.4 — the rule US-16's chart already follows.
+- **Rows are not tappable in this pass.** Opening the workout they came from, or jumping
+  from a logged set anywhere in the app straight to this screen, are both left for a
+  follow-up: the audit's frame implies the second, but doing it well means deciding what a
+  tap on a set means on every screen that already gives a set a tap target of its own
+  (`WorkoutDetailScreen`'s opens the editor), which is a real design decision and not one
+  this story invents by default. This screen remains reached exactly as US-16 already
+  reaches it — from the catalog, or Progress's top section.
+- With nothing ever performed (US-16's `NoData` state), the log section is absent rather
+  than shown empty — the same absence pattern the chart itself already uses.
+- The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited** — nothing
+  here touches the session screen.
+
 ---
 
 ## M5 — Health Connect (optional)
