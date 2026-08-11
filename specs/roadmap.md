@@ -294,6 +294,18 @@ call to rename ahead of the range selector below.
       `FinishSummaryScreen`'s one row, not for every visible row of a 200-session list. Needs
       a purpose-built O(sets) read, not a call to the existing use case per row
 
+### US-34 — Exercise log
+
+Added 2026-08-11. See `user-stories.md`'s US-34 for the full story.
+
+- [ ] Session-by-session log below US-16's chart: one row per finished session with at
+      least one set for the exercise, newest first, showing the session's best set, est.
+      1RM, and its individual sets (`ExerciseLogOf`, new — mirrors `ExerciseTrendOf`'s
+      three-read pattern so the two never disagree about which sessions counted)
+- [ ] **Deferred, not built:** rows are not tappable — neither opening the source workout
+      nor a "tap any set to see its exercise's log" entry point elsewhere in the app.
+      Reached exactly as US-16 already is: catalog, or Progress's top section
+
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.
 
