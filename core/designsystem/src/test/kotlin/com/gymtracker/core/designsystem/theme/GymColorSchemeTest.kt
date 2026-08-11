@@ -131,6 +131,27 @@ class GymColorSchemeTest {
     }
 
     @Test
+    fun `outlineVariant is legible against the ground, not just different from lavender`() {
+        // The bug the test above missed: overriding outlineVariant away from #CAC4D0 to
+        // #C6C4C3 changed the value without fixing the problem, because #C6C4C3 measures only
+        // ~1.3:1 against the ground — a rule nobody can see, still passing "isn't lavender".
+        // `Color.kt` now sets outlineVariant to ink at 40% opacity, deliberately *not* the WCAG
+        // 1.4.11 non-text 3:1 minimum: `GymDivider` is used everywhere from list rows to a
+        // screen's one structural rule (a heavier, solid-ink rule some screens draw directly
+        // rather than through this token), and this floor gates the lighter, more common case.
+        // Comfortably above the ~1.3:1 that shipped, so this test fails the moment the value
+        // regresses toward invisible again.
+        schemes.forEach { (name, scheme) ->
+            val ratio = contrastRatio(scheme.outlineVariant, scheme.background)
+            assertTrue(
+                ratio >= MINIMUM_DIVIDER_CONTRAST,
+                "$name outlineVariant is $ratio:1 against the ground, below the " +
+                    "${MINIMUM_DIVIDER_CONTRAST}:1 floor a visible row rule needs",
+            )
+        }
+    }
+
+    @Test
     fun `error stays red`() {
         // Note this no longer separates Delete from Save — see the class comment. It survives
         // because error red is a convention worth keeping, not because it guarantees anything
@@ -196,6 +217,15 @@ class GymColorSchemeTest {
 
         /** The accent measures 1.00 light and 0.76 dark; this leaves room without inviting a brown. */
         const val ACCENT_SATURATION_FLOOR = 0.60
+
+        /**
+         * Comfortably above the ~1.3:1 the pre-ADR-0029 value measured, comfortably below the
+         * 3:1 WCAG 1.4.11 non-text minimum the structural rule (solid ink) clears instead. Ink
+         * at 40% measures ~2.4:1 light / ~3.4:1 dark against the ground; this floor is set below
+         * both so a legitimate future adjustment to the exact opacity doesn't require touching
+         * the test, while a regression back toward invisible still fails it.
+         */
+        const val MINIMUM_DIVIDER_CONTRAST = 2.0
 
         const val RED_BAND_START = 345.0
         const val RED_BAND_END = 15.0

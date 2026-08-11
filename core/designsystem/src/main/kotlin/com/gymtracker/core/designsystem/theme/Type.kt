@@ -65,20 +65,63 @@ internal val ArchivoFamily =
  * - **Sizes stay in `sp`**, so the OS font-size setting still multiplies them. A member who
  *   has already turned system text up gets larger text still; capping that would be the
  *   accessibility bug M7 exists to catch.
+ *
+ * **Weight hierarchy**, added on top of ADR-0019's sizes. ADR-0019 says numbers carry weight
+ * 800 (see `NumeralText`) but never said what titles and meta text carry, which is why every
+ * screen sat in the same narrow mid-weight band regardless of role. `titleLarge` (screen and
+ * section titles — "Routines", "Workout complete", an exercise name) and `titleSmall` (row
+ * labels — "Rest", "Up next") move to ExtraBold; the body roles, which read as meta text under
+ * a heavier line, move to Medium. **`titleMedium` is deliberately left alone.** It is Compose's
+ * default weight, not ADR-0019's, and it is also the role `LoggedSets` and `RestPanel`'s "Up
+ * next" render — lines that mix words and numbers in one string. `NumeralText` creates its
+ * contrast by bolding only the digit runs *within* a line; if the line's own base weight were
+ * already ExtraBold, that span would be invisible and the two would read identically. Every
+ * other role above is either pure words or pure meta, so raising its base weight costs nothing.
  */
 val GymTypography: Typography =
     Typography().run {
         copy(
-            bodySmall = bodySmall.copy(fontFamily = ArchivoFamily, fontSize = 16.sp, lineHeight = 22.sp),
-            bodyMedium = bodyMedium.copy(fontFamily = ArchivoFamily, fontSize = 18.sp, lineHeight = 24.sp),
-            bodyLarge = bodyLarge.copy(fontFamily = ArchivoFamily, fontSize = 20.sp, lineHeight = 28.sp),
+            bodySmall =
+                bodySmall.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+            bodyMedium =
+                bodyMedium.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 18.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+            bodyLarge =
+                bodyLarge.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 20.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
             // Button and chip text.
             labelLarge = labelLarge.copy(fontFamily = ArchivoFamily, fontSize = 18.sp, lineHeight = 24.sp),
-            titleSmall = titleSmall.copy(fontFamily = ArchivoFamily, fontSize = 20.sp, lineHeight = 26.sp),
+            titleSmall =
+                titleSmall.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 20.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
             // The logged-set line: the primary content of the session screen, sized by role
-            // rather than by an ad-hoc fontSize so the rule above stays honest.
+            // rather than by an ad-hoc fontSize so the rule above stays honest. Weight is left at
+            // Compose's default — see the class doc's "titleMedium is deliberately left alone".
             titleMedium = titleMedium.copy(fontFamily = ArchivoFamily, fontSize = 22.sp, lineHeight = 28.sp),
-            titleLarge = titleLarge.copy(fontFamily = ArchivoFamily, fontSize = 28.sp, lineHeight = 36.sp),
+            titleLarge =
+                titleLarge.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 28.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
             // The roles below keep Material's sizes — ADR-0011 only raised what the app renders
             // today. They carry the family anyway so that the next screen to reach for one gets
             // Archivo rather than silently reintroducing Roboto. `displayLarge` is the rest

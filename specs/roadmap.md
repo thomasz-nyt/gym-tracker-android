@@ -429,6 +429,19 @@ framing for this one case. New instrumented coverage:
 `RoutineDeletionTest` (the list never renders "Delete routine"; deleting from the editor returns
 to a list without the routine). Verified live on device at every step.
 
+**Two ADR-0019 compliance gaps closed 2026-08-11, once the design bundle itself became
+available and confirmed both values exactly.** `outlineVariant` (#C6C4C3, ~1.3:1 against the
+ground) was gated only by inequality against Material's lavender, not by legibility —
+`GymColorSchemeTest` now asserts a minimum contrast ratio too, and the value moves to ink at
+40% opacity (#9F9D9D light / #6A6968 dark), the exact figure the design specifies. And
+`GymDimens.PrimaryAction` moves from ADR-0016's original 64dp to the 72dp the design's own
+constraints named; `GymDimensTest` now pins the value instead of only floor-checking it against
+`MinTouchTarget`, so the two can't quietly drift apart again. Also added: an ExtraBold/Medium
+weight hierarchy on `titleLarge`/`titleSmall` and the body roles — `titleMedium` deliberately
+excluded, since it is the role `LoggedSets` and `RestPanel`'s mixed word/number lines render,
+and `NumeralText`'s digit-span contrast depends on the line's own base weight not already
+matching it. Verified live on device.
+
 **In progress:**
 
 - **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a
