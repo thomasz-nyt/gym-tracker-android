@@ -310,6 +310,25 @@ Added 2026-08-11. See `user-stories.md`'s US-34 for the full story.
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.
 
+### `SessionProgress` — groundwork, not yet wired anywhere
+
+Added 2026-08-11. `core/domain/session/SessionProgress.kt`: a pure function of a session and
+its movements answering how many are done, which is current, and which are still to come.
+
+This is the revisit `adr/0023-the-rest-period-earns-its-space.md` named in advance — "of N"
+and "then X" were refused there because a freestyle session's `position` records the order
+exercises were *added*, not a plan, and ADR-0023 said to revisit "when ADR-0020 lands." US-32
+landed a session's routine provenance, so a session copied from a routine now has an order
+that *is* a plan; `orderIsAPlan` on this type is exactly that distinction, structurally, so a
+future screen cannot show "Exercise 3 of 6" for a freestyle session by forgetting to check.
+
+- [x] `SessionProgress` and `sessionProgressOf`, JUnit 5 table tests, no UI. Closed 2026-08-11
+- [ ] **Not built here:** wiring this into the session screen — "Exercise 3 of 6", "Still to
+      come" — which needs its own ADR (ADR-0029, not yet written) to settle the copy and how
+      `orderIsAPlan == false` reads ("Also in this workout", no ordinal claim, per the plan
+      this groundwork came from), a UI decision this entry does not make by building the type
+      it will eventually need
+
 ---
 
 ## M5 — Health Connect (optional)
