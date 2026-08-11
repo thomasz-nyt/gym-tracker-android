@@ -363,6 +363,22 @@ parameter and its indicator token (`ShapeKeyTokens.CornerFull`) resolves to a ha
 brief's own constraints. Revisit if Material3 ever adds the hook, or if a custom widget is
 explicitly authorised.
 
+**Destructive actions off the row (ADR-0019), closed 2026-08-10.** `Delete routine` sat on the
+Routines list row beside `Start`, styled as a plain `TextButton` despite a comment claiming it
+was already outlined — and wrapped the row onto a second line to fit (redesign audit finding
+04). It now lives in the routine editor as an `OutlinedButton`, below `Add exercise` and never
+sharing that surface; `Start` is the row's one filled, constructive action and `Edit` stays
+quiet. `RoutinesViewModel.onDeleteRoutine` moved to `RoutineEditorViewModel` with it — see
+`RoutineEditorViewModelTest`'s two new cases, which replace the coverage
+`RoutinesViewModelTest` used to carry. `HistoryScreen`'s `Delete` was **not** relocated the same
+way: moving it to `WorkoutDetailScreen` would lose US-06a's five-second undo window, which lives
+in the per-destination `HistoryViewModel` instance and does not survive a navigation pop. It was
+restyled from a filled-looking `TextButton` to an outlined one instead, and stays on the row —
+a deliberate, documented deviation from the redesign brief's "moves off the row entirely"
+framing for this one case. New instrumented coverage:
+`RoutineDeletionTest` (the list never renders "Delete routine"; deleting from the editor returns
+to a list without the routine). Verified live on device at every step.
+
 **In progress:**
 
 - **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a

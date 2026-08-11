@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -26,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,7 +73,6 @@ fun RoutinesRoute(
         onCreateRoutine = viewModel::onCreateRoutine,
         onEditRoutine = onEditRoutine,
         onStartRoutine = viewModel::onStartRoutine,
-        onDeleteRoutine = viewModel::onDeleteRoutine,
         modifier = modifier,
     )
 }
@@ -84,7 +86,6 @@ internal fun RoutinesScreen(
     onCreateRoutine: (String) -> Unit = {},
     onEditRoutine: (RoutineId) -> Unit = {},
     onStartRoutine: (RoutineId) -> Unit = {},
-    onDeleteRoutine: (RoutineId) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var naming by remember { mutableStateOf(false) }
@@ -105,7 +106,6 @@ internal fun RoutinesScreen(
                             row = row,
                             onEdit = { onEditRoutine(row.routine.id) },
                             onStart = { onStartRoutine(row.routine.id) },
-                            onDelete = { onDeleteRoutine(row.routine.id) },
                         )
                         GymDivider()
                     }
@@ -160,36 +160,55 @@ private fun EmptyRoutines(modifier: Modifier = Modifier) {
     }
 }
 
-/** One routine: what it is called, how much is in it, and the two things you can do with it. */
+/**
+ * One routine: what it is called, how much is in it, and the two things you can do with it.
+ *
+ * **Deleting is not one of them.** ADR-0019's rule is that a destructive control never shares
+ * a surface with a constructive one, and `Start` is the row's constructive action — so
+ * deleting a routine lives in the editor instead (`RoutineEditorScreen`'s own outlined button),
+ * which also fixes the row that used to wrap onto a second line to fit it (redesign audit
+ * finding 04). `Start` is filled, the row's one prominent action; `Edit` stays quiet.
+ */
 @Composable
 private fun RoutineListItem(
     row: RoutineRow,
     onEdit: () -> Unit,
     onStart: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     ListItem(
         headlineContent = { Text(row.routine.name, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(row.movementSummary(), style = MaterialTheme.typography.bodyMedium) },
         trailingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-                TextButton(onClick = onEdit, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = onEdit,
+                    modifier =
+                        Modifier
+                            .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                            .semantics { contentDescription = "Edit ${row.routine.name}" },
+                ) {
                     Text("Edit")
                 }
-                TextButton(onClick = onStart, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Button(
+                    onClick = onStart,
+                    // Button reads CornerFull rather than the shape scale (Shape.kt's
+                    // documented trap), so without this it stays a stadium regardless of
+                    // GymShapes.
+                    shape = MaterialTheme.shapes.large,
+                    modifier =
+                        Modifier
+                            .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                            .semantics { contentDescription = "Start ${row.routine.name}" },
+                ) {
                     Text("Start")
                 }
             }
         },
         modifier = Modifier.fillMaxWidth(),
     )
-    // Destructive, so it is outlined and never shares a surface with a save (ADR-0019). It
-    // lives on the row it deletes rather than in a menu, because there is no menu here.
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = onDelete, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
-            Text("Delete routine", style = MaterialTheme.typography.labelLarge)
-        }
-    }
 }
 
 /** "3 movements" — a count, never a set-and-rep target (ADR-0020). */

@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -187,15 +188,19 @@ private fun WorkoutList(
                     }
                 },
                 trailingContent = {
-                    // ADR-0019 replaced ADR-0016's "red means destructive" with a structural
-                    // rule, because red is the accent now: a destructive control never shares a
-                    // surface with a save, and is outlined rather than filled. This button
-                    // predates that rule and still sits on the same row as the primary action —
-                    // opening the workout — so it is a known exception ADR-0019 flags to
-                    // revisit, not a pattern to copy.
-                    TextButton(
+                    // ADR-0019: a destructive control is outlined, never filled — this was a
+                    // filled-looking TextButton until it was fixed here. The row's own tap
+                    // target opens the workout, which is a navigation, not a save, so this
+                    // does not "share a surface with a save" in the letter of that rule; it is
+                    // outlined regardless, to read as destructive the same way SetEditSheet's
+                    // and the routine editor's delete controls do. Kept on the row rather than
+                    // moved (unlike Routines' delete): moving it to WorkoutDetailScreen would
+                    // lose US-06a's five-second undo, since that window lives in this screen's
+                    // HistoryViewModel instance and would not survive a navigation away from it.
+                    OutlinedButton(
                         onClick = { onDelete(summary.session.id) },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
                     ) {
                         Text("Delete")
