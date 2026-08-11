@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -156,7 +154,6 @@ private fun MovementPhoto(imageAsset: String?) {
             Modifier
                 .fillMaxWidth()
                 .height(PHOTO_HEIGHT)
-                .clip(RoundedCornerShape(PHOTO_CORNER))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -213,7 +210,6 @@ private val DETAIL_GAP = GymDimens.Gap
 private val TAG_GAP = GymDimens.TightGap
 private val MIN_TARGET = GymDimens.MinTouchTarget
 private val PHOTO_HEIGHT = 220.dp
-private val PHOTO_CORNER = 12.dp
 
 @Preview
 @Composable

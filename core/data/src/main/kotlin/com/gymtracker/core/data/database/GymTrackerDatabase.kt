@@ -32,7 +32,7 @@ import com.gymtracker.core.data.set.SetEntity
         RoutineEntity::class,
         RoutineItemEntity::class,
     ],
-    version = 7,
+    version = 9,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -60,6 +60,8 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V5_STARTER_EXERCISES = 5
         private const val V6_ALIASES_AND_UNSPECIFIED_EQUIPMENT = 6
         private const val V7_ROUTINES = 7
+        private const val V8_TARGETS = 8
+        private const val V9_ROUTINE_ORIGIN = 9
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -243,6 +245,48 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                         "CREATE INDEX IF NOT EXISTS `index_routine_items_exercise_id` " +
                             "ON `routine_items` (`exercise_id`)",
                     )
+                }
+            }
+
+        /**
+         * Adds a target to `routine_items` and `session_exercises` (US-30, ADR-0027).
+         *
+         * Three nullable columns on each — `sessions` and `sets` are explicitly untouched,
+         * which is the ADR's central bargain: a target is a snapshot copied at
+         * `StartSessionFromRoutine` time, never a live pointer back to the routine, so a device
+         * upgrading mid-workout keeps every row it already had, with no target on any of them
+         * until one is set.
+         */
+        val MIGRATION_7_8 =
+            object : Migration(V7_ROUTINES, V8_TARGETS) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_sets` INTEGER")
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_reps` INTEGER")
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_weight_kg` REAL")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_sets` INTEGER")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_reps` INTEGER")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_weight_kg` REAL")
+                }
+            }
+
+        /**
+         * Adds routine provenance to `sessions` (US-32, ADR-0028): a name and an id, both
+         * written once by `StartSessionFromRoutine` and never updated afterward.
+         *
+         * Deliberately its own migration, not folded into v8: ADR-0027 states in terms that its
+         * migration makes "no change to `sessions` or `sets`," and this one exists precisely
+         * because that was true when it was written and stopped being the whole story two days
+         * later. Neither column is a foreign key, and nothing here — or anywhere in `SessionDao`
+         * or `RoutineDao` — joins `sessions` to `routines`. A device upgrading keeps every
+         * session it had, each with no routine until a fresh one is started; existing sessions
+         * render as "Freestyle," honestly, because there is nothing to reconstruct their
+         * provenance from.
+         */
+        val MIGRATION_8_9 =
+            object : Migration(V8_TARGETS, V9_ROUTINE_ORIGIN) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `sessions` ADD COLUMN `routine_name` TEXT")
+                    db.execSQL("ALTER TABLE `sessions` ADD COLUMN `routine_id` TEXT")
                 }
             }
     }

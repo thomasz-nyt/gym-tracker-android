@@ -83,6 +83,9 @@ private fun StepButton(
     FilledTonalButton(
         onClick = onClick,
         contentPadding = PaddingValues(0.dp),
+        // FilledTonalButton reads CornerFull rather than the shape scale (Shape.kt's
+        // documented trap), so without this it stays a stadium regardless of GymShapes.
+        shape = MaterialTheme.shapes.large,
         modifier =
             Modifier
                 .size(GymDimens.StepperTarget)

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Queries over `routines` (US-29). */
@@ -47,6 +48,10 @@ interface RoutineItemDao {
 
     @Insert
     suspend fun insert(item: RoutineItemEntity)
+
+    /** US-30: matched by primary key, so this only ever touches the row [item] names. */
+    @Update
+    suspend fun update(item: RoutineItemEntity)
 
     @Query("DELETE FROM routine_items WHERE id = :id")
     suspend fun delete(id: String)

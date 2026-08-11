@@ -30,13 +30,17 @@ class GymColorSchemeTest {
         mapOf(
             "primary" to (primary to onPrimary),
             "primaryContainer" to (primaryContainer to onPrimaryContainer),
+            "secondary" to (secondary to onSecondary),
             "secondaryContainer" to (secondaryContainer to onSecondaryContainer),
+            "background" to (background to onBackground),
             "surface" to (surface to onSurface),
             "surfaceVariant" to (surfaceVariant to onSurfaceVariant),
             // Cards and the set-entry sheet sit on these, and they carry onSurface text.
+            "surfaceContainerLowest" to (surfaceContainerLowest to onSurface),
             "surfaceContainerLow" to (surfaceContainerLow to onSurface),
             "surfaceContainer" to (surfaceContainer to onSurface),
             "surfaceContainerHigh" to (surfaceContainerHigh to onSurface),
+            "surfaceContainerHighest" to (surfaceContainerHighest to onSurface),
             "error" to (error to onError),
         )
 

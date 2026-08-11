@@ -9,8 +9,12 @@ import java.time.Duration
  * One row of the history list (US-06): a finished session with the counts and volume its
  * sets add up to.
  *
- * @property exerciseCount appearances of an exercise in the session, so an exercise come back
- *   to later counts twice — which is what the member did (ADR-0004).
+ * @property exerciseCount appearances of an exercise **that have at least one set logged** —
+ *   coming back to an exercise later counts it twice (ADR-0004), but adding one and never
+ *   getting to it counts zero. That second case is common once a session can start from a
+ *   routine (US-29): every movement is copied in whether or not the member reaches it, so
+ *   counting rows rather than work would make this figure describe the plan, not the session
+ *   (constitution §2.4).
  * @property volumeKg total weight moved, summed over the sets that have a weight recorded.
  *   Null when none of them did.
  * @property bodyweightSetCount sets logged without a weight. Reported separately and never
@@ -44,10 +48,11 @@ data class SessionSummary(
             val appearances = exercises.filter { it.sessionId == session.id }.map { it.id }.toSet()
             val performed = sets.filter { it.sessionExerciseId in appearances }
             val weighted = performed.mapNotNull { set -> set.weightKg?.let { it * set.reps } }
+            val appearancesWithSets = performed.map { it.sessionExerciseId }.toSet()
 
             return SessionSummary(
                 session = session,
-                exerciseCount = appearances.size,
+                exerciseCount = appearancesWithSets.size,
                 setCount = performed.size,
                 volumeKg = if (weighted.isEmpty()) null else weighted.sum(),
                 bodyweightSetCount = performed.count { it.weightKg == null },

@@ -35,6 +35,7 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.progress.DetectPersonalRecord
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
+import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.progress.WeeklyVolumeByBodyPart
@@ -102,6 +103,8 @@ object DataModule {
                 GymTrackerDatabase.MIGRATION_4_5,
                 GymTrackerDatabase.MIGRATION_5_6,
                 GymTrackerDatabase.MIGRATION_6_7,
+                GymTrackerDatabase.MIGRATION_7_8,
+                GymTrackerDatabase.MIGRATION_8_9,
             ).build()
 
     @Provides
@@ -196,6 +199,13 @@ object DataModule {
         sets: SetRepository,
         zone: ZoneId,
     ): ExerciseTrendOf = ExerciseTrendOf(sessions, sessionExercises, sets, zone)
+
+    @Provides
+    fun mostRecentlyTrainedExercise(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): MostRecentlyTrainedExercise = MostRecentlyTrainedExercise(sessions, sessionExercises, sets)
 
     @Provides
     fun personalRecordsOf(

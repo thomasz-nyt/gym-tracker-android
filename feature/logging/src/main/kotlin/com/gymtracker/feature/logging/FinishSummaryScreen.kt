@@ -11,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -19,6 +18,7 @@ import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
@@ -65,6 +65,14 @@ internal fun FinishSummaryScreen(
         verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
     ) {
         Text(text = "Workout complete", style = MaterialTheme.typography.titleLarge)
+        // US-32 (ADR-0028): leads with the routine this session was started from, the same
+        // way HistoryScreen's row does — falling back to "Freestyle" for an ordinary start.
+        Text(
+            text =
+                detail.summary.session.routine
+                    ?.name ?: "Freestyle",
+            style = MaterialTheme.typography.titleMedium,
+        )
         Text(text = detail.summary.describe(unit), style = MaterialTheme.typography.bodyMedium)
 
         if (records.isNotEmpty()) {
@@ -90,7 +98,7 @@ private fun RecordsSection(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
         Text(text = "New personal records", style = MaterialTheme.typography.titleMedium)
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(RECORD_ROW_GAP)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
             items(records, key = { "${it.exerciseId.value}-${it.reps}" }) { record ->
                 Text(
                     text = record.describe(names[record.exerciseId], unit),
@@ -121,7 +129,9 @@ private fun PersonalRecord.describe(
  * Duration · exercises · sets · volume — the same figures history already shows for this
  * session (`WorkoutHeader` in `WorkoutDetailScreen.kt`), copied rather than shared: it is ten
  * lines, and `PastLoggedSets`'s own doc comment already sets the precedent for duplicating a
- * short private UI text-builder over reaching across files for it.
+ * short private UI text-builder over reaching across files for it. Kept in sync with
+ * `HistoryScreen`'s `describe()` by hand — the bodyweight segment below is the one they had
+ * drifted apart on before US-32.
  */
 private fun SessionSummary.describe(unit: WeightUnit): String =
     buildString {
@@ -129,6 +139,9 @@ private fun SessionSummary.describe(unit: WeightUnit): String =
         append("$exerciseCount ${"exercise".orPlural(exerciseCount)}")
         append("  ·  $setCount ${"set".orPlural(setCount)}")
         WeightFormatter.formatVolume(volumeKg, unit)?.let { append("  ·  $it") }
+        if (bodyweightSetCount > 0) {
+            append("  ·  $bodyweightSetCount bodyweight")
+        }
     }
 
 private fun String.orPlural(count: Int): String = if (count == 1) this else "${this}s"
@@ -141,7 +154,6 @@ private fun Duration.asLength(): String {
 }
 
 private const val MINUTES_IN_HOUR = 60L
-private val RECORD_ROW_GAP = 4.dp
 
 private const val PREVIEW_DURATION_MINUTES = 47L
 private const val PREVIEW_WEIGHT_KG = 102.5
@@ -158,6 +170,7 @@ private fun previewDetail(): SessionDetail {
             startedAt = started,
             endedAt = started.plus(Duration.ofMinutes(PREVIEW_DURATION_MINUTES)),
             metrics = null,
+            routine = RoutineOrigin(id = "r1", name = "Upper A"),
         )
     val appearance = SessionExercise(SessionExerciseId("se-1"), session.id, ExerciseId("bench"), 1)
     val sets = listOf(ExerciseSet("a", appearance.id, 1, PREVIEW_WEIGHT_KG, PREVIEW_REPS, null, started))

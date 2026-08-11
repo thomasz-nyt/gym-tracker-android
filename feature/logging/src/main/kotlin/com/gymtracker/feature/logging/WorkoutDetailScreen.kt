@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -25,15 +23,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
+import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -151,7 +148,7 @@ internal fun WorkoutDetailScreen(
                 ) {
                     items(detail.exercises, key = { it.sessionExercise.id.value }) { performed ->
                         PerformedExerciseCard(performed, unit, onEditSet)
-                        HorizontalDivider()
+                        GymDivider()
                     }
                 }
             }
@@ -180,6 +177,12 @@ private fun WorkoutHeader(
                     append("${summary.exerciseCount} ${"exercise".orPlural(summary.exerciseCount)}")
                     append("  ·  ${summary.setCount} ${"set".orPlural(summary.setCount)}")
                     WeightFormatter.formatVolume(summary.volumeKg, unit)?.let { append("  ·  $it") }
+                    // Matches HistoryScreen's describe(), which this duplicates on purpose
+                    // (see this file's own doc comment on why) — the two had drifted apart
+                    // on exactly this segment before US-32.
+                    if (summary.bodyweightSetCount > 0) {
+                        append("  ·  ${summary.bodyweightSetCount} bodyweight")
+                    }
                 },
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -313,7 +316,6 @@ private fun DetailThumbnail(imageAsset: String?) {
         modifier =
             Modifier
                 .size(GymDimens.Thumbnail)
-                .clip(RoundedCornerShape(DETAIL_THUMBNAIL_CORNER))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -337,7 +339,6 @@ private fun Instant.asDetailDate(): String = DETAIL_DATE.format(atZone(ZoneId.sy
 private val DETAIL_DATE = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())
 
 private const val MINUTES_IN_HOUR = 60L
-private val DETAIL_THUMBNAIL_CORNER = 8.dp
 
 @GymPreviews
 @Composable

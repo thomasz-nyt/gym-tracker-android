@@ -9,6 +9,7 @@ import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.routine.AddExerciseToRoutine
+import com.gymtracker.core.domain.routine.DeleteRoutine
 import com.gymtracker.core.domain.routine.MoveExerciseInRoutine
 import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
@@ -65,6 +66,7 @@ class RoutineEditorViewModelTest {
             removeExerciseFromRoutine = RemoveExerciseFromRoutine(items),
             moveExerciseInRoutine = MoveExerciseInRoutine(items),
             renameRoutine = RenameRoutine(routines),
+            deleteRoutine = DeleteRoutine(routines),
             lastPerformanceOf = LastPerformanceOf(sets),
         ).also { it.open(upperA) }
 
@@ -194,6 +196,36 @@ class RoutineEditorViewModelTest {
 
             viewModel.uiState.test {
                 assertNull(expectMostRecentItem().movements.single().lastTime)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `deleting the routine removes it and its movements`() =
+        runTest {
+            // ADR-0019: destructive lives in the editor now, not on the Routines list row —
+            // see RoutinesScreen.kt for why. The cascade itself is unchanged from what
+            // RoutinesViewModelTest used to cover.
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+
+            viewModel.onDeleteRoutine()
+
+            assertTrue(routines.all.isEmpty())
+            assertTrue(items.all.isEmpty(), "cascade, not orphans")
+        }
+
+    @Test
+    fun `deleting reports that it happened, so the screen can leave`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+
+            viewModel.isDeleted.test {
+                assertEquals(false, awaitItem())
+                viewModel.onDeleteRoutine()
+                assertEquals(true, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }

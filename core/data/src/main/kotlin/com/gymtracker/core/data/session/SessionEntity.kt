@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
@@ -16,6 +17,10 @@ import java.time.Instant
  * `updated_at` and `sync_state` carry no meaning until the M2 sync engine exists, but they
  * are part of the schema of record, so they are here from the start rather than added by a
  * migration later.
+ *
+ * `routine_name` and `routine_id` arrived at v9 (US-32, ADR-0028). **Neither is a
+ * `@ForeignKey`, and no `@Query` anywhere in this file or [SessionDao] names `routines`** —
+ * that is the enforcement mechanism, not just a comment; see `SessionRoutineOriginTest`.
  */
 @Entity(
     tableName = "sessions",
@@ -33,6 +38,8 @@ data class SessionEntity(
     @ColumnInfo(name = "metrics_source") val metricsSource: String?,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "sync_state") val syncState: String,
+    @ColumnInfo(name = "routine_name") val routineName: String? = null,
+    @ColumnInfo(name = "routine_id") val routineId: String? = null,
 )
 
 /** Not yet synced. The only value M1 ever writes; see `data-model.md` § Sync. */
@@ -46,7 +53,17 @@ internal fun SessionEntity.toDomain(): WorkoutSession =
         startedAt = Instant.ofEpochMilli(startedAt),
         endedAt = endedAt?.let(Instant::ofEpochMilli),
         metrics = metrics(),
+        routine = routineOrigin(),
     )
+
+/**
+ * Both columns are written together, always, by [WorkoutSession.toEntity] below — so a row
+ * with one null and the other not should never exist. Treated as absent rather than trusted
+ * half-way, the same caution [com.gymtracker.core.data.routine.RoutineItemEntity.toTarget]
+ * takes with its three columns.
+ */
+private fun SessionEntity.routineOrigin(): RoutineOrigin? =
+    if (routineName == null || routineId == null) null else RoutineOrigin(id = routineId, name = routineName)
 
 /** Null unless a health source actually provided something — never a zero-filled object. */
 private fun SessionEntity.metrics(): SessionMetrics? {
@@ -76,4 +93,6 @@ internal fun WorkoutSession.toEntity(updatedAt: Instant = Instant.now()): Sessio
         metricsSource = metrics?.source,
         updatedAt = updatedAt.toEpochMilli(),
         syncState = SYNC_STATE_PENDING,
+        routineName = routine?.name,
+        routineId = routine?.id,
     )

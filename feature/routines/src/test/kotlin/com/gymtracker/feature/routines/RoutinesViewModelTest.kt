@@ -10,7 +10,6 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.routine.AddExerciseToRoutine
 import com.gymtracker.core.domain.routine.CreateRoutine
-import com.gymtracker.core.domain.routine.DeleteRoutine
 import com.gymtracker.core.domain.routine.StartSessionFromRoutine
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
@@ -59,7 +58,6 @@ class RoutinesViewModelTest {
             items = items,
             currentMember = FakeCurrentMember(alice),
             createRoutine = CreateRoutine(routines) { RoutineId("r-${nextRoutine++}") },
-            deleteRoutine = DeleteRoutine(routines),
             startSessionFromRoutine =
                 StartSessionFromRoutine(
                     routines = routines,
@@ -110,19 +108,6 @@ class RoutinesViewModelTest {
                 assertEquals(0, expectMostRecentItem().routines.single().movements)
                 cancelAndIgnoreRemainingEvents()
             }
-        }
-
-    @Test
-    fun `deleting a routine removes it and its movements`() =
-        runTest {
-            val viewModel = viewModel()
-            viewModel.onCreateRoutine("Upper A")
-            addToRoutine(RoutineId("r-1"), bench)
-
-            viewModel.onDeleteRoutine(RoutineId("r-1"))
-
-            assertTrue(routines.all.isEmpty())
-            assertTrue(items.all.isEmpty(), "cascade, not orphans")
         }
 
     @Test

@@ -6,7 +6,6 @@ import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.routine.CreateRoutine
-import com.gymtracker.core.domain.routine.DeleteRoutine
 import com.gymtracker.core.domain.routine.RoutineItemRepository
 import com.gymtracker.core.domain.routine.RoutineRepository
 import com.gymtracker.core.domain.routine.StartSessionFromRoutine
@@ -56,7 +55,13 @@ sealed interface RoutineStart {
     data object AlreadyRunning : RoutineStart
 }
 
-/** US-29: the member's routines, and starting one. */
+/**
+ * US-29: the member's routines, and starting one.
+ *
+ * Deleting a routine lives in [RoutineEditorViewModel] instead — ADR-0019's rule is that a
+ * destructive control never shares a surface with a constructive one, and this screen's row
+ * already carries Edit and Start. See `RoutinesScreen.kt`'s `RoutineListItem`.
+ */
 @HiltViewModel
 class RoutinesViewModel
     @Inject
@@ -65,7 +70,6 @@ class RoutinesViewModel
         private val items: RoutineItemRepository,
         private val currentMember: CurrentMember,
         private val createRoutine: CreateRoutine,
-        private val deleteRoutine: DeleteRoutine,
         private val startSessionFromRoutine: StartSessionFromRoutine,
     ) : ViewModel() {
         private val member: Flow<com.gymtracker.core.domain.model.UserId> = flow { emit(currentMember.id()) }
@@ -95,11 +99,6 @@ class RoutinesViewModel
         /** Creates an empty routine. The editor is where it gains movements. */
         fun onCreateRoutine(name: String) {
             viewModelScope.launch { createRoutine(currentMember.id(), name) }
-        }
-
-        /** Deletes a routine and its movements. No session is affected (ADR-0020). */
-        fun onDeleteRoutine(id: RoutineId) {
-            viewModelScope.launch { deleteRoutine(id) }
         }
 
         /** Starts a workout from a routine, reporting the outcome through [startOutcome]. */

@@ -24,6 +24,17 @@ object GymDimens {
     val Gap = 12.dp
     val TightGap = 8.dp
 
+    /** The one step below [TightGap]: a label and the row directly under it, nothing looser. */
+    val HairGap = 4.dp
+
     /** Catalog thumbnails: big enough to recognise a machine from across the gym floor. */
     val Thumbnail = 72.dp
+
+    /**
+     * A divider (ADR-0019): thick enough to survive bad gym lighting. A 1dp Material hairline
+     * is the first thing to disappear under it — the same reasoning that made
+     * [com.gymtracker.core.designsystem.component.SecondaryActionButton] tonal instead of
+     * outlined.
+     */
+    val DividerThickness = 2.dp
 }

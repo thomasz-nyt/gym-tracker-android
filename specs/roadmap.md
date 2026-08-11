@@ -190,20 +190,59 @@ place they could — a target leaking into a chart or a PR — is forbidden by t
 ADR-0027 rather than managed by sequencing.
 
 - [x] ADR-0027 and US-30 written, and `data-model.md` updated, **before** any code
-- [ ] Migration v8: three nullable `target_*` columns on `routine_items` **and** on
-      `session_exercises`. Additive; `sessions` and `sets` untouched
-- [ ] `RoutineItem` and `SessionExercise` carry a target; a use case sets and clears one
-- [ ] `StartSessionFromRoutine` copies targets across with the movements, so the session holds
-      its own snapshot and there is still nothing to join back to the routine
+- [x] Migration v8: three nullable `target_*` columns on `routine_items` **and** on
+      `session_exercises`. Additive; `sessions` and `sets` untouched. Closed 2026-08-09
+- [x] `RoutineItem` and `SessionExercise` carry a target; a use case sets and clears one
+      (`SetRoutineItemTarget`). Closed 2026-08-09
+- [x] `StartSessionFromRoutine` copies targets across with the movements, so the session holds
+      its own snapshot and there is still nothing to join back to the routine. Closed 2026-08-09
 - [ ] The routine editor can enter, edit and clear a target. **Replaces** the structural test in
       `RoutineEditorViewModelTest` that currently asserts no target field exists — replaced by a
-      test of the new invariant, never simply deleted
+      test of the new invariant, never simply deleted. **Not built.** The three boxes above are
+      the domain and schema; this box and the two below are UI and are their own PRs by
+      ADR-0027's own split ("this is more than one PR")
 - [ ] A target prefills set entry; with none, US-03's prefill from history is unchanged
 - [ ] Targets render labelled as targets, beside history rather than merged into it
 
 **Exit:** a routine created on the sofa arrives at the gym carrying its numbers, and no chart,
 no volume figure and no personal record has moved as a result. `TwoTapSetLoggingTest` passes
 **unedited** — ADR-0017 and ADR-0020 both name that as the signal this went wrong.
+
+### US-32 — A session remembers the routine it was started from
+
+Story: US-32. See `adr/0028-a-session-remembers-its-routine.md`. Added 2026-08-09, the same
+day as M3b, once History's "Sun 9 Aug, 13:53" turned out to be a real gap and not just a
+missing string: nothing recorded *which* routine a session came from, so nothing could ever
+say so.
+
+- [x] ADR-0028 and US-32 written, and `data-model.md` updated, **before** any code
+- [x] Migration v8 → v9: `sessions.routine_name` and `sessions.routine_id`, both nullable.
+      Additive; `sets`, `session_exercises` and `routine_items` untouched — this migration
+      is scoped to exactly what ADR-0028 claims and nothing US-30 already added.
+      Closed 2026-08-10
+- [x] `WorkoutSession` carries a `RoutineOrigin?`; `StartSessionFromRoutine` writes it once,
+      at start, and nothing reads it back through a repository. Closed 2026-08-10
+- [x] History and the finish summary lead with the routine's name, falling back to
+      `Freestyle`. Closed 2026-08-10, verified live on device: created a routine, started it,
+      logged a set, finished, and confirmed both the finish summary and the History row show
+      the routine's name — not the bare date the audit's finding 01 complained about. Also
+      fixed `SessionSummary.exerciseCount`, which counted every appearance a routine copied
+      in whether or not it was ever touched — a routine-started session could read "3
+      exercises" for one actually performed. It now counts only appearances with at least one
+      set, and `HistoryScreen`'s and `FinishSummaryScreen`'s bodyweight-count segments, which
+      had drifted apart, were brought back in sync
+- [x] The four enforcement mechanisms ADR-0028 names are tests, not comments: the id's type,
+      the structural test replacing `StartSessionFromRoutineTest`'s current tripwire, a
+      schema test that `sessions` has no foreign key to `routines` (its intended DAO-level
+      form — reflecting over `@Query` annotations — turned out to be unworkable:
+      `androidx.room.Query`'s retention is `CLASS`, not `RUNTIME`, confirmed against the
+      compiled `room-common` jar, so the check reads the CREATE TABLE SQL Room actually built
+      instead), and confirmation that nothing in US-30's target pipeline changed. Closed
+      2026-08-10
+
+**Exit:** a session started from a routine shows that routine's name in History and the
+finish summary, a session started without one shows `Freestyle`, and renaming or deleting a
+routine afterward changes neither. `TwoTapSetLoggingTest` passes **unedited**.
 
 ---
 
@@ -226,14 +265,34 @@ because it is the first place US-18's records are shown anywhere in the app.
 - [x] Empty and sparse-data states designed, not accidental (US-19)
 - [ ] Time range selector. Split from the line above, which it had been sharing: the states are
       done and the selector is not, so one checkbox could not tell the truth about both
-- [ ] Finish as a summary, not a confirm dialog (US-31). The confirm dialog itself is
+- [x] Finish as a summary, not a confirm dialog (US-31). The confirm dialog itself is
       unchanged — only what happens after confirming, which is where the summary and any
-      records set that session are shown
+      records set that session are shown. Shipped in `87e975c` (PR #35); this box was left
+      unchecked in that commit, against `CLAUDE.md`'s own definition of done. Ticked here
+      2026-08-09 rather than silently, since the gap sat on `main` for a while
 
 **US-18 was answered on 2026-08-09** after three sessions deferred it — see ADR-0025. A record
 is the heaviest load ever lifted **at a given rep count**, so every record is a set that
 actually happened and a 100x8 sets one without having to beat a 105x1. The estimated-1RM
 reading was rejected: it would announce a record for a weight nobody has lifted.
+
+### US-33 — Progress replaces History
+
+Added 2026-08-10. See `user-stories.md`'s US-33 for the full story, including the deliberate
+call to rename ahead of the range selector below.
+
+- [x] Tab and screen title renamed History → Progress; "Past workouts" demoted to a section
+      heading above the unchanged session list. Closed 2026-08-10
+- [x] Top section: est. 1RM + 8-week delta for the exercise most recently actually trained
+      (`MostRecentlyTrainedExercise`, new — an appearance a routine copied in but never
+      performed is skipped in favour of one that was). No lift switcher; tapping opens the
+      existing per-exercise trend screen (US-16) unchanged. Closed 2026-08-10
+- [x] "Weekly volume by muscle" restyled as a labelled row in the top section, replacing the
+      bare `TextButton`; same destination. Closed 2026-08-10
+- [ ] **Deferred, not built:** a "PR" badge on session rows. `PersonalRecordsAchievedIn` reads
+      the member's entire session history per row it is asked about — fine for
+      `FinishSummaryScreen`'s one row, not for every visible row of a 200-session list. Needs
+      a purpose-built O(sets) read, not a call to the existing use case per row
 
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.
@@ -303,6 +362,40 @@ Tracked here rather than in a milestone, because these do not all belong to one.
 
 **Shipped:** the visual system (ADR-0019), the rest panel and one-tap log (ADR-0023), bottom
 navigation (ADR-0024), the warm-up timer (US-28), routines (US-29).
+
+ADR-0019 shipped in `6b2671d` with a handful of compliance gaps that survived review: three
+`.clip(RoundedCornerShape(...))` calls rounding catalog and workout-detail photos against the
+"every radius is 0" rule; `StepperField`'s step buttons and `DrillDownTopBar`'s back button
+reading `CornerFull` unfixed (the exact trap `Shape.kt` documents); dividers at Material's 1dp
+hairline rather than a thickness that survives gym lighting; button labels centred rather than
+flush left; `outlineVariant`, `background`, `secondary` and the extreme `surfaceContainer*` roles
+un-gated by `GymColorSchemeTest`; and "numbers carry weight 800" (ADR-0019's own text) never
+applied anywhere. Closed 2026-08-09, plus a `NumeralText` component (bolds digit runs via
+`AnnotatedString` spans, decoupled from button-label uppercasing which cannot be done safely —
+see `GymButtons.kt`'s `ButtonLabel` doc comment — without risking `TwoTapSetLoggingTest`'s
+case-sensitive `onNodeWithText` matches). The nav-bar selected-item pill is **not** closed:
+confirmed via the compiled `material3-api.jar` that `NavigationBarItem` still exposes no `shape`
+parameter and its indicator token (`ShapeKeyTokens.CornerFull`) resolves to a hardcoded
+`CircleShape`, never one of `Shapes`'s five roles. Fixing it means reimplementing
+`NavigationBarItem` from primitives, which is a custom widget — out of bounds per the redesign
+brief's own constraints. Revisit if Material3 ever adds the hook, or if a custom widget is
+explicitly authorised.
+
+**Destructive actions off the row (ADR-0019), closed 2026-08-10.** `Delete routine` sat on the
+Routines list row beside `Start`, styled as a plain `TextButton` despite a comment claiming it
+was already outlined — and wrapped the row onto a second line to fit (redesign audit finding
+04). It now lives in the routine editor as an `OutlinedButton`, below `Add exercise` and never
+sharing that surface; `Start` is the row's one filled, constructive action and `Edit` stays
+quiet. `RoutinesViewModel.onDeleteRoutine` moved to `RoutineEditorViewModel` with it — see
+`RoutineEditorViewModelTest`'s two new cases, which replace the coverage
+`RoutinesViewModelTest` used to carry. `HistoryScreen`'s `Delete` was **not** relocated the same
+way: moving it to `WorkoutDetailScreen` would lose US-06a's five-second undo window, which lives
+in the per-destination `HistoryViewModel` instance and does not survive a navigation pop. It was
+restyled from a filled-looking `TextButton` to an outlined one instead, and stays on the row —
+a deliberate, documented deviation from the redesign brief's "moves off the row entirely"
+framing for this one case. New instrumented coverage:
+`RoutineDeletionTest` (the list never renders "Delete routine"; deleting from the editor returns
+to a list without the routine). Verified live on device at every step.
 
 **In progress:**
 

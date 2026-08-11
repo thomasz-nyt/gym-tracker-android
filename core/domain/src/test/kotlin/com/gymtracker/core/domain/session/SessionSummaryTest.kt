@@ -135,14 +135,32 @@ class SessionSummaryTest {
     }
 
     @Test
-    fun `an exercise added but never performed still counts as an exercise`() {
-        // US-02 lets an exercise exist in a session before its first set. Someone who racked
-        // up, decided against it and moved on did add it, and the history row should say so.
+    fun `an exercise added but never performed does not count as an exercise`() {
+        // US-02 lets an exercise exist in a session before its first set — a routine copies
+        // in every one of its movements this way (US-29), whether or not the member actually
+        // gets to them. Counting the row rather than the work would make "3 exercises" a
+        // count of what was *added*, not what was *done*, which is the honesty gap constitution
+        // §2.4 exists to close. Racking up and moving on leaves nothing behind, and the
+        // history row should say so.
         val summary = SessionSummary.of(session(), listOf(appearance("se-1", 1)), sets = emptyList())
 
-        assertEquals(1, summary.exerciseCount)
+        assertEquals(0, summary.exerciseCount)
         assertEquals(0, summary.setCount)
         assertNull(summary.volumeKg)
+    }
+
+    @Test
+    fun `an exercise appearing twice with only one appearance performed counts once`() {
+        // The case a routine-started session makes common: US-29 copies every movement in
+        // order, so a session can hold several appearances nobody touched. Position 2 here
+        // never got a set — exerciseCount reads the work, not the plan.
+        val exercises = listOf(appearance("se-1", 1), appearance("se-2", 2))
+        val sets = listOf(set("se-1", 1, 60.0, 10))
+
+        val summary = SessionSummary.of(session(), exercises, sets)
+
+        assertEquals(1, summary.exerciseCount)
+        assertEquals(1, summary.setCount)
     }
 
     @Test

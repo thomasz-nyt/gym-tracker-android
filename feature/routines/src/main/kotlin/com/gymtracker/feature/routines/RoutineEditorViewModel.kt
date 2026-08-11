@@ -11,6 +11,7 @@ import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.routine.AddExerciseToRoutine
+import com.gymtracker.core.domain.routine.DeleteRoutine
 import com.gymtracker.core.domain.routine.MoveExerciseInRoutine
 import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
@@ -78,9 +79,15 @@ class RoutineEditorViewModel
         private val removeExerciseFromRoutine: RemoveExerciseFromRoutine,
         private val moveExerciseInRoutine: MoveExerciseInRoutine,
         private val renameRoutine: RenameRoutine,
+        private val deleteRoutine: DeleteRoutine,
         private val lastPerformanceOf: LastPerformanceOf,
     ) : ViewModel() {
         private val editing = MutableStateFlow<RoutineId?>(null)
+
+        private val deleted = MutableStateFlow(false)
+
+        /** True once [onDeleteRoutine] has completed, so the screen knows to leave. */
+        val isDeleted: StateFlow<Boolean> = deleted
 
         /** Renamed locally the instant it is typed, so the field does not fight the database. */
         private val typedName = MutableStateFlow<String?>(null)
@@ -158,6 +165,19 @@ class RoutineEditorViewModel
 
         fun onRemoveMovement(id: RoutineItemId) {
             viewModelScope.launch { removeExerciseFromRoutine(id) }
+        }
+
+        /**
+         * Deletes the routine being edited and its movements (ADR-0019: destructive lives here,
+         * not on the Routines list row). No session is affected — a routine relates to one only
+         * by having been copied into it (ADR-0020), and a copy does not depend on the original.
+         */
+        fun onDeleteRoutine() {
+            val id = editing.value ?: return
+            viewModelScope.launch {
+                deleteRoutine(id)
+                deleted.value = true
+            }
         }
 
         /**

@@ -8,6 +8,7 @@ import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.CatalogAssetReader
 import com.gymtracker.core.data.exercise.CatalogSeeder
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItem
@@ -171,6 +172,44 @@ class RoutineTest {
 
             assertEquals(listOf("Upper A"), routines.observeRoutines(alice).first().map { it.name })
         }
+
+    @Test
+    fun `a target round-trips through Room, and each field is independently nullable`() =
+        runTest {
+            val id = upperA()
+            item("i1", id, bench, 1)
+            val target = MovementTarget(sets = 3, reps = 8, weightKg = 47.6)
+
+            items.updateItem(items.itemsOf(id).single().copy(target = target))
+
+            assertEquals(target, items.itemsOf(id).single().target)
+        }
+
+    @Test
+    fun `a movement with no target round-trips as null, not as a row of zeroes`() =
+        runTest {
+            val id = upperA()
+            item("i1", id, bench, 1)
+
+            assertNull(items.itemsOf(id).single().target, "US-13's absence pattern, not a zero")
+        }
+
+    @Test
+    fun `clearing a target updates only the movement it was cleared on`() =
+        runTest {
+            val id = upperA()
+            item("i1", id, bench, 1)
+            item("i2", id, squat, 2)
+            val target = MovementTarget(sets = 3, reps = 8, weightKg = 47.6)
+            items.updateItem(items.itemsOf(id).first { it.exerciseId == bench }.copy(target = target))
+            items.updateItem(items.itemsOf(id).first { it.exerciseId == squat }.copy(target = target))
+
+            items.updateItem(items.itemsOf(id).first { it.exerciseId == bench }.copy(target = null))
+
+            val byExercise = items.itemsOf(id).associateBy { it.exerciseId }
+            assertNull(byExercise.getValue(bench).target)
+            assertEquals(target, byExercise.getValue(squat).target)
+        }
 }
 
 /** The v7 upgrade is additive: nothing already on the device is disturbed by it. */
@@ -227,5 +266,66 @@ class RoutineMigrationTest {
             assertTrue(it.moveToFirst())
             assertEquals(0, it.getInt(0))
         }
+    }
+
+    /**
+     * US-30 (ADR-0027): the v8 upgrade adds three nullable target columns to `routine_items`
+     * and `session_exercises`, and touches nothing else — `sessions` and `sets` are explicitly
+     * out of scope for this migration.
+     */
+    @Test
+    fun `migrating from 7 to 8 adds target columns and keeps every existing row`() {
+        val name = "migration-7-8.db"
+
+        helper.createDatabase(name, 7).use { v7 ->
+            v7.execSQL(
+                "INSERT INTO sessions (id, user_id, gym_name, started_at, ended_at, avg_hr, max_hr, " +
+                    "active_kcal, metrics_source, updated_at, sync_state) " +
+                    "VALUES ('s1', 'u1', NULL, 1000, NULL, NULL, NULL, NULL, NULL, 1000, 'PENDING')",
+            )
+            v7.execSQL(
+                "INSERT INTO exercises (id, name, aliases_json, primary_json, secondary_json, " +
+                    "equipment, instructions_json, media_url, media_type, youtube_url, source, " +
+                    "is_starter, image_asset, updated_at) " +
+                    "VALUES ('e1', 'Bench Press', '[]', '[]', '[]', 'BARBELL', '[]', NULL, NULL, NULL, " +
+                    "'free-exercise-db', 0, NULL, 1000)",
+            )
+            v7.execSQL(
+                "INSERT INTO session_exercises (id, session_id, exercise_id, position, updated_at, sync_state) " +
+                    "VALUES ('se1', 's1', 'e1', 1, 1000, 'PENDING')",
+            )
+            v7.execSQL(
+                "INSERT INTO routines (id, user_id, name, position, created_at, updated_at, sync_state) " +
+                    "VALUES ('r1', 'u1', 'Upper A', 1, 1000, 1000, 'PENDING')",
+            )
+            v7.execSQL(
+                "INSERT INTO routine_items (id, routine_id, exercise_id, position, updated_at, sync_state) " +
+                    "VALUES ('ri1', 'r1', 'e1', 1, 1000, 'PENDING')",
+            )
+        }
+
+        val v8 = helper.runMigrationsAndValidate(name, 8, true, GymTrackerDatabase.MIGRATION_7_8)
+
+        listOf("sessions", "exercises", "session_exercises", "routines", "routine_items").forEach { table ->
+            v8.query("SELECT COUNT(*) FROM $table").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1, it.getInt(0), "$table lost a row to an additive migration")
+            }
+        }
+        v8.query("SELECT target_sets, target_reps, target_weight_kg FROM routine_items WHERE id = 'ri1'").use {
+            assertTrue(it.moveToFirst())
+            assertTrue(it.isNull(0), "an upgraded row has no target until one is set")
+            assertTrue(it.isNull(1))
+            assertTrue(it.isNull(2))
+        }
+        v8
+            .query(
+                "SELECT target_sets, target_reps, target_weight_kg FROM session_exercises WHERE id = 'se1'",
+            ).use {
+                assertTrue(it.moveToFirst())
+                assertTrue(it.isNull(0), "a session predating this migration has no target either")
+                assertTrue(it.isNull(1))
+                assertTrue(it.isNull(2))
+            }
     }
 }

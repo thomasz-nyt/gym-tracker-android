@@ -9,6 +9,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.em
 import com.gymtracker.core.designsystem.theme.GymDimens
 
 /**
@@ -31,7 +35,7 @@ fun PrimaryActionButton(
         shape = MaterialTheme.shapes.large,
         modifier = modifier.fillMaxWidth().height(GymDimens.PrimaryAction),
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium)
+        ButtonLabel(text, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -52,6 +56,32 @@ fun SecondaryActionButton(
         shape = MaterialTheme.shapes.large,
         modifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
     ) {
-        Text(text, style = MaterialTheme.typography.titleSmall)
+        ButtonLabel(text, style = MaterialTheme.typography.titleSmall)
     }
+}
+
+/**
+ * ADR-0019: button labels sit flush left at the padding edge, weight 800, with a little
+ * letter-spacing — never centred, including on the full-width buttons above.
+ *
+ * **Deliberately not visually uppercased.** `TwoTapSetLoggingTest` and `CorrectingASetTest`
+ * match button labels case-sensitively (`onNodeWithText("Add set")`, `onNodeWithText("Save
+ * set")`) because a `Text` composable's drawn string and its semantics string are the same
+ * value — there is no supported way to draw "ADD SET" while keeping "Add set" as what the
+ * instrumented suite (and TalkBack) reads, short of a `clearAndSetSemantics` override this repo
+ * has no precedent for and that trades a broad, hard-to-verify risk to the two-tap tripwire for
+ * a stylistic detail. [FontWeight.ExtraBold], the letter-spacing and the flush-left alignment
+ * below are pure [androidx.compose.ui.text.TextStyle] changes and carry none of that risk.
+ */
+@Composable
+private fun ButtonLabel(
+    text: String,
+    style: TextStyle,
+) {
+    Text(
+        text = text,
+        style = style.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.05.em),
+        textAlign = TextAlign.Start,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

@@ -83,6 +83,10 @@ internal class FakeRoutineItems : RoutineItemRepository {
         state.value = state.value + item
     }
 
+    override suspend fun updateItem(item: RoutineItem) {
+        state.value = state.value.map { if (it.id == item.id) item else it }
+    }
+
     override suspend fun removeItem(id: RoutineItemId) {
         state.value = state.value.filterNot { it.id == id }
     }

@@ -10,8 +10,9 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
+import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseId
@@ -60,6 +62,7 @@ fun RoutineEditorRoute(
     LaunchedEffect(routineId) { viewModel.open(routineId) }
 
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isDeleted by viewModel.isDeleted.collectAsStateWithLifecycle()
 
     // The picker hands ids back the same way it does for a session (US-02a): appended in pick
     // order, so one visit can add several movements.
@@ -70,6 +73,11 @@ fun RoutineEditorRoute(
         onPicksHandled()
     }
 
+    // Deleting and leaving are the same navigation action: there is nothing left here to edit.
+    LaunchedEffect(isDeleted) {
+        if (isDeleted) onBack()
+    }
+
     RoutineEditorScreen(
         state = state,
         onBack = onBack,
@@ -78,6 +86,7 @@ fun RoutineEditorRoute(
         onRemoveMovement = viewModel::onRemoveMovement,
         onMoveUp = viewModel::onMoveUp,
         onMoveDown = viewModel::onMoveDown,
+        onDeleteRoutine = viewModel::onDeleteRoutine,
         modifier = modifier,
     )
 }
@@ -91,6 +100,7 @@ internal fun RoutineEditorScreen(
     onRemoveMovement: (RoutineItemId) -> Unit = {},
     onMoveUp: (Int) -> Unit = {},
     onMoveDown: (Int) -> Unit = {},
+    onDeleteRoutine: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -128,12 +138,25 @@ internal fun RoutineEditorScreen(
                             onMoveDown = { onMoveDown(index) },
                             onRemove = { onRemoveMovement(row.itemId) },
                         )
-                        HorizontalDivider()
+                        GymDivider()
                     }
                 }
             }
 
             PrimaryActionButton(text = "Add exercise", onClick = onAddExercise)
+
+            // Destructive, so it is outlined and never shares a surface with a save (ADR-0019)
+            // — "Add exercise" above is this screen's one constructive action. Living here
+            // rather than on the Routines list row is also what fixes that row wrapping onto a
+            // second line to fit it (redesign audit finding 04).
+            OutlinedButton(
+                onClick = onDeleteRoutine,
+                shape = MaterialTheme.shapes.large,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Delete routine")
+            }
         }
     }
 }
