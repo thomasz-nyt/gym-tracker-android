@@ -10,6 +10,7 @@ import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
+import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.progress.PersonalRecord
@@ -19,6 +20,7 @@ import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.SessionDetail
+import com.gymtracker.core.domain.session.SessionProgress
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
@@ -43,6 +45,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -79,12 +82,33 @@ data class SessionUiState(
     val restRemaining: Duration? = null,
     /** What the rest panel says is coming, or null before anything is logged (ADR-0023). */
     val upNext: UpNextSet? = null,
+    /**
+     * What the movement list's one-tap log button will write (ADR-0029, US-35) — the current
+     * movement's next set, independent of rest. Unlike [upNext], this is not null just because
+     * nothing has been logged in the session yet; it is null only when there is no movement
+     * left to log ([SessionProgress.current] is null) or no prefill exists for it yet (a brand
+     * new exercise with no history and no target — in which case there is nothing sensible to
+     * write with one tap, and the screen falls back to `Add set` alone).
+     */
+    val nextLoggableSet: UpNextSet? = null,
     /** Whether the exercise just removed from the session can still be put back (US-02c). */
     val canUndoRemoval: Boolean = false,
     /** The exercise being walked through, if any (US-05a). */
     val guided: GuidedState = GuidedState(),
     /** What is showing over the just-finished session, if anything (US-31). */
     val finish: FinishFlow? = null,
+    /**
+     * How many movements are done, which is current, and which are still to come (ADR-0029);
+     * null before the first emission the same way [activeSession] is.
+     */
+    val progress: SessionProgress? = null,
+    /**
+     * Which row [SessionPlan][com.gymtracker.feature.logging.session.SessionPlan] has open
+     * (ADR-0029) — the last movement with any set logged, or the first movement if none do yet.
+     * Deliberately not derived from [progress]`.current` on the UI side; see where this is
+     * computed in the ViewModel for why the two answer different questions.
+     */
+    val openSessionExerciseId: SessionExerciseId? = null,
 )
 
 /**
@@ -108,13 +132,60 @@ sealed interface FinishFlow {
 }
 
 /**
- * The rest, as ADR-0023 made it: a countdown and the set it is counting down to. They travel
- * together because they are one panel, and because it keeps [ScreenExtras] at five fields.
+ * Everything that is a function of [WorkoutSession] plus member/unit: the session itself, the
+ * exercises in display order, the rest countdown and what it counts down to (ADR-0023), how far
+ * through the plan the session is, and what one tap would log next (ADR-0029, US-35).
+ *
+ * One `combine` group rather than several, and that is load-bearing, not tidiness. `activeSession`,
+ * `member` and `exercisesInOrder` are cold flows (`flatMapLatest` / `flow {}`), so every
+ * independent `combine(activeSession, ...)` elsewhere in this class re-subscribes them from
+ * scratch — and `combine` fires its lambda on *every* input emission, not once per logical
+ * upstream change. Two independent subscriptions to the same cold upstream can each deliver
+ * their own emission for one write to the underlying repository, and the screen would observe a
+ * genuinely transient state in between: the session already updated, [progress] not yet
+ * recomputed for it. That is exactly what several `ActiveSessionViewModelTest` cases caught —
+ * not a duplicate value (a `distinctUntilChanged` would have caught that), but two *different*
+ * [SessionUiState] values a few microseconds apart, only the first of which the test's exact
+ * `awaitItem()` sequence expected. Reading [session] and [exercises] here rather than as
+ * separate outer `combine` arguments is what makes "the session changed" and "progress changed"
+ * arrive as one atomic update instead of two.
  */
-private data class RestPanel(
-    val remaining: Duration?,
+private data class SessionData(
+    val session: WorkoutSession?,
+    val exercises: List<SessionExerciseRow>,
     val upNext: UpNextSet?,
+    val progress: SessionProgress?,
+    /** Which row is open — see the computation site for why this is not [SessionProgress.current]. */
+    val openSessionExerciseId: SessionExerciseId?,
+    val nextLoggableSet: UpNextSet?,
 )
+
+/**
+ * [SessionData] plus the rest countdown (ADR-0023). Kept as a second, outer `combine` — not
+ * folded into [SessionData]'s own — because [RestController.remaining] ticks once a second for
+ * as long as any collector holds it, and [SessionData]'s own computation is not free: it reads
+ * [SessionProgress], and calls [PrefillFromLastSet] and [SetRepository.lastSetOfBefore], both
+ * suspend Room queries. Combining those into the same lambda `remaining` feeds would re-run all
+ * three every single second, forever, for no reason — the countdown ticking is not a reason for
+ * the plan or the one-tap prefill to be recomputed. Splitting them costs nothing structurally
+ * (this combine still fires from exactly one upstream subscription to each cold flow, so
+ * [SessionData]'s own class doc about atomic updates still holds) and turns a per-second Room
+ * query pair into what it should be: work done only when the session actually changes.
+ */
+private data class SessionComputed(
+    val data: SessionData,
+    val remaining: Duration?,
+) {
+    // Pass-through accessors so call sites read `computed.progress` etc. rather than
+    // `computed.data.progress` — SessionData's split from this class is an internal
+    // recomputation-cost detail, not something the rest of the ViewModel should have to know.
+    val session get() = data.session
+    val exercises get() = data.exercises
+    val upNext get() = data.upNext
+    val progress get() = data.progress
+    val openSessionExerciseId get() = data.openSessionExerciseId
+    val nextLoggableSet get() = data.nextLoggableSet
+}
 
 /**
  * What the session screen itself renders, grouped only because `combine` takes a fixed number
@@ -127,7 +198,6 @@ private data class RestPanel(
 private data class ScreenExtras(
     val unit: WeightUnit,
     val entry: SetEntry?,
-    val rest: RestPanel,
     val edit: SetEdit?,
     val canUndoSetDelete: Boolean,
 )
@@ -254,16 +324,11 @@ class ActiveSessionViewModel
                     }
                 }
 
-        /**
-         * US-02b: newest first, so the exercise just added is under the thumb rather than at
-         * the bottom of a growing list.
-         *
-         * Reversed here and not in SQL on purpose. [exercisesInOrder] stays in `position`
-         * order — the order the workout was performed in, which is what history (US-06b)
-         * reads, what US-06a's restore promises back unchanged, and what guided mode walks
-         * through to find the next exercise (US-05a).
-         */
-        private val exercises: Flow<List<SessionExerciseRow>> = exercisesInOrder.map { it.asReversed() }
+        // US-02b's newest-first reversal lives in sessionComputed now (see its doc) — reversed
+        // there rather than in SQL, same as before, but read out of the one atomic combine
+        // instead of a second top-level subscription to exercisesInOrder. [exercisesInOrder]
+        // itself stays in `position` order for the callers below that need it that way: history
+        // (US-06b), US-06a's restore, and guided mode finding the next exercise (US-05a).
 
         /**
          * Walking through one exercise lives in its own state holder; see [GuidedController].
@@ -287,67 +352,149 @@ class ActiveSessionViewModel
             )
 
         /**
-         * What follows the running rest (ADR-0023), recomputed from the database whenever the
-         * session's sets change. `exercises` already re-emits on every write, so it is the
-         * trigger; nothing about "up next" is remembered between emissions.
+         * The session itself, its exercises, how far through the plan it is, and what one tap
+         * would log next (ADR-0029, US-35) — everything that is a function of the session
+         * changing, as opposed to a second ticking by. One `combine`, for the reason
+         * [SessionData]'s doc explains: reading `session`/`exercises` back out of *this* value,
+         * rather than from separate outer `combine` arguments that independently resubscribe
+         * `activeSession` / `exercisesInOrder`, is what keeps them arriving as one atomic update.
+         *
+         * [SessionProgress] reads [rows] in plan order (the order [exercisesInOrder] is already
+         * in) rather than the newest-first order the display list uses, since "current" and
+         * "still to come" are both defined in terms of the plan; `exercises` below reverses it
+         * for display the same way the old top-level `exercises` val did (US-02b).
+         *
+         * The one-tap prefill ([UpNextSet] built from [SessionProgress]'s open movement) is a
+         * deliberately separate computation from [determineUpNextSet], which is keyed off "the
+         * most recently logged set in this session" and is null until something has been logged
+         * at all; the movement list needs a one-tap target from the very first set of the
+         * session, before anything has been logged for anyone. It reads
+         * [PrefillFromLastSet] only — not [SessionExercise.target] — matching `Add set`'s
+         * current behaviour exactly (US-30's target-aware prefill is a separate, not-yet-built
+         * change; both this and `Add set` pick it up together when it lands, rather than
+         * drifting apart from each other in the meantime).
          */
-        private val restPanel: Flow<RestPanel> =
+        private val sessionData: Flow<SessionData> =
             combine(
-                rest.remaining(),
                 activeSession,
                 member,
                 unitPreference.observe(),
-                exercises,
-            ) { remaining, session, memberId, unit, _ ->
-                RestPanel(
-                    remaining = remaining,
+                exercisesInOrder,
+            ) { session, memberId, unit, rows ->
+                val progress =
+                    session?.let {
+                        SessionProgress.of(
+                            session = it,
+                            exercises = rows.map { row -> row.sessionExercise },
+                            sets = rows.flatMap { row -> row.sets },
+                        )
+                    }
+
+                // The row the session screen has open (ADR-0029) — deliberately *not*
+                // progress.current. SessionProgress.current means "zero sets logged", which is
+                // correct for the header's "n of m done" but wrong for "which row is expanded
+                // on screen": the moment the first set is logged against it, progress.current
+                // would jump straight to null (or the next movement), and the movement someone
+                // is mid-set on — one of three sets done, two to go — would have nowhere to
+                // render at all. "The last movement with any set logged, or the first movement
+                // if none do yet" is what the design's `1a Session mid-set` frame actually
+                // shows: a movement with SET 1 and SET 2 already checked off and SET 3 dimmed
+                // as NEXT, all on the *same* open row.
+                val currentRow = rows.lastOrNull { it.sets.isNotEmpty() } ?: rows.firstOrNull()
+                val prefill =
+                    currentRow?.let { row -> prefillFromLastSet(row.sessionExercise.exerciseId, memberId, unit) }
+                val nextLoggableSet =
+                    if (currentRow == null || prefill == null) {
+                        null
+                    } else {
+                        UpNextSet(
+                            sessionExerciseId = currentRow.sessionExercise.id,
+                            exerciseId = currentRow.sessionExercise.exerciseId,
+                            setNumber = currentRow.sets.size + 1,
+                            prefill = prefill,
+                            comparison =
+                                sets.lastSetOfBefore(
+                                    currentRow.sessionExercise.exerciseId,
+                                    memberId,
+                                    currentRow.sessionExercise.sessionId,
+                                ),
+                        )
+                    }
+
+                SessionData(
+                    session = session,
+                    // US-02b: newest first, the same reversal the old top-level `exercises`
+                    // val did — kept here instead so nothing outside this combine subscribes
+                    // to exercisesInOrder a second time.
+                    exercises = rows.asReversed(),
                     upNext = session?.let { determineUpNextSet(it.id, memberId, unit) },
+                    progress = progress,
+                    openSessionExerciseId = currentRow?.sessionExercise?.id,
+                    nextLoggableSet = nextLoggableSet,
                 )
             }
 
         /**
-         * The screen state everything but [finish] drives. A `combine` of five is already at
-         * the arity `kotlinx.coroutines.flow.combine` offers without an array-indexed lambda, so
-         * [finish] is layered on with a second, outer `combine` below rather than squeezed into
-         * one of the existing grouping records — it is not a screen extra or a side trip, and
-         * ADR-0017 already asked this class not to pile unrelated concerns onto those.
+         * [sessionData] plus the rest countdown (ADR-0023). See [SessionComputed]'s doc for why
+         * this is a second, outer `combine` rather than adding `rest.remaining()` as a fifth
+         * argument above: that ticks once a second for as long as the session is active, and
+         * [sessionData]'s own computation is two suspend Room queries deep — this is what keeps
+         * a countdown tick from re-running either of them.
+         */
+        private val sessionComputed: Flow<SessionComputed> =
+            combine(rest.remaining(), sessionData) { remaining, data ->
+                SessionComputed(data = data, remaining = remaining)
+            }
+
+        /**
+         * The screen state everything but [finish] drives. `sessionComputed` is a single
+         * argument here rather than the several it replaces (`activeSession`, `exercises`, the
+         * rest panel, [SessionProgress], the one-tap prefill) — see its doc for why folding
+         * them into one atomic value, instead of separate `combine` arguments that would each
+         * independently resubscribe the same cold upstream flows, is load-bearing here and not
+         * just tidying up.
          */
         private val sessionState: Flow<SessionUiState> =
             combine(
-                activeSession,
+                sessionComputed,
                 stalePrompt,
-                exercises,
                 combine(
                     unitPreference.observe(),
                     setEntry.entry,
-                    restPanel,
                     setEdit.edit,
                     setEdit.canUndo,
-                ) { unit, entry, panel, edit, canUndoSetDelete ->
-                    ScreenExtras(unit, entry, panel, edit, canUndoSetDelete)
+                ) { unit, entry, edit, canUndoSetDelete ->
+                    ScreenExtras(unit, entry, edit, canUndoSetDelete)
                 },
                 combine(removal.canUndo, guided.state) { canUndoRemoval, guidedState ->
                     SideTrips(canUndoRemoval, guidedState)
                 },
-            ) { session, prompt, inSession, extras, sideTrips ->
+            ) { computed, prompt, extras, sideTrips ->
                 SessionUiState(
                     isLoading = false,
-                    activeSession = session,
+                    activeSession = computed.session,
                     stalePrompt = prompt,
-                    exercises = inSession,
+                    exercises = computed.exercises,
                     unit = extras.unit,
                     setEntry = extras.entry,
                     setEdit = extras.edit,
                     canUndoSetDelete = extras.canUndoSetDelete,
-                    restRemaining = extras.rest.remaining,
-                    upNext = extras.rest.upNext,
+                    restRemaining = computed.remaining,
+                    upNext = computed.upNext,
                     canUndoRemoval = sideTrips.canUndoRemoval,
                     guided = sideTrips.guided,
+                    progress = computed.progress,
+                    openSessionExerciseId = computed.openSessionExerciseId,
+                    nextLoggableSet = computed.nextLoggableSet,
                 )
             }
 
         val uiState: StateFlow<SessionUiState> =
             combine(sessionState, finish.flow) { state, finishing -> state.copy(finish = finishing) }
+                // Cheap insurance, not the fix for the transient-state race sessionComputed's
+                // doc describes — that fix is structural (one atomic combine). This just
+                // collapses the case where finish.flow re-emits its already-current value.
+                .distinctUntilChanged()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
         init {

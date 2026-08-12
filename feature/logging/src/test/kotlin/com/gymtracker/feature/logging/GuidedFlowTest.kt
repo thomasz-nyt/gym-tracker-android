@@ -96,7 +96,7 @@ class GuidedFlowTest {
             restTimerStore = restStore,
             prefillFromLastSet = PrefillFromLastSet(sets),
             unitPreference = units,
-            startSession = StartSession(repository, clock) { SessionId("new") },
+            startSession = StartSession(repository, restStore, clock) { SessionId("new") },
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),

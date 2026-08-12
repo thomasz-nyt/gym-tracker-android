@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -15,12 +17,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.rest.UpNextSet
+import com.gymtracker.core.domain.session.SessionProgress
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
+import com.gymtracker.feature.logging.SessionExerciseRow
 import com.gymtracker.feature.logging.WarmUp
 import java.time.Duration
 import java.time.Instant
@@ -32,8 +38,9 @@ import java.util.Locale
  * The warm-up: a stopwatch, and nothing else (US-28, ADR-0021).
  *
  * Idle, it is one quiet text button — the warm-up is the least of what this screen does and it
- * does not get to look like the most. Running, it counts up at the size the rest countdown uses,
- * because it is read from the same distance.
+ * does not get to look like the most. Running, it counts up at [displayLarge]'s size — ADR-0029
+ * gave that role to "the countdown you read from across the room," and a warm-up is read from
+ * the same distance.
  *
  * What is deliberately absent: a weight field, a rep field, an exercise name, and any "save".
  * There is nothing to save. Stopping it discards it, which is why the control says "Done"
@@ -64,10 +71,10 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
-                Text("Warm-up", style = MaterialTheme.typography.titleSmall)
+                EyebrowLabel(text = "Warm-up", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     text = elapsed.asCountdown(),
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.displayLarge,
                     modifier =
                         Modifier.semantics {
                             contentDescription = "Warm-up ${elapsed.asCountdown()} elapsed, not recorded"
@@ -85,115 +92,198 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
 }
 
 /**
- * The rest countdown, at the size you can read from where you are actually standing (ADR-0016).
+ * Resting, as ADR-0029 draws it: the countdown is a full-bleed accent surface, and "Up next" —
+ * the movement, its target, and the comparison to last time — sits below it on the bare ground,
+ * not inside the coloured block. The log button beneath both stays live and says
+ * "DON'T WAIT" (ADR-0023's rule, restated for the new copy): resting never blocks logging.
  *
- * It was an assist chip, which made the most-glanced thing on the screen the smallest. Skip is
- * beside it because it is the only decision the timer offers.
+ * **The design's `+30s` and its audio-cue label ("CUE AT 0:10 & 0:00") are both left out.**
+ * `RestTimer.extend()` does not exist yet, and a button that visibly does nothing is worse than
+ * an absent one — as is a label promising a sound the phone never makes. Both arrive together
+ * with the use case that backs them, rather than as chrome drawn ahead of its behaviour.
+ *
+ * The design's countdown progress bar needs the configured rest *duration*, not just what is
+ * left — [SessionUiState][com.gymtracker.feature.logging.SessionUiState] does not carry that
+ * today, and faking a fraction from [remaining] alone would draw a bar that resets to full every
+ * time the countdown ticks. Left out rather than built wrong; the fix is threading
+ * `RestTimerStore.defaultRest` through, not a layout change.
  */
 @Composable
-internal fun RestBanner(
+internal fun RestingBody(
     remaining: Duration,
     upNext: UpNextSet?,
     exerciseName: String?,
+    progress: SessionProgress?,
+    exercises: List<SessionExerciseRow>,
     unit: WeightUnit,
     onSkipRest: () -> Unit,
     onLogNext: () -> Unit,
     onAdjust: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(GymDimens.Gap),
-            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("Rest", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = remaining.asCountdown(),
-                        style = MaterialTheme.typography.displayMedium,
-                        modifier =
-                            Modifier.semantics {
-                                contentDescription = "Rest ${remaining.asCountdown()} remaining"
-                            },
-                    )
-                }
-                TextButton(
-                    onClick = onSkipRest,
-                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                ) {
-                    Text("Skip")
-                }
-            }
+    Column(modifier = modifier) {
+        RestCountdownBanner(remaining = remaining, onSkipRest = onSkipRest)
 
-            // ADR-0023: the ninety seconds says what is coming, and lets it be logged from here.
-            // Absent before the first set of the session — there is nothing to be next yet.
-            if (upNext != null) {
-                UpNext(upNext = upNext, exerciseName = exerciseName, unit = unit)
-                Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-                    PrimaryActionButton(
-                        text = "Log set ${upNext.setNumber}",
-                        onClick = onLogNext,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(
-                        onClick = onAdjust,
-                        modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                    ) {
-                        Text("Adjust")
-                    }
+        if (upNext != null) {
+            UpNext(
+                upNext = upNext,
+                exerciseName = exerciseName,
+                nextMovementName = nextMovementName(progress, exercises),
+                unit = unit,
+                modifier = Modifier.padding(GymDimens.ScreenPadding).weight(1f, fill = false),
+            )
+
+            // Deliberately *not* wrapped in Modifier.verticalScroll to give performScrollTo() a
+            // scrollable ancestor — SessionMovements.kt's BottomLogBar tried exactly that and
+            // it made Compose's test idling hang instead of the throw it was meant to avoid,
+            // for as long as the caller's own timeout. No test currently targets this row, but
+            // if one needs to, the proven fix is putting it inside a real LazyColumn (as
+            // SessionPlan's log bar is now), not a bare verticalScroll on an already-fitting Row.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
+                modifier = Modifier.padding(horizontal = GymDimens.ScreenPadding, vertical = GymDimens.Gap),
+            ) {
+                PrimaryActionButton(
+                    eyebrow = "LOG SET ${upNext.setNumber} — DON'T WAIT",
+                    detail = logButtonDetail(upNext, unit),
+                    onClick = onLogNext,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(
+                    onClick = onAdjust,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
+                ) {
+                    // "Add set", not the design's "ADJUST" — see SessionScaffold.kt's
+                    // BottomLogBar for why: this opens the exact sheet that label already names,
+                    // and TwoTapSetLoggingTest matches that string literally.
+                    Text("Add set")
                 }
             }
         }
     }
 }
 
+/** The accent-filled countdown block: eyebrow, the giant number, and `SKIP REST`. */
+@Composable
+private fun RestCountdownBanner(
+    remaining: Duration,
+    onSkipRest: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        ) {
+            EyebrowLabel(text = "Rest", color = MaterialTheme.colorScheme.onPrimary)
+            Text(
+                text = remaining.asCountdown(),
+                style = MaterialTheme.typography.displayLarge,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = "Rest ${remaining.asCountdown()} remaining"
+                    },
+            )
+            OutlinedButton(
+                onClick = onSkipRest,
+                shape = MaterialTheme.shapes.large,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.StepperTarget),
+            ) {
+                Text("SKIP REST")
+            }
+        }
+    }
+}
+
 /**
- * What the next set will be, and what the same movement was last time (ADR-0023).
+ * What the next set will be, and what the same movement was last time (ADR-0023, ADR-0029).
  *
- * Note what is **not** here: no "of N", because nothing in the app knows how many sets you
- * intend — [UpNextSet] has no field it could be rendered from. And no comparison at all when
- * the movement has no earlier session, rather than a zero or a dash pretending to be one
- * (constitution §2.4).
+ * [nextMovementName] is the "then Seated Cable Rows" clause — present only for a session
+ * started from a routine ([SessionProgress.orderIsAPlan]), the same rule the segment bar in
+ * [SessionScaffold] follows: a freestyle session's order is add-order, not a plan, and this
+ * screen does not claim otherwise.
  */
 @Composable
 private fun UpNext(
     upNext: UpNextSet,
     exerciseName: String?,
+    nextMovementName: String?,
     unit: WeightUnit,
+    modifier: Modifier = Modifier,
 ) {
     val next = WeightFormatter.format(upNext.prefill.weight?.let { UnitConverter.toKilograms(it, unit) }, unit)
-    Column {
-        Text("Up next", style = MaterialTheme.typography.titleSmall)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+        EyebrowLabel(text = "Up next", color = MaterialTheme.colorScheme.primary)
         Text(
             text = exerciseName ?: upNext.exerciseId.value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.headlineSmall,
         )
-        Text(
+        NumeralText(
             text =
                 buildString {
+                    // No "of N": UpNextSet's own doc is explicit that the app does not know how
+                    // many sets are intended, so there is no total here to render (ADR-0023).
                     append("Set ${upNext.setNumber}")
-                    append("   ${upNext.prefill.reps} reps")
-                    append("   ${next.primary}")
-                    next.secondary?.let { append("  ·  $it") }
+                    nextMovementName?.let { append("  ·  then $it") }
                 },
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        GymDivider()
+        // The reading unit alone at 44sp, and the conversion on its own quieter line beneath.
+        // Both on one line is 20-odd characters at that size: it wrapped, and the wrap pushed
+        // the comparison below it off the panel. ADR-0008 wants both units present, not both
+        // equally loud — this is the same primary/secondary split the set rows already use.
+        NumeralText(
+            text = "${next.primary} × ${upNext.prefill.reps}",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        next.secondary?.let { secondary ->
+            NumeralText(
+                text = secondary,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         upNext.comparison?.let { last ->
             val previous = WeightFormatter.format(last.weightKg, unit)
-            Text(
-                text = "Last ${last.performedAt.asDay()}  ·  ${last.reps} reps   ${previous.primary}",
-                style = MaterialTheme.typography.bodyMedium,
+            NumeralText(
+                text = "Last ${last.performedAt.asDay()}  ·  ${previous.primary} × ${last.reps}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+}
+
+/** The first movement in [SessionProgress.stillToCome], only when the session's order is a plan. */
+private fun nextMovementName(
+    progress: SessionProgress?,
+    exercises: List<SessionExerciseRow>,
+): String? {
+    val next = progress?.takeIf { it.orderIsAPlan }?.stillToCome?.firstOrNull() ?: return null
+    return exercises.firstOrNull { it.sessionExercise.id == next.id }?.exercise?.name ?: next.exerciseId.value
+}
+
+/**
+ * "LOG SET n" button's detail line — the reading unit only, matching [UpNext]'s big line.
+ *
+ * The conversion is deliberately absent here rather than appended: the button is half the
+ * screen's width beside `Add set`, and both units at `titleMedium` wrapped to a second line
+ * that the button's own height then clipped. The kilo figure is on screen directly above,
+ * in [UpNext], for anyone who reads in that unit (ADR-0008).
+ */
+private fun logButtonDetail(
+    upNext: UpNextSet,
+    unit: WeightUnit,
+): String {
+    val weight = WeightFormatter.format(upNext.prefill.weight?.let { UnitConverter.toKilograms(it, unit) }, unit)
+    return "${weight.primary} × ${upNext.prefill.reps}"
 }
 
 /** The day a set happened, for the rest panel's comparison line. */

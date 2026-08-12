@@ -43,4 +43,25 @@ object GymDimens {
      * outlined.
      */
     val DividerThickness = 2.dp
+
+    /**
+     * A structural rule (ADR-0029): the heavier of the two weights the session screen draws
+     * with, under the header. [DividerThickness] is the same thickness deliberately — the two
+     * differ in colour, not weight (solid ink here, [outlineVariant][ColorScheme.outlineVariant]
+     * for a row rule), so this token exists for readability at the call site, not a different
+     * number.
+     */
+    val StructuralRuleThickness = DividerThickness
+
+    /** ADR-0029: one bar in the session header's segment indicator. */
+    val SegmentHeight = 6.dp
+
+    /**
+     * The gap between segment-bar bars (ADR-0029). The design's own value is 3dp; this reuses
+     * [HairGap] (4dp) rather than adding a token for a 1dp difference nothing else needs.
+     */
+    val SegmentGap = HairGap
+
+    /** ADR-0029: the fixed-width label column a set row and a still-to-come row both align to. */
+    val RowLabelWidth = 44.dp
 }

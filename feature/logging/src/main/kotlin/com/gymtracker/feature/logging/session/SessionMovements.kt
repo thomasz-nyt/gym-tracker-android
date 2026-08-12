@@ -7,108 +7,268 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExerciseId
+import com.gymtracker.core.domain.rest.UpNextSet
+import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.feature.logging.SessionExerciseRow
 
 /**
- * The exercises in the session, each with its sets and its way to add another (US-03).
+ * The plan, live (ADR-0029): the open movement with its set rows, and everything still to come
+ * as one ruled line each. Read against the design bundle's `1a Session mid-set` frame.
  *
- * One card per exercise, each ending in a full-width "Add set" (ADR-0016). It used to be a
- * small text button on the row's right edge — the most-tapped control in the app rendered as
- * the smallest thing on screen. "Start exercise" (US-05a) and "Remove" (US-02c) sit above it as
- * a lighter-weight row: "Add set" stays the one filled action per card.
+ * Replaces the card stack this used to be. There is no `Card` and no `surfaceContainer*` fill
+ * anywhere below — flush-left rows on the bare ground, separated by [GymDivider]'s row-weight
+ * rule. The one filled control on the whole screen is the log button in [SessionScaffold]'s
+ * bottom bar, not anything in this file.
+ *
+ * [openSessionExerciseId] — not [com.gymtracker.core.domain.session.SessionProgress.current] —
+ * decides which row is open. `SessionProgress.current` means "zero sets logged," which is right
+ * for the header's "n of m done" and wrong for this: the moment the open movement's first set
+ * is logged, `current` would jump to the *next* movement (or null), and the movement someone is
+ * mid-set on — two of three sets done — would have nowhere to render. See
+ * `ActiveSessionViewModel`'s computation of [openSessionExerciseId] for the actual rule.
+ * "Still to come" reads plan order back out of [exercises] itself (`sessionExercise.position`)
+ * rather than needing a second, separately-ordered list passed in.
+ *
+ * "Start exercise" (US-05a) and "Remove" (US-02c) are not in the design's frames — the mockup
+ * does not show every control the app already has to keep. They stay, as a quiet text row under
+ * the open movement's meta line, because guided mode and removing a movement are both real
+ * capabilities this screen cannot silently drop.
+ *
+ * **The log bar is the last item in this `LazyColumn`, not a fixed sibling outside it.** ADR-0029
+ * describes it as pinned; the first attempt at that (a plain `Row` outside this list) is exactly
+ * where `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` broke: `performScrollTo()` throws —
+ * not no-ops — on a node with no scrollable ancestor at all, which a fixed sibling never has.
+ * Wrapping that lone `Row` in its own `Modifier.verticalScroll` "fixed" the throw but made
+ * `waitUntil`/`performScrollTo` hang instead, for as long as the test's own timeout, on every
+ * one of those tests — worth naming plainly as a real, reproduced failure mode, not a hunch: a
+ * `ScrollState` Compose's test idling never considers settled is a bug in the *app*, not just an
+ * inconvenience for the suite. The old per-card "Add set" already proved a `LazyColumn` item
+ * works; putting the log bar back inside one is the same proven shape, not a new one.
  */
 @Composable
-internal fun SessionExercises(
+internal fun SessionPlan(
     exercises: List<SessionExerciseRow>,
+    openSessionExerciseId: SessionExerciseId?,
+    nextLoggableSet: UpNextSet?,
     unit: WeightUnit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
+    onLogNextSet: (UpNextSet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-        itemsIndexed(exercises, key = { _, row -> row.sessionExercise.id.value }) { index, row ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(GymDimens.Gap),
-                    verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        // The catalog entry is only absent if the row outlived its exercise,
-                        // which the schema forbids; show the id rather than a blank line.
-                        Text(
-                            text = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        // The place added, not the place shown (US-02b): the list itself is
-                        // newest-first, but this number counts up in the order you added them,
-                        // so removing one leaves a gap on purpose rather than renumbering.
-                        Text(
-                            text = "${exercises.size - index}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    LoggedSets(row.sets, unit) { set -> onEditSet(row, set) }
-                    Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-                        TextButton(
-                            onClick = { onStartExercise(row) },
-                            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                        ) {
-                            Text("Start exercise")
-                        }
-                        // ADR-0019 replaced ADR-0016's "red means destructive" with a structural
-                        // rule, because red is the accent now: a destructive control never
-                        // shares a surface with a save, and is outlined rather than filled. This
-                        // button predates that rule and still sits beside "Add set" on the same
-                        // card — a known exception ADR-0019 flags to revisit, not a pattern to
-                        // copy (US-02c).
-                        TextButton(
-                            onClick = { onRemoveExercise(row.sessionExercise.id) },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                        ) {
-                            Text("Remove")
-                        }
-                    }
-                    PrimaryActionButton(text = "Add set", onClick = { onAddSet(row) })
-                }
+    val planOrder = exercises.sortedBy { it.sessionExercise.position }
+    val currentRow = planOrder.firstOrNull { it.sessionExercise.id == openSessionExerciseId }
+
+    LazyColumn(modifier = modifier) {
+        if (currentRow != null) {
+            item(key = "current-${currentRow.sessionExercise.id.value}") {
+                CurrentMovement(
+                    row = currentRow,
+                    exerciseNumber = currentRow.sessionExercise.position,
+                    movementsTotal = planOrder.size,
+                    unit = unit,
+                    onRemoveExercise = onRemoveExercise,
+                    onStartExercise = onStartExercise,
+                    onEditSet = onEditSet,
+                )
+            }
+        }
+
+        val stillToCome =
+            if (currentRow == null) {
+                emptyList()
+            } else {
+                planOrder.filter { it.sessionExercise.position > currentRow.sessionExercise.position }
+            }
+        if (stillToCome.isNotEmpty()) {
+            item(key = "still-to-come-label") {
+                EyebrowLabel(
+                    text = "Still to come",
+                    // Deliberately muted, not accent — the redesign audit's finding 07 flagged
+                    // exactly this shape (a label the same colour as a link) reading as tappable
+                    // when it is not.
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = GymDimens.Gap, bottom = GymDimens.TightGap),
+                )
+            }
+            items(stillToCome, key = { "queue-${it.sessionExercise.id.value}" }) { row ->
+                StillToComeRow(
+                    index = row.sessionExercise.position,
+                    name = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
+                    target = row.sessionExercise.target,
+                    unit = unit,
+                    // Out-of-order logging already exists (US-02): tapping ahead opens the same
+                    // sheet "Add set" would, for the movement tapped rather than the current one.
+                    onClick = { onAddSet(row) },
+                )
+            }
+        }
+
+        if (currentRow != null) {
+            item(key = "log-bar") {
+                BottomLogBar(
+                    currentRow = currentRow,
+                    nextLoggableSet = nextLoggableSet,
+                    unit = unit,
+                    onLogNextSet = onLogNextSet,
+                    onAddSet = onAddSet,
+                    modifier = Modifier.padding(top = GymDimens.Gap, bottom = GymDimens.ScreenPadding),
+                )
             }
         }
     }
 }
 
 /**
- * The sets already logged against one exercise, each in both units (ADR-0008), and each its own
- * tap target (ADR-0022).
+ * The mid-set log bar: the one-tap log button plus the way to open the stepper sheet (US-35).
+ * Absent — not disabled — when there is nothing to log one-tap ([nextLoggableSet] null): a
+ * brand-new exercise with no history and no target has nothing sensible to write without
+ * opening the sheet first, so only the sheet-opening button shows in that case.
  *
- * These used to be collapsed — three identical sets read as "3 × 12" on one line (ADR-0009).
- * That was fine to read and impossible to correct: one line, three rows, three ids, and no way
- * for a tap to say which. US-04 needs every set reachable, so the grouping went and the set
- * index stays as the label, naming the row it edits.
+ * **The secondary button reads "Add set", not the design's "ADJUST".** It is the exact same
+ * control `Add set` always was — same callback, same sheet, same "Save set" confirm — and
+ * `TwoTapSetLoggingTest` matches `onNodeWithText("Add set")` literally. Renaming the label
+ * without renaming what it does would be exactly the kind of change CLAUDE.md and the roadmap
+ * both call out: "if this test needs editing, the redesign went wrong." It does not need
+ * editing, because the control it depends on kept its name.
+ */
+@Composable
+private fun BottomLogBar(
+    currentRow: SessionExerciseRow,
+    nextLoggableSet: UpNextSet?,
+    unit: WeightUnit,
+    onLogNextSet: (UpNextSet) -> Unit,
+    onAddSet: (SessionExerciseRow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+        if (nextLoggableSet != null) {
+            PrimaryActionButton(
+                eyebrow = "LOG SET ${nextLoggableSet.setNumber}",
+                detail = logButtonDetail(nextLoggableSet, unit),
+                onClick = { onLogNextSet(nextLoggableSet) },
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(
+                onClick = { onAddSet(currentRow) },
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
+            ) {
+                Text("Add set")
+            }
+        } else {
+            PrimaryActionButton(
+                text = "Add set",
+                onClick = { onAddSet(currentRow) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** "100 lb · 45.4 kg × 8", the same conversion [RestPanel]'s "Up next" reads. */
+private fun logButtonDetail(
+    next: UpNextSet,
+    unit: WeightUnit,
+): String {
+    val weight = WeightFormatter.format(next.prefill.weight?.let { UnitConverter.toKilograms(it, unit) }, unit)
+    // Reading unit only — same reason as RestPanel.kt's namesake: this button shares its row
+    // with `Add set`, and both units at this size wrap to a line the button then clips. The set
+    // rows directly above carry the conversion (ADR-0008).
+    return "${weight.primary} × ${next.prefill.reps}"
+}
+
+/**
+ * The movement currently open: eyebrow, name, target, its set rows, and (kept from before the
+ * redesign, absent from the design's own frames) the way to start it guided or remove it.
+ */
+@Composable
+private fun CurrentMovement(
+    row: SessionExerciseRow,
+    exerciseNumber: Int,
+    movementsTotal: Int,
+    unit: WeightUnit,
+    onRemoveExercise: (SessionExerciseId) -> Unit,
+    onStartExercise: (SessionExerciseRow) -> Unit,
+    onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
+) {
+    Column(modifier = Modifier.padding(bottom = GymDimens.Gap)) {
+        Column(
+            modifier = Modifier.padding(bottom = GymDimens.TightGap),
+            // GymDimens has no token between 0 and HairGap (4dp); reusing it here rather than
+            // naming a raw 2dp, per ADR-0011's "feature code never hard-codes a dp" rule.
+            verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
+        ) {
+            EyebrowLabel(
+                text = "Exercise $exerciseNumber of $movementsTotal",
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            targetLine(row.sessionExercise.target, unit)?.let { line ->
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+            TextButton(
+                onClick = { onStartExercise(row) },
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Start exercise")
+            }
+            // ADR-0019's structural rule (a destructive control never shares a surface with a
+            // save) is about the screen's one filled control, which this row is not — but it
+            // stays outlined-in-spirit (plain text, error-coloured) rather than filled regardless.
+            TextButton(
+                onClick = { onRemoveExercise(row.sessionExercise.id) },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Remove")
+            }
+        }
+
+        LoggedSets(row.sets, unit) { set -> onEditSet(row, set) }
+    }
+}
+
+/**
+ * The sets already logged against the current movement, each in both units (ADR-0008), each its
+ * own tap target (ADR-0022) — ruled rows, not a collapsed line (ADR-0009 already explained why:
+ * one line for three sets was unreadable to correct). Every row runs through [NumeralText] so
+ * its numbers carry the weight ADR-0019 asks for.
  */
 @Composable
 private fun LoggedSets(
@@ -116,35 +276,137 @@ private fun LoggedSets(
     unit: WeightUnit,
     onEditSet: (ExerciseSet) -> Unit,
 ) {
-    if (sets.isEmpty()) {
-        Text("No sets yet", style = MaterialTheme.typography.bodyMedium)
-        return
-    }
-
     Column {
+        GymDivider()
         sets.forEach { set ->
             val weight = WeightFormatter.format(set.weightKg, unit)
-            Text(
-                text =
-                    buildString {
-                        append("${set.setIndex}.  ${set.reps} reps")
-                        append("   ${weight.primary}")
-                        weight.secondary?.let { append("  ·  $it") }
-                        set.rpe?.let { append("   RPE $it") }
-                    },
-                // The line you came back to the phone to read, so it takes the role that says
-                // so rather than the smallest one there is (ADR-0011).
-                style = MaterialTheme.typography.titleMedium,
+            Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .sizeIn(minHeight = GymDimens.MinTouchTarget)
                         .clickable { onEditSet(set) }
-                        // Named rather than left to the row's text, so the target says what it
-                        // does — for TalkBack (M7) as much as for the tests.
                         .semantics { contentDescription = "Edit set ${set.setIndex}" }
-                        .wrapContentHeight(Alignment.CenterVertically),
+                        .padding(vertical = GymDimens.HairGap),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "SET ${set.setIndex}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(GymDimens.RowLabelWidth),
+                )
+                NumeralText(
+                    text =
+                        buildString {
+                            append("${weight.primary} × ${set.reps}")
+                            weight.secondary?.let { append("  ·  $it") }
+                        },
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "✓",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            GymDivider()
+        }
+        if (sets.isEmpty()) {
+            Text(
+                text = "No sets yet",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = GymDimens.Gap),
             )
         }
+    }
+}
+
+/** One remaining movement in the plan: index, name, target — no per-row actions of its own. */
+@Composable
+private fun StillToComeRow(
+    index: Int,
+    name: String,
+    target: MovementTarget?,
+    unit: WeightUnit,
+    onClick: () -> Unit,
+) {
+    Column {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .clickable(onClick = onClick)
+                    .padding(vertical = GymDimens.HairGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$index",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(GymDimens.RowLabelWidth),
+            )
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            queueTargetLine(target, unit)?.let { line ->
+                NumeralText(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        GymDivider()
+    }
+}
+
+/** A section eyebrow (ADR-0029): uppercased for display only, the string itself untouched. */
+@Composable
+internal fun EyebrowLabel(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = modifier,
+    )
+}
+
+/** "Target 3 × 8 · 105 lb" for the current movement, or null when it has no target (US-13). */
+private fun targetLine(
+    target: MovementTarget?,
+    unit: WeightUnit,
+): String? {
+    val setsReps = setsRepsPart(target) ?: return null
+    val weight = target?.weightKg?.let { WeightFormatter.format(it, unit).primary }
+    return "Target $setsReps" + (weight?.let { " · $it" } ?: "")
+}
+
+/** "3×10 · 90 lb" for a still-to-come row — the same numbers, without the "Target" label. */
+private fun queueTargetLine(
+    target: MovementTarget?,
+    unit: WeightUnit,
+): String? {
+    val setsReps = setsRepsPart(target)?.replace(" × ", "×") ?: return null
+    val weight = target?.weightKg?.let { WeightFormatter.format(it, unit).primary }
+    return setsReps + (weight?.let { " · $it" } ?: "")
+}
+
+private fun setsRepsPart(target: MovementTarget?): String? {
+    val sets = target?.sets
+    val reps = target?.reps
+    return when {
+        sets != null && reps != null -> "$sets × $reps"
+        reps != null -> "$reps reps"
+        sets != null -> "$sets sets"
+        else -> null
     }
 }

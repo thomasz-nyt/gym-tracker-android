@@ -8,6 +8,7 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.routine.AddExerciseToRoutine
 import com.gymtracker.core.domain.routine.CreateRoutine
 import com.gymtracker.core.domain.routine.StartSessionFromRoutine
@@ -15,6 +16,8 @@ import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -23,10 +26,33 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+private class FakeRestTimerStore : RestTimerStore {
+    private val endsAt = MutableStateFlow<Instant?>(null)
+    private val default = MutableStateFlow(Duration.ofSeconds(60))
+    private val asked = MutableStateFlow(false)
+
+    override val restEndsAt = endsAt
+    override val defaultRest = default
+    override val shouldAskForNotificationPermission = asked.map { !it }
+
+    override suspend fun setRestEndsAt(instant: Instant?) {
+        endsAt.value = instant
+    }
+
+    override suspend fun setDefaultRest(rest: Duration) {
+        default.value = rest
+    }
+
+    override suspend fun markNotificationPermissionAsked() {
+        asked.value = true
+    }
+}
 
 /** US-29 as the routines list sees it. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -62,7 +88,10 @@ class RoutinesViewModelTest {
                 StartSessionFromRoutine(
                     routines = routines,
                     items = items,
-                    startSession = StartSession(sessions, Clock.fixed(now, ZoneOffset.UTC)) { SessionId("s-1") },
+                    startSession =
+                        StartSession(sessions, FakeRestTimerStore(), Clock.fixed(now, ZoneOffset.UTC)) {
+                            SessionId("s-1")
+                        },
                     addExerciseToSession =
                         AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextAppearance++}") },
                 ),
