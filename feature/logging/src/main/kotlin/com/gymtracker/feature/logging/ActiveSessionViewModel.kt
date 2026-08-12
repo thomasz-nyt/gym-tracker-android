@@ -35,8 +35,10 @@ import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.SetInput
+import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.set.UpdateSet
+import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -368,11 +370,10 @@ class ActiveSessionViewModel
          * deliberately separate computation from [determineUpNextSet], which is keyed off "the
          * most recently logged set in this session" and is null until something has been logged
          * at all; the movement list needs a one-tap target from the very first set of the
-         * session, before anything has been logged for anyone. It reads
-         * [PrefillFromLastSet] only — not [SessionExercise.target] — matching `Add set`'s
-         * current behaviour exactly (US-30's target-aware prefill is a separate, not-yet-built
-         * change; both this and `Add set` pick it up together when it lands, rather than
-         * drifting apart from each other in the meantime).
+         * session, before anything has been logged for anyone. It merges [SessionExercise.target]
+         * with [PrefillFromLastSet] per field — exactly the merge `SetEntryController.open` uses
+         * for `Add set` — rather than switching wholesale on whichever is present, since a
+         * target's own fields are each independently optional (US-30).
          */
         private val sessionData: Flow<SessionData> =
             combine(
@@ -401,8 +402,15 @@ class ActiveSessionViewModel
                 // shows: a movement with SET 1 and SET 2 already checked off and SET 3 dimmed
                 // as NEXT, all on the *same* open row.
                 val currentRow = rows.lastOrNull { it.sets.isNotEmpty() } ?: rows.firstOrNull()
-                val prefill =
+                val history =
                     currentRow?.let { row -> prefillFromLastSet(row.sessionExercise.exerciseId, memberId, unit) }
+                val target = currentRow?.sessionExercise?.target
+                val targetWeight = target?.weightKg?.let { UnitConverter.fromKilograms(it, unit) }
+                val mergedReps = target?.reps ?: history?.reps
+                val prefill =
+                    mergedReps?.let { reps ->
+                        SetPrefill(weight = targetWeight ?: history?.weight, reps = reps)
+                    }
                 val nextLoggableSet =
                     if (currentRow == null || prefill == null) {
                         null

@@ -3,6 +3,7 @@ package com.gymtracker.feature.routines
 import app.cash.turbine.test
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
@@ -13,6 +14,7 @@ import com.gymtracker.core.domain.routine.DeleteRoutine
 import com.gymtracker.core.domain.routine.MoveExerciseInRoutine
 import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
+import com.gymtracker.core.domain.routine.SetRoutineItemTarget
 import com.gymtracker.core.domain.set.LastPerformanceOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -68,6 +70,7 @@ class RoutineEditorViewModelTest {
             renameRoutine = RenameRoutine(routines),
             deleteRoutine = DeleteRoutine(routines),
             lastPerformanceOf = LastPerformanceOf(sets),
+            setRoutineItemTarget = SetRoutineItemTarget(items),
         ).also { it.open(upperA) }
 
     private suspend fun givenUpperA() {
@@ -231,21 +234,168 @@ class RoutineEditorViewModelTest {
         }
 
     @Test
-    fun `the editor state carries no target field for a screen to render`() =
+    fun `a movement with no target carries none, same absence pattern as lastTime`() =
         runTest {
-            // Structural, and the reason this test exists: if a future edit adds a target to
-            // MovementRow, this breaks rather than quietly shipping a prescription.
+            // ADR-0027 replaces the old structural test ("no target field exists") with this
+            // one: the field exists now, and a movement nobody has set a target for shows none —
+            // the same US-13 absence this class already tests for `lastTime`, not a zero.
             givenUpperA()
             val viewModel = viewModel()
             viewModel.onAddExercise(bench)
 
             viewModel.uiState.test {
-                val movement = expectMostRecentItem().movements.single()
-                val fields = movement.javaClass.declaredFields.map { it.name }
-                assertTrue(
-                    fields.none { it.contains("target", true) || it.contains("planned", true) },
-                    "MovementRow gained a target field: $fields",
-                )
+                assertNull(expectMostRecentItem().movements.single().target)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a movement's target is entered and reaches the screen`() =
+        runTest {
+            // The fake member reads pounds (ADR-0006): 135 lb typed is 61.23 kg stored, the
+            // same round trip `Add set`'s own weight field uses.
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8", weight = "135")
+            viewModel.target.onSave()
+
+            viewModel.uiState.test {
+                val target = expectMostRecentItem().movements.single().target
+                assertEquals(MovementTarget(sets = 3, reps = 8, weightKg = 61.23), target)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `editing an existing target shows its load back in the member's own unit`() =
+        runTest {
+            // Found on a device, not in a test: the load field showed the stored kilograms
+            // verbatim regardless of the member's unit, so entering "105" meant to be pounds
+            // was saved as 105 kg. This is the round trip that must hold instead.
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8", weight = "135")
+            viewModel.target.onSave()
+
+            viewModel.target.onEdit(itemId)
+
+            viewModel.target.editor.test {
+                assertEquals("135", awaitItem()?.weight, "61.23 kg read back as the 135 lb it was typed as")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a target can be entered with some fields left blank`() =
+        runTest {
+            // US-30: "3 x 8, load unrecorded is a plan" — each field is optional on its own.
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8")
+            viewModel.target.onSave()
+
+            viewModel.uiState.test {
+                val target = expectMostRecentItem().movements.single().target
+                assertEquals(MovementTarget(sets = 3, reps = 8, weightKg = null), target)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `editing one movement's target changes no other movement`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            viewModel.onAddExercise(squat)
+            val benchId = items.itemsOf(upperA).first { it.exerciseId == bench }.id
+
+            viewModel.target.onEdit(benchId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8", weight = "135")
+            viewModel.target.onSave()
+
+            viewModel.uiState.test {
+                val movements = expectMostRecentItem().movements
+                assertEquals(MovementTarget(3, 8, 61.23), movements.first { it.exerciseId == bench }.target)
+                assertNull(movements.first { it.exerciseId == squat }.target, "squat's target is untouched")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `an existing target reopens the editor prefilled, and can be changed`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8", weight = "135")
+            viewModel.target.onSave()
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.editor.test {
+                val editor = awaitItem()
+                assertEquals("3", editor?.sets)
+                assertEquals("8", editor?.reps)
+                assertEquals("135", editor?.weight)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            viewModel.target.onFieldChanged(reps = "6")
+            viewModel.target.onSave()
+
+            viewModel.uiState.test {
+                assertEquals(MovementTarget(3, 6, 61.23), expectMostRecentItem().movements.single().target)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a target can be cleared`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8", weight = "105")
+            viewModel.target.onSave()
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onClear()
+
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().movements.single().target)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `an out-of-range target is rejected rather than saved`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "0", reps = "8")
+            viewModel.target.onSave()
+
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().movements.single().target, "0 sets is not a valid target")
                 cancelAndIgnoreRemainingEvents()
             }
         }

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +35,7 @@ import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.set.LastPerformance
@@ -42,12 +46,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The routine editor (US-29): a name, an order, add and remove.
+ * The routine editor (US-29, and US-30 for the target half): a name, an order, add and remove
+ * — and, for each movement, a plan for next time.
  *
- * **What is not here is the design.** The mock let you tap a target — "3×8 · 100 lb" — and
- * change it. ADR-0020 chose a routine that stores no target, so there is no such field and no
- * control that could create one. What sits beside each movement instead is what you actually
- * lifted last time, dated and labelled as history.
+ * ADR-0020 originally chose a routine that stores no target at all — the mock's tappable
+ * "3×8 · 100 lb" was deliberately not built. ADR-0027 is the later, narrower reversal of
+ * exactly that point: a target can be entered, edited and cleared here, and it renders beside
+ * what was actually lifted last time, never merged into it — see [MovementListItem].
  */
 @Composable
 fun RoutineEditorRoute(
@@ -63,6 +68,7 @@ fun RoutineEditorRoute(
 
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isDeleted by viewModel.isDeleted.collectAsStateWithLifecycle()
+    val targetEditor by viewModel.target.editor.collectAsStateWithLifecycle()
 
     // The picker hands ids back the same way it does for a session (US-02a): appended in pick
     // order, so one visit can add several movements.
@@ -87,8 +93,19 @@ fun RoutineEditorRoute(
         onMoveUp = viewModel::onMoveUp,
         onMoveDown = viewModel::onMoveDown,
         onDeleteRoutine = viewModel::onDeleteRoutine,
+        onEditTarget = viewModel.target::onEdit,
         modifier = modifier,
     )
+
+    targetEditor?.let { editor ->
+        TargetEditorDialog(
+            editor = editor,
+            onFieldChanged = viewModel.target::onFieldChanged,
+            onSave = viewModel.target::onSave,
+            onClear = viewModel.target::onClear,
+            onDismiss = viewModel.target::onDismiss,
+        )
+    }
 }
 
 @Composable
@@ -101,6 +118,7 @@ internal fun RoutineEditorScreen(
     onMoveUp: (Int) -> Unit = {},
     onMoveDown: (Int) -> Unit = {},
     onDeleteRoutine: () -> Unit = {},
+    onEditTarget: (RoutineItemId) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -137,6 +155,7 @@ internal fun RoutineEditorScreen(
                             onMoveUp = { onMoveUp(index) },
                             onMoveDown = { onMoveDown(index) },
                             onRemove = { onRemoveMovement(row.itemId) },
+                            onEditTarget = { onEditTarget(row.itemId) },
                         )
                         GymDivider()
                     }
@@ -162,7 +181,11 @@ internal fun RoutineEditorScreen(
 }
 
 /**
- * One movement, and what it was last time.
+ * One movement: what it was last time, what it is planned to be next time, and reordering.
+ *
+ * [row.lastTime] and [row.target] are both shown when both exist, on their own lines, never
+ * reconciled into one (US-30, ADR-0027) — the labelling rule is what makes a target safe to
+ * show at all, so "Target" is part of the string, not a color or a position doing the work.
  *
  * Reordering is up/down rather than a drag — see [RoutineEditorViewModel.onMoveUp] for why.
  * The buttons are text for the same reason the bottom bar's labels are: there is no icon
@@ -177,6 +200,7 @@ private fun MovementListItem(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
+    onEditTarget: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = GymDimens.TightGap),
@@ -194,36 +218,76 @@ private fun MovementListItem(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-            TextButton(
-                onClick = onMoveUp,
-                enabled = !isFirst,
-                modifier =
-                    Modifier
-                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
-                        .semantics { contentDescription = "Move ${row.exerciseName} up" },
-            ) {
-                Text("Up")
-            }
-            TextButton(
-                onClick = onMoveDown,
-                enabled = !isLast,
-                modifier =
-                    Modifier
-                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
-                        .semantics { contentDescription = "Move ${row.exerciseName} down" },
-            ) {
-                Text("Down")
-            }
-            TextButton(
-                onClick = onRemove,
-                modifier =
-                    Modifier
-                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
-                        .semantics { contentDescription = "Remove ${row.exerciseName}" },
-            ) {
-                Text("Remove")
-            }
+        // The other half, added by ADR-0027: absent the same way when nobody has set one.
+        row.target?.let { target ->
+            Text(
+                text = target.asTargetLine(unit),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        MovementActions(
+            row = row,
+            isFirst = isFirst,
+            isLast = isLast,
+            onMoveUp = onMoveUp,
+            onMoveDown = onMoveDown,
+            onRemove = onRemove,
+            onEditTarget = onEditTarget,
+        )
+    }
+}
+
+/** Up, down, target, remove — split out of [MovementListItem] to keep that function short. */
+@Composable
+private fun MovementActions(
+    row: MovementRow,
+    isFirst: Boolean,
+    isLast: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onRemove: () -> Unit,
+    onEditTarget: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        TextButton(
+            onClick = onMoveUp,
+            enabled = !isFirst,
+            modifier =
+                Modifier
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .semantics { contentDescription = "Move ${row.exerciseName} up" },
+        ) {
+            Text("Up")
+        }
+        TextButton(
+            onClick = onMoveDown,
+            enabled = !isLast,
+            modifier =
+                Modifier
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .semantics { contentDescription = "Move ${row.exerciseName} down" },
+        ) {
+            Text("Down")
+        }
+        TextButton(
+            onClick = onEditTarget,
+            modifier =
+                Modifier
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .semantics { contentDescription = "Set a target for ${row.exerciseName}" },
+        ) {
+            Text(if (row.target == null) "Set target" else "Edit target")
+        }
+        TextButton(
+            onClick = onRemove,
+            modifier =
+                Modifier
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .semantics { contentDescription = "Remove ${row.exerciseName}" },
+        ) {
+            Text("Remove")
         }
     }
 }
@@ -249,3 +313,98 @@ private fun java.time.Instant.asDay(): String = DAY_FORMAT.format(atZone(ZoneId.
 
 private val DAY_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault())
+
+/**
+ * "Target 3 × 8 · 105 lb" — every present field joined, any absent field simply not mentioned
+ * (US-30: "each is optional on its own", so a load-only or a sets-only target is still a target,
+ * not nothing).
+ */
+private fun MovementTarget.asTargetLine(unit: WeightUnit): String {
+    val setsReps =
+        when {
+            sets != null && reps != null -> "$sets × $reps"
+            sets != null -> "$sets sets"
+            reps != null -> "$reps reps"
+            else -> null
+        }
+    val weight = weightKg?.let { WeightFormatter.format(it, unit).primary }
+    val parts = listOfNotNull(setsReps, weight)
+    return "Target " + parts.joinToString("  ·  ")
+}
+
+/**
+ * Sets, edits or clears one movement's target (US-30).
+ *
+ * Three plain text fields rather than the stepper the session screen uses for logging a set:
+ * this dialog is reached from the sofa, not mid-set with chalk on your fingers, so ADR-0016's
+ * one-handed constraint does not apply here the way it does there.
+ */
+@Composable
+private fun TargetEditorDialog(
+    editor: TargetEditorState,
+    onFieldChanged: (sets: String?, reps: String?, weight: String?) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Target for ${editor.exerciseName}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+                Text(
+                    text = "Each number is optional. A blank field says nothing about that number.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = editor.sets,
+                    onValueChange = { onFieldChanged(it, null, null) },
+                    label = { Text("Sets") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = editor.reps,
+                    onValueChange = { onFieldChanged(null, it, null) },
+                    label = { Text("Reps") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = editor.weight,
+                    onValueChange = { onFieldChanged(null, null, it) },
+                    label = { Text("Load (${editor.unit.name.lowercase()})") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            Row {
+                // Destructive, so text rather than filled (ADR-0019) — but it shares this
+                // dialog with Save rather than living behind a second tap: unlike a logged set,
+                // a target is not something the app is recording on someone's behalf, and
+                // clearing one is exactly as reversible as never having set it.
+                TextButton(
+                    onClick = onClear,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                ) {
+                    Text("Clear")
+                }
+                TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                    Text("Cancel")
+                }
+            }
+        },
+    )
+}

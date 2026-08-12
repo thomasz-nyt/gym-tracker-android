@@ -7,6 +7,7 @@ import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.UserId
@@ -17,6 +18,7 @@ import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
 import com.gymtracker.core.domain.routine.RoutineItemRepository
 import com.gymtracker.core.domain.routine.RoutineRepository
+import com.gymtracker.core.domain.routine.SetRoutineItemTarget
 import com.gymtracker.core.domain.set.LastPerformance
 import com.gymtracker.core.domain.set.LastPerformanceOf
 import com.gymtracker.core.domain.units.WeightUnit
@@ -37,17 +39,35 @@ import javax.inject.Inject
 /**
  * One movement in the editor.
  *
- * **There is no target field here, and there must never be one.** [lastTime] is what the
- * member actually lifted; it is null when they never have, and the screen then shows the
- * movement with no numbers rather than a zero (US-13's absence pattern, constitution §2.4).
- * ADR-0020 bought the routine concept with exactly this, and `RoutineEditorViewModelTest`
- * asserts the absence structurally.
+ * [lastTime] is what the member actually lifted; it is null when they never have, and the
+ * screen then shows the movement with no numbers rather than a zero (US-13's absence pattern,
+ * constitution §2.4). [target] is the plan for next time (US-30, ADR-0027) — also null rather
+ * than zero when nobody has set one, the same absence pattern, and rendered visibly distinct
+ * from [lastTime] rather than merged into it. ADR-0020 named the earlier version of this type,
+ * with no target field at all, as the whole bargain that bought the routine concept; ADR-0027
+ * is the later maintainer decision that revisits exactly that point, and only that point.
  */
 data class MovementRow(
     val itemId: RoutineItemId,
     val exerciseId: ExerciseId,
     val exerciseName: String,
     val lastTime: LastPerformance?,
+    val target: MovementTarget? = null,
+)
+
+/**
+ * The target-entry form for one movement (US-30). String fields, the same reason
+ * `SetEntry`'s are: a field can be blank mid-edit without being a parse error, and "3 sets,
+ * load unrecorded" needs to render two filled fields and one truly empty one, not a zero.
+ */
+data class TargetEditorState(
+    val itemId: RoutineItemId,
+    val exerciseName: String,
+    /** The member's unit, read once when the editor opened — for [weight]'s field label. */
+    val unit: WeightUnit,
+    val sets: String,
+    val reps: String,
+    val weight: String,
 )
 
 /** Everything the routine editor renders. */
@@ -71,8 +91,8 @@ class RoutineEditorViewModel
     @Inject
     constructor(
         private val routines: RoutineRepository,
-        items: RoutineItemRepository,
-        catalog: ExerciseCatalog,
+        private val items: RoutineItemRepository,
+        private val catalog: ExerciseCatalog,
         private val currentMember: CurrentMember,
         unitPreference: UnitPreference,
         private val addExerciseToRoutine: AddExerciseToRoutine,
@@ -81,8 +101,24 @@ class RoutineEditorViewModel
         private val renameRoutine: RenameRoutine,
         private val deleteRoutine: DeleteRoutine,
         private val lastPerformanceOf: LastPerformanceOf,
+        private val setRoutineItemTarget: SetRoutineItemTarget,
     ) : ViewModel() {
         private val editing = MutableStateFlow<RoutineId?>(null)
+
+        /**
+         * The target-entry form lives in its own state holder; see [TargetEditorController].
+         * `editing::value` rather than a captured id: the routine being edited can change (a
+         * fresh [open]) while this controller instance does not.
+         */
+        val target =
+            TargetEditorController(
+                items = items,
+                catalog = catalog,
+                setRoutineItemTarget = setRoutineItemTarget,
+                unitPreference = unitPreference,
+                routineId = editing::value,
+                scope = viewModelScope,
+            )
 
         private val deleted = MutableStateFlow(false)
 
@@ -116,6 +152,7 @@ class RoutineEditorViewModel
                                     exerciseId = item.exerciseId,
                                     exerciseName = byId[item.exerciseId]?.name ?: item.exerciseId.value,
                                     lastTime = lastPerformanceOf(item.exerciseId, member),
+                                    target = item.target,
                                 )
                             },
                         )
