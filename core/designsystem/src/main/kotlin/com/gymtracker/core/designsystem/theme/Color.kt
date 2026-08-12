@@ -59,8 +59,15 @@ private val OutlineDark = Color(0xFF8F8C8B)
 
 // The token `HorizontalDivider` reads. Never set before ADR-0019, so it drew Material's
 // #CAC4D0 lavender on browse, history and workout detail — redesign audit, finding 08.
-private val OutlineVariantLight = Color(0xFFC6C4C3)
-private val OutlineVariantDark = Color(0xFF4A4847)
+//
+// Set once, then found still nearly invisible: #C6C4C3 measured ~1.3:1 against the ground,
+// which `GymColorSchemeTest`'s "not Material's lavender" check could not catch, because it only
+// asserted inequality, not legibility. This is ink at 40% opacity over each scheme's own
+// ground — visible without being loud, since `GymDivider` is used everywhere from list rows to
+// a screen's one structural rule, and this token has to work at that weight for all of them.
+// `GymColorSchemeTest` now gates the ratio this produces, not just that it changed.
+private val OutlineVariantLight = Color(0xFF9F9D9D)
+private val OutlineVariantDark = Color(0xFF6A6968)
 
 private val ErrorLight = Color(0xFFBA1A1A)
 private val ErrorDark = Color(0xFFFFB4AB)

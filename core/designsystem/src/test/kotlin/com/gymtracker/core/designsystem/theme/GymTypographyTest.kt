@@ -2,9 +2,11 @@ package com.gymtracker.core.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -85,5 +87,30 @@ class GymTypographyTest {
                 "$role would clip: ${style.fontSize} text in a ${style.lineHeight} line",
             )
         }
+    }
+
+    @Test
+    fun `titles carry ExtraBold, so a screen reads with a real weight hierarchy`() {
+        // Titles and section labels — pure words, never mixed with a number the way
+        // titleMedium is — so raising the base weight costs nothing and gives the screen
+        // contrast beyond size alone.
+        assertEquals(FontWeight.ExtraBold, GymTypography.titleLarge.fontWeight)
+        assertEquals(FontWeight.ExtraBold, GymTypography.titleSmall.fontWeight)
+    }
+
+    @Test
+    fun `meta text carries Medium, one step below a title`() {
+        assertEquals(FontWeight.Medium, GymTypography.bodySmall.fontWeight)
+        assertEquals(FontWeight.Medium, GymTypography.bodyMedium.fontWeight)
+        assertEquals(FontWeight.Medium, GymTypography.bodyLarge.fontWeight)
+    }
+
+    @Test
+    fun `titleMedium stays off the ExtraBold hierarchy, so NumeralText's digit spans still read as bolder`() {
+        // titleMedium is what LoggedSets and RestPanel's "Up next" render — lines that mix
+        // words and a number in one string. NumeralText creates its contrast by bolding only
+        // the digit runs within such a line; if the line's own base weight already matched
+        // ExtraBold, that span would draw nothing extra and the two would be indistinguishable.
+        assertNotEquals(FontWeight.ExtraBold, GymTypography.titleMedium.fontWeight)
     }
 }

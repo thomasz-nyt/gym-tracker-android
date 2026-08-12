@@ -17,8 +17,14 @@ object GymDimens {
     /** A stepper's +/− button: pressed repeatedly, one-handed, so larger than the floor. */
     val StepperTarget = 56.dp
 
-    /** A screen's one primary action: full width, and this tall. Sized to be hit without looking. */
-    val PrimaryAction = 64.dp
+    /**
+     * A screen's one primary action: full width, and this tall. Sized to be hit without looking.
+     *
+     * Raised from ADR-0016's original 64dp to 72dp (redesign audit, "sweaty hands, phone at
+     * arm's length") — see `GymDimensTest`'s pinned-value test, added because `>= MinTouchTarget`
+     * alone let 64dp and 72dp look identical to the suite.
+     */
+    val PrimaryAction = 72.dp
 
     val ScreenPadding = 24.dp
     val Gap = 12.dp
