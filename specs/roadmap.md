@@ -4,13 +4,13 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestones: **M4**, and **M3b** alongside it. M0, M1, M3 and M3a are complete; M2 is
-deliberately postponed so the offline core can be finished before accounts and sync arrive, and
-M3a was taken ahead of M4 for the same reason.
+Current milestone: **M4**. M0, M1, M3, M3a and M3b are complete; M2 is deliberately postponed
+so the offline core can be finished before accounts and sync arrive, and M3a and M3b were both
+taken ahead of M4 for the same reason.
 
-M3b breaks the "milestones are sequential" rule at the top of this file, and does so knowingly:
-it is routines work that touches no table M4 reads, so running it beside M4 risks nothing that
-sequencing would protect. Said out loud rather than left for someone to notice.
+M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
+it was routines work that touched no table M4 reads, so running it beside M4 risked nothing
+that sequencing would protect. Said out loud rather than left for someone to notice.
 
 What is left from the `Redesign.dc.html` audit is **not** all in M4, and is listed at the end
 of this file so it does not get lost between milestones.
@@ -196,17 +196,36 @@ ADR-0027 rather than managed by sequencing.
       (`SetRoutineItemTarget`). Closed 2026-08-09
 - [x] `StartSessionFromRoutine` copies targets across with the movements, so the session holds
       its own snapshot and there is still nothing to join back to the routine. Closed 2026-08-09
-- [ ] The routine editor can enter, edit and clear a target. **Replaces** the structural test in
-      `RoutineEditorViewModelTest` that currently asserts no target field exists — replaced by a
-      test of the new invariant, never simply deleted. **Not built.** The three boxes above are
-      the domain and schema; this box and the two below are UI and are their own PRs by
-      ADR-0027's own split ("this is more than one PR")
-- [ ] A target prefills set entry; with none, US-03's prefill from history is unchanged
-- [ ] Targets render labelled as targets, beside history rather than merged into it
+- [x] The routine editor can enter, edit and clear a target. The structural test in
+      `RoutineEditorViewModelTest` that asserted no target field exists is replaced by
+      `a movement with no target carries none, same absence pattern as lastTime` plus six more
+      covering entry, partial fields, independence between movements, re-editing, clearing and
+      rejecting an out-of-range value — a test of the new invariant, not a deletion.
+      `TargetEditorController` (new, `feature/routines`) owns the form; `TargetEditorDialog`
+      is the UI. Closed 2026-08-12
+- [x] A target prefills set entry; with none, US-03's prefill from history is unchanged.
+      `SetEntryController.open` merges `SessionExercise.target` with `PrefillFromLastSet`
+      per field (a target's sets/reps/load are each independently optional, US-30), and
+      `ActiveSessionViewModel`'s one-tap `nextLoggableSet` (ADR-0029, US-35) picks up the same
+      merge — the two prefill surfaces were flagged in that class's own doc as needing to land
+      together rather than drift apart, and this is that. Closed 2026-08-12
+- [x] Targets render labelled as targets, beside history rather than merged into it. The
+      session screen's `SessionMovements.kt`/`RestPanel.kt` already did this from ADR-0029
+      (`Target 3 × 8 · 105 lb`, never reconciled with `Last Tue`); the routine editor gained
+      the same line (`MovementListItem`), muted rather than accent so it never
+      out-competes what was actually lifted. Closed 2026-08-12
 
 **Exit:** a routine created on the sofa arrives at the gym carrying its numbers, and no chart,
 no volume figure and no personal record has moved as a result. `TwoTapSetLoggingTest` passes
-**unedited** — ADR-0017 and ADR-0020 both name that as the signal this went wrong.
+**unedited** — verified in the full instrumented suite alongside `OneTapSetLoggingTest` and
+`CorrectingASetTest`, run twice from a cleared app. M3b closed 2026-08-12.
+
+A load typed into the target editor is converted through the member's unit preference, the same
+`UnitConverter` round trip `Add set`'s own weight field uses — caught on a device, not in a
+test: the field had no unit label and stored whatever was typed as raw kilograms regardless of
+the member reading pounds. `Load (lb)`/`Load (kg)` now labels it, and
+`RoutineEditorViewModelTest` pins the round trip (135 lb typed → 61.23 kg stored → 135 lb shown
+again on reopen).
 
 ### US-32 — A session remembers the routine it was started from
 

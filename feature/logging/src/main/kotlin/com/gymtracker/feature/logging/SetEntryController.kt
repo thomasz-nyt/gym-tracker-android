@@ -6,6 +6,7 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.SetInput
+import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.weightIncrement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,31 +48,41 @@ class SetEntryController(
     val entry: StateFlow<SetEntry?> = state
 
     /**
-     * Opens entry prefilled from the member's most recent set of this exercise (US-03).
+     * Opens entry prefilled from the movement's target if the session copied one, falling back
+     * per-field to the member's most recent set of this exercise otherwise (US-03, US-30).
      *
-     * The whole point of the prefill is that the numbers are usually already right, so
-     * confirming costs one more tap.
+     * A target's fields are each independently optional — "3 x 8, load unrecorded" is a valid
+     * plan (ADR-0027) — so this is a per-field merge, not a switch: whichever of weight/reps the
+     * target leaves unset still reads from history, exactly as it would with no target at all.
+     * Nothing here writes a target anywhere; it only decides what the two text fields start at.
      */
     fun open(row: SessionExerciseRow) {
         scope.launch {
             val exerciseId = row.sessionExercise.exerciseId
             val unit = unitPreference.current()
-            val prefill = prefillFromLastSet(exerciseId, currentMember.id(), unit)
+            val target = row.sessionExercise.target
+            val history = prefillFromLastSet(exerciseId, currentMember.id(), unit)
+
+            val targetWeight = target?.weightKg?.let { UnitConverter.fromKilograms(it, unit) }
+            val weight = targetWeight ?: history?.weight
+            val reps = target?.reps ?: history?.reps
 
             state.value =
                 SetEntry(
                     sessionExerciseId = row.sessionExercise.id,
                     exerciseName = row.exercise?.name ?: exerciseId.value,
-                    // Already in the member's unit; PrefillFromLastSet converted it.
-                    weight = prefill?.weight?.let(::trimNumber).orEmpty(),
-                    reps = prefill?.reps?.toString().orEmpty(),
-                    // Not prefilled from history: how many sets you did last time is not a
-                    // claim about today, and defaulting to 1 keeps the two-tap path intact.
+                    // Already in the member's unit; both UnitConverter and PrefillFromLastSet
+                    // converted their half.
+                    weight = weight?.let(::trimNumber).orEmpty(),
+                    reps = reps?.toString().orEmpty(),
+                    // Not prefilled from either source: how many sets you did or planned is not
+                    // a claim about today's count, and defaulting to 1 keeps the two-tap path
+                    // intact (ADR-0009).
                     sets = "1",
                     // Never carried forward: RPE is how hard *that* set felt (US-03 prefills
                     // weight and reps only), so repeating it would invent a measurement.
                     rpe = "",
-                    prefilled = prefill != null,
+                    prefilled = target != null || history != null,
                 )
         }
     }
