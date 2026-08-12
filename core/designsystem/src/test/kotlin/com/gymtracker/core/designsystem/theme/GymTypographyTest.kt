@@ -113,4 +113,34 @@ class GymTypographyTest {
         // ExtraBold, that span would draw nothing extra and the two would be indistinguishable.
         assertNotEquals(FontWeight.ExtraBold, GymTypography.titleMedium.fontWeight)
     }
+
+    @Test
+    fun `ADR-0029's five new roles are pinned to the design's exact pixel values`() {
+        assertEquals(104.sp, GymTypography.displayLarge.fontSize, "the rest countdown")
+        assertEquals(FontWeight.ExtraBold, GymTypography.displayLarge.fontWeight)
+        assertEquals(44.sp, GymTypography.headlineMedium.fontSize, "the rest banner's weight readout")
+        assertEquals(FontWeight.ExtraBold, GymTypography.headlineMedium.fontWeight)
+        assertEquals(27.sp, GymTypography.headlineSmall.fontSize, "a movement name")
+        assertEquals(FontWeight.ExtraBold, GymTypography.headlineSmall.fontWeight)
+        assertEquals(13.sp, GymTypography.labelMedium.fontSize, "SET n / NEXT row labels")
+        assertEquals(FontWeight.Bold, GymTypography.labelMedium.fontWeight)
+        assertEquals(12.sp, GymTypography.labelSmall.fontSize, "section eyebrows")
+        assertEquals(FontWeight.Bold, GymTypography.labelSmall.fontWeight)
+    }
+
+    @Test
+    fun `displayMedium is untouched, because GuidedExerciseScreen's rep counter also reads it`() {
+        // ADR-0029 gave the countdown its own role (displayLarge) rather than resizing this one,
+        // specifically so GuidedExerciseScreen (ADR-0017, a different feature) is not affected.
+        assertEquals(material.displayMedium.fontSize, GymTypography.displayMedium.fontSize)
+    }
+
+    @Test
+    fun `ADR-0029's new roles carry Archivo too`() {
+        assertEquals(ArchivoFamily, GymTypography.displayLarge.fontFamily)
+        assertEquals(ArchivoFamily, GymTypography.headlineMedium.fontFamily)
+        assertEquals(ArchivoFamily, GymTypography.headlineSmall.fontFamily)
+        assertEquals(ArchivoFamily, GymTypography.labelMedium.fontFamily)
+        assertEquals(ArchivoFamily, GymTypography.labelSmall.fontFamily)
+    }
 }

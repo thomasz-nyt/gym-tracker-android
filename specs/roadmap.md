@@ -323,11 +323,11 @@ that *is* a plan; `orderIsAPlan` on this type is exactly that distinction, struc
 future screen cannot show "Exercise 3 of 6" for a freestyle session by forgetting to check.
 
 - [x] `SessionProgress` and `sessionProgressOf`, JUnit 5 table tests, no UI. Closed 2026-08-11
-- [ ] **Not built here:** wiring this into the session screen — "Exercise 3 of 6", "Still to
-      come" — which needs its own ADR (ADR-0029, not yet written) to settle the copy and how
-      `orderIsAPlan == false` reads ("Also in this workout", no ordinal claim, per the plan
-      this groundwork came from), a UI decision this entry does not make by building the type
-      it will eventually need
+- [x] Wired into the session screen: `adr/0029-the-session-screen-is-a-ruled-sheet.md`
+      settles the copy (`orderIsAPlan == false` reads "Also in this workout", no ordinal
+      claim) and rebuilds `feature/logging/.../session/` as a ruled sheet with the segment
+      bar, "n of m done", and US-35's one-tap log button added beside `Add set`.
+      `TwoTapSetLoggingTest` passes unedited. Closed 2026-08-12
 
 ---
 

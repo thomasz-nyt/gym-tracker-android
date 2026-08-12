@@ -17,6 +17,7 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
@@ -87,6 +88,9 @@ class TwoTapSetLoggingTest {
     @Inject
     lateinit var currentMember: CurrentMember
 
+    @Inject
+    lateinit var restTimerStore: RestTimerStore
+
     /**
      * Puts the member mid-workout with a prior set already logged: someone between sets with
      * the phone in their hand, which is the state the criterion describes.
@@ -105,6 +109,12 @@ class TwoTapSetLoggingTest {
             // The app database is a real file that outlives a single test method, so start from
             // a known state. Discarding a session cascades to its exercises and sets.
             listOf(LAST_WEEK, TODAY_SESSION).forEach { sessions.deleteSession(it) }
+            // This fixture writes straight to the repository rather than through StartSession,
+            // so it does not get that use case's own clearing of a leftover rest timer
+            // (ADR-0029, US-35): the session screen now renders resting as an exclusive
+            // full-screen mode, so a rest another test method left running would otherwise hide
+            // this test's own "Add set" behind it.
+            restTimerStore.setRestEndsAt(null)
 
             val lastWeek = LAST_WEEK
             sessions.startSession(

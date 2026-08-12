@@ -4,6 +4,10 @@ import app.cash.turbine.test
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -25,8 +29,15 @@ class StartSessionTest {
     private val alice = UserId("alice")
     private val bob = UserId("bob")
 
-    private fun startSession(repository: SessionRepository) =
-        StartSession(sessions = repository, clock = clock, newId = { SessionId("generated") })
+    private fun startSession(
+        repository: SessionRepository,
+        restTimerStore: RestTimerStore = FakeRestTimerStore(),
+    ) = StartSession(
+        sessions = repository,
+        restTimerStore = restTimerStore,
+        clock = clock,
+        newId = { SessionId("generated") },
+    )
 
     @Test
     fun `starting with no active session stamps started_at with now`() =
@@ -117,4 +128,64 @@ class StartSessionTest {
                 assertEquals(null, awaitItem())
             }
         }
+
+    @Test
+    fun `a new session clears a rest timer left running by whatever ended before it`() =
+        runTest {
+            val repository = FakeSessionRepository()
+            val restTimerStore = FakeRestTimerStore()
+            restTimerStore.setRestEndsAt(now.plus(Duration.ofSeconds(45)))
+
+            startSession(repository, restTimerStore)(alice)
+
+            assertEquals(
+                null,
+                restTimerStore.restEndsAt.first(),
+                "a fresh session has no business inheriting a countdown from an unrelated one",
+            )
+        }
+
+    @Test
+    fun `resuming an active session leaves its own rest timer alone`() =
+        runTest {
+            val existing =
+                WorkoutSession(
+                    id = SessionId("existing"),
+                    userId = alice,
+                    gymName = null,
+                    startedAt = now.minus(Duration.ofMinutes(5)),
+                    endedAt = null,
+                    metrics = null,
+                )
+            val repository = FakeSessionRepository(listOf(existing))
+            val restTimerStore = FakeRestTimerStore()
+            val restingUntil = now.plus(Duration.ofSeconds(20))
+            restTimerStore.setRestEndsAt(restingUntil)
+
+            startSession(repository, restTimerStore)(alice)
+
+            assertEquals(restingUntil, restTimerStore.restEndsAt.first(), "resuming is not a fresh start")
+        }
+
+    private class FakeRestTimerStore : RestTimerStore {
+        private val endsAt = MutableStateFlow<Instant?>(null)
+        private val default = MutableStateFlow(Duration.ofSeconds(60))
+        private val asked = MutableStateFlow(false)
+
+        override val restEndsAt = endsAt
+        override val defaultRest = default
+        override val shouldAskForNotificationPermission = asked.map { !it }
+
+        override suspend fun setRestEndsAt(instant: Instant?) {
+            endsAt.value = instant
+        }
+
+        override suspend fun setDefaultRest(rest: Duration) {
+            default.value = rest
+        }
+
+        override suspend fun markNotificationPermissionAsked() {
+            asked.value = true
+        }
+    }
 }

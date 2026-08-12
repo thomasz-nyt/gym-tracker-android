@@ -19,6 +19,7 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
@@ -81,6 +82,9 @@ class CorrectingASetTest {
     @Inject
     lateinit var currentMember: CurrentMember
 
+    @Inject
+    lateinit var restTimerStore: RestTimerStore
+
     /**
      * Mid-workout with two sets already logged, and they are **identical** on purpose: before
      * ADR-0022 these two rendered as the single line "2 × 8", which is exactly the case where
@@ -101,6 +105,11 @@ class CorrectingASetTest {
             // be the one the screen resumes, so clear it rather than adding a second.
             sessions.observeActiveSession(member).first()?.let { sessions.deleteSession(it.id) }
             sessions.deleteSession(TODAY_SESSION)
+            // Same reasoning as the session cleanup above, but for the rest timer (ADR-0010):
+            // it is stored global rather than per-session, and ADR-0029 made resting an
+            // exclusive full-screen mode, so a countdown another test's set-logging left running
+            // would hide this fixture's sets behind the rest banner instead of the plan.
+            restTimerStore.setRestEndsAt(null)
 
             sessions.startSession(WorkoutSession(TODAY_SESSION, member, null, now, null, null))
             sessionExercises.add(SessionExercise(TODAY, TODAY_SESSION, exercise.id, 1))

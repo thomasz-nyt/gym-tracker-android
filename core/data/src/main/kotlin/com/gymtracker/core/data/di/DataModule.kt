@@ -286,9 +286,15 @@ object DataModule {
     @Provides
     fun startSession(
         sessions: SessionRepository,
+        restTimerStore: RestTimerStore,
         clock: Clock,
     ): StartSession =
-        StartSession(sessions = sessions, clock = clock, newId = { SessionId(UUID.randomUUID().toString()) })
+        StartSession(
+            sessions = sessions,
+            restTimerStore = restTimerStore,
+            clock = clock,
+            newId = { SessionId(UUID.randomUUID().toString()) },
+        )
 
     @Provides
     fun endSession(

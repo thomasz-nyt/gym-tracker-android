@@ -4,6 +4,7 @@ import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
 import java.time.Clock
 
 /** Whether "Start workout" created a session or returned the one already running. */
@@ -30,6 +31,7 @@ sealed interface StartSessionResult {
  */
 class StartSession(
     private val sessions: SessionRepository,
+    private val restTimerStore: RestTimerStore,
     private val clock: Clock,
     private val newId: () -> SessionId,
 ) {
@@ -58,6 +60,12 @@ class StartSession(
                 routine = routine,
             )
         sessions.startSession(session)
+        // The rest timer (ADR-0010) is stored keyed by nothing but "the member's current rest" —
+        // it has no session id of its own. Without this, a countdown left running by whatever
+        // session just ended (or was abandoned) would still be live when this brand new one
+        // opens, and ADR-0029's session screen treats resting as an exclusive full-screen mode:
+        // the plan would never render at all until an unrelated timer someone else started ran out.
+        restTimerStore.setRestEndsAt(null)
         return StartSessionResult.Started(session)
     }
 }
