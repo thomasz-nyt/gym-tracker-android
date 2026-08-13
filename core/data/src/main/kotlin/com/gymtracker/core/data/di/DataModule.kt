@@ -47,6 +47,7 @@ import com.gymtracker.core.domain.routine.AddExerciseToRoutine
 import com.gymtracker.core.domain.routine.CreateRoutine
 import com.gymtracker.core.domain.routine.DeleteRoutine
 import com.gymtracker.core.domain.routine.MoveExerciseInRoutine
+import com.gymtracker.core.domain.routine.NextRoutineToTrain
 import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
 import com.gymtracker.core.domain.routine.RoutineItemRepository
@@ -158,6 +159,12 @@ object DataModule {
         startSession: StartSession,
         addExerciseToSession: AddExerciseToSession,
     ): StartSessionFromRoutine = StartSessionFromRoutine(routines, items, startSession, addExerciseToSession)
+
+    @Provides
+    fun nextRoutineToTrain(
+        routines: RoutineRepository,
+        sessions: SessionRepository,
+    ): NextRoutineToTrain = NextRoutineToTrain(routines, sessions)
 
     @Provides
     fun logSet(

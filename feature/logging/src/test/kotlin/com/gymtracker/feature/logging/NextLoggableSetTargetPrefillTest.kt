@@ -83,6 +83,7 @@ class NextLoggableSetTargetPrefillTest {
                 prefillFromLastSet = PrefillFromLastSet(sets),
                 unitPreference = units,
                 startSession = StartSession(repository, restStore, clock) { SessionId("new") },
+                startSessionFromRoutine = fakeStartSessionFromRoutine(),
                 addExerciseToSession = AddExerciseToSession(sessionExercises) { SessionExerciseId("unused") },
                 endSession = EndSession(repository, sets, clock),
                 workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),

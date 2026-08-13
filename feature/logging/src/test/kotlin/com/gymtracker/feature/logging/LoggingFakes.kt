@@ -9,13 +9,22 @@ import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.Routine
+import com.gymtracker.core.domain.model.RoutineId
+import com.gymtracker.core.domain.model.RoutineItem
+import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimerStore
+import com.gymtracker.core.domain.routine.RoutineItemRepository
+import com.gymtracker.core.domain.routine.RoutineRepository
+import com.gymtracker.core.domain.routine.StartSessionFromRoutine
 import com.gymtracker.core.domain.session.SessionRepository
+import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.WeightUnit
@@ -23,6 +32,7 @@ import com.gymtracker.core.domain.warmup.WarmUpTimerStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 
@@ -270,4 +280,55 @@ internal class FakeSessions(
         state.value = state.value.filterNot { it.id == id }
         cascade(id)
     }
+}
+
+/** Empty and never exercised (US-36) — [ActiveSessionViewModel] only needs a valid instance. */
+internal class FakeRoutines : RoutineRepository {
+    override fun observeRoutines(userId: UserId): Flow<List<Routine>> = MutableStateFlow(emptyList())
+
+    override suspend fun find(id: RoutineId): Routine? = null
+
+    override suspend fun add(routine: Routine) = Unit
+
+    override suspend fun rename(
+        id: RoutineId,
+        name: String,
+    ) = Unit
+
+    override suspend fun delete(id: RoutineId) = Unit
+
+    override suspend fun nextRoutinePosition(userId: UserId): Int = 1
+}
+
+/** Empty and never exercised (US-36) — see [FakeRoutines]. */
+internal class FakeRoutineItems : RoutineItemRepository {
+    override fun observeItems(routineId: RoutineId): Flow<List<RoutineItem>> = MutableStateFlow(emptyList())
+
+    override suspend fun itemsOf(routineId: RoutineId): List<RoutineItem> = emptyList()
+
+    override suspend fun addItem(item: RoutineItem) = Unit
+
+    override suspend fun updateItem(item: RoutineItem) = Unit
+
+    override suspend fun removeItem(id: RoutineItemId) = Unit
+
+    override suspend fun nextItemPosition(routineId: RoutineId): Int = 1
+
+    override suspend fun setItemPositions(positions: Map<RoutineItemId, Int>) = Unit
+}
+
+/**
+ * A [StartSessionFromRoutine] built from throwaway fakes, entirely independent of whatever
+ * repositories the calling test set up. None of `ActiveSessionViewModel`'s existing tests
+ * exercise the routine-start path (US-36) — this exists only to satisfy the constructor.
+ */
+internal fun fakeStartSessionFromRoutine(): StartSessionFromRoutine {
+    val sessions = FakeSessions()
+    val sessionExercises = FakeSessionExercises()
+    return StartSessionFromRoutine(
+        routines = FakeRoutines(),
+        items = FakeRoutineItems(),
+        startSession = StartSession(sessions, FakeRestTimerStore(), Clock.systemUTC()) { SessionId("unused") },
+        addExerciseToSession = AddExerciseToSession(sessionExercises) { SessionExerciseId("unused") },
+    )
 }

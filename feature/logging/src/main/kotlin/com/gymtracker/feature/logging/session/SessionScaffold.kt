@@ -32,6 +32,8 @@ import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.SecondaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.Routine
+import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.UpNextSet
@@ -76,6 +78,9 @@ internal fun SessionBody(
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     onFinishSummaryDismissed: () -> Unit,
+    nextRoutine: Routine?,
+    onStartFromRoutine: (RoutineId) -> Unit,
+    onOpenRoutines: () -> Unit,
     warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
@@ -118,7 +123,14 @@ internal fun SessionBody(
                 )
             else ->
                 Box(modifier = Modifier.padding(GymDimens.ScreenPadding)) {
-                    NoSession(onStartWorkout, onOpenHistory, onBrowseCatalog)
+                    NoSession(
+                        onStartWorkout = onStartWorkout,
+                        onOpenHistory = onOpenHistory,
+                        onBrowseCatalog = onBrowseCatalog,
+                        nextRoutine = nextRoutine,
+                        onStartFromRoutine = onStartFromRoutine,
+                        onOpenRoutines = onOpenRoutines,
+                    )
                 }
         }
     }
@@ -131,34 +143,69 @@ private fun CenteredSpinner() {
     }
 }
 
+/**
+ * Train home with no workout running (US-36, ADR-0030).
+ *
+ * `Routines` is reached only from here — one outlined button, top-right, on every state this
+ * composable can be in, including the routine-less one below. Below it, the screen says which
+ * routine is due next when it can honestly say one (the one gone longest without being done,
+ * or never done at all) and offers `Start <name>` beside the unconditional `Freestyle` action;
+ * with no routines at all it falls back to exactly what this screen said before this story,
+ * unchanged word for word so `TabNavigationTest`'s `"Start workout"` signal keeps meaning what
+ * it always has.
+ */
 @Composable
 private fun NoSession(
     onStartWorkout: () -> Unit,
     onOpenHistory: () -> Unit,
     onBrowseCatalog: () -> Unit,
+    nextRoutine: Routine?,
+    onStartFromRoutine: (RoutineId) -> Unit,
+    onOpenRoutines: () -> Unit,
 ) {
-    // Bottom-weighted rather than centred (ADR-0016): starting a workout is done one-handed,
-    // standing, often with the other hand holding something, so the button that matters is
-    // the one nearest the thumb.
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        Text(
-            text = "No workout in progress",
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f).wrapContentHeight(Alignment.CenterVertically),
-        )
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            OutlinedButton(
+                onClick = onOpenRoutines,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Routines")
+            }
+        }
 
-        Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-            // Above the primary action but below it in weight: history and the catalog are
-            // what you reach for around a workout, not during one (constitution §2).
-            SecondaryActionButton(text = "Past workouts", onClick = onOpenHistory)
-            // Looking a machine up without starting a workout (US-12).
-            SecondaryActionButton(text = "Browse exercises", onClick = onBrowseCatalog)
-            PrimaryActionButton(text = "Start workout", onClick = onStartWorkout)
+        // Bottom-weighted rather than centred (ADR-0016): starting a workout is done one-handed,
+        // standing, often with the other hand holding something, so the button that matters is
+        // the one nearest the thumb.
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            Text(
+                text = nextRoutine?.let { "${it.name} is next up" } ?: "No workout in progress",
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f).wrapContentHeight(Alignment.CenterVertically),
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+                // Above the primary action but below it in weight: history and the catalog are
+                // what you reach for around a workout, not during one (constitution §2).
+                SecondaryActionButton(text = "Past workouts", onClick = onOpenHistory)
+                // Looking a machine up without starting a workout (US-12).
+                SecondaryActionButton(text = "Browse exercises", onClick = onBrowseCatalog)
+
+                if (nextRoutine == null) {
+                    PrimaryActionButton(text = "Start workout", onClick = onStartWorkout)
+                } else {
+                    SecondaryActionButton(text = "Freestyle", onClick = onStartWorkout)
+                    PrimaryActionButton(
+                        text = "Start ${nextRoutine.name}",
+                        onClick = { onStartFromRoutine(nextRoutine.id) },
+                    )
+                }
+            }
         }
     }
 }

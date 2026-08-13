@@ -58,4 +58,11 @@ class GymDimensTest {
         assertEquals(6.dp, GymDimens.SegmentHeight)
         assertEquals(GymDimens.HairGap, GymDimens.SegmentGap)
     }
+
+    @Test
+    fun `ADR-0030's hand-built navigation bar is pinned to the design's values`() {
+        assertEquals(76.dp, GymDimens.NavigationBarHeight)
+        assertEquals(24.dp, GymDimens.NavigationBarIconSize)
+        assertTrue(GymDimens.NavigationBarHeight >= GymDimens.MinTouchTarget)
+    }
 }

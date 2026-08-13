@@ -9,6 +9,7 @@ import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.UserId
@@ -18,6 +19,7 @@ import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.UpNextSet
+import com.gymtracker.core.domain.routine.StartSessionFromRoutine
 import com.gymtracker.core.domain.session.EndSession
 import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionProgress
@@ -233,6 +235,7 @@ class ActiveSessionViewModel
         private val catalog: ExerciseCatalog,
         private val currentMember: CurrentMember,
         private val startSession: StartSession,
+        private val startSessionFromRoutine: StartSessionFromRoutine,
         private val addExerciseToSession: AddExerciseToSession,
         endSession: EndSession,
         workoutDetail: WorkoutDetail,
@@ -538,6 +541,22 @@ class ActiveSessionViewModel
 
         fun onStartWorkout() {
             viewModelScope.launch { startSession(currentMember.id()) }
+        }
+
+        /**
+         * Starts a session from the routine Train home is offering (US-36), the same one-tap
+         * shortcut [onStartWorkout] is for the freestyle case — no navigation event, because the
+         * screen already flips from `NoSession` to the running session reactively the moment
+         * [activeSession] observes it.
+         *
+         * If a workout is already running, [StartSessionFromRoutine] resumes it and copies
+         * nothing in (US-01) — the same outcome starting the same routine from the Routines
+         * screen already has, silently here because there is no separate screen to explain it
+         * on: the session that appears is the one already running, which answers the question
+         * without a banner.
+         */
+        fun onStartFromRoutine(routineId: RoutineId) {
+            viewModelScope.launch { startSessionFromRoutine(routineId, currentMember.id()) }
         }
 
         /**

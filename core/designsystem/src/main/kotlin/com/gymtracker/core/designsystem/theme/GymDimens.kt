@@ -64,4 +64,10 @@ object GymDimens {
 
     /** ADR-0029: the fixed-width label column a set row and a still-to-come row both align to. */
     val RowLabelWidth = 44.dp
+
+    /** ADR-0030: the hand-built bottom bar's height — taller than [MinTouchTarget] on purpose. */
+    val NavigationBarHeight = 76.dp
+
+    /** ADR-0030: each tab's icon in the hand-built bottom bar. */
+    val NavigationBarIconSize = 24.dp
 }

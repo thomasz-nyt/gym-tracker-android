@@ -19,6 +19,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.Routine
+import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.StaleSessionPrompt
@@ -54,15 +56,27 @@ fun LoggingRoute(
     onBrowseCatalog: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onAddExercise: () -> Unit = {},
+    onOpenRoutines: () -> Unit = {},
     pickedExerciseIds: List<String> = emptyList(),
     onPicksHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ActiveSessionViewModel = hiltViewModel(),
     warmUpViewModel: WarmUpViewModel = hiltViewModel(),
+    trainHomeViewModel: TrainHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val warmUpElapsed by warmUpViewModel.elapsed.collectAsStateWithLifecycle()
+    val nextRoutine by trainHomeViewModel.nextRoutine.collectAsStateWithLifecycle()
     RestNotifications(viewModel)
+
+    // Re-ranked whenever NoSession is what's on screen (US-36) — after finishing a workout, or
+    // after a visit to Routines that might have added, deleted or renamed one. Firing on every
+    // activeSession change rather than only on the null->non-null->null edge is redundant with
+    // the ViewModel's own init-time read the first time, but cheap: one Room read against
+    // already-observed tables, not a new subscription.
+    LaunchedEffect(state.activeSession) {
+        if (state.activeSession == null) trainHomeViewModel.refresh()
+    }
 
     // Browse is a destination of its own, so it hands exercises back through the nav result
     // rather than this screen owning a search overlay (US-12, ADR-0013).
@@ -97,6 +111,9 @@ fun LoggingRoute(
         onUndoSetDelete = viewModel.setEdit::undo,
         onLogNextSet = viewModel::onLogNextSet,
         onAddExercise = onAddExercise,
+        nextRoutine = nextRoutine,
+        onStartFromRoutine = viewModel::onStartFromRoutine,
+        onOpenRoutines = onOpenRoutines,
         warmUp =
             WarmUp(
                 elapsed = warmUpElapsed,
@@ -208,6 +225,9 @@ internal fun LoggingScreen(
     onUndoSetDelete: () -> Unit = {},
     onLogNextSet: (UpNextSet) -> Unit = {},
     onAddExercise: () -> Unit = {},
+    nextRoutine: Routine? = null,
+    onStartFromRoutine: (RoutineId) -> Unit = {},
+    onOpenRoutines: () -> Unit = {},
     warmUp: WarmUp = WarmUp(),
     modifier: Modifier = Modifier,
 ) {
@@ -239,6 +259,9 @@ internal fun LoggingScreen(
             onUndoSetDelete = onUndoSetDelete,
             onLogNextSet = onLogNextSet,
             onAddExercise = onAddExercise,
+            nextRoutine = nextRoutine,
+            onStartFromRoutine = onStartFromRoutine,
+            onOpenRoutines = onOpenRoutines,
             warmUp = warmUp,
             modifier = modifier,
         )
@@ -287,6 +310,9 @@ private fun SessionScreen(
     onUndoSetDelete: () -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
     onAddExercise: () -> Unit,
+    nextRoutine: Routine?,
+    onStartFromRoutine: (RoutineId) -> Unit,
+    onOpenRoutines: () -> Unit,
     warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
@@ -307,6 +333,9 @@ private fun SessionScreen(
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             onFinishSummaryDismissed = onFinishSummaryDismissed,
+            nextRoutine = nextRoutine,
+            onStartFromRoutine = onStartFromRoutine,
+            onOpenRoutines = onOpenRoutines,
             warmUp = warmUp,
             modifier = Modifier.padding(padding),
         )
