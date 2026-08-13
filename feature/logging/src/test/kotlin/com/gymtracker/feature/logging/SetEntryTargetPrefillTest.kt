@@ -1,6 +1,9 @@
 package com.gymtracker.feature.logging
 
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
+import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
@@ -37,28 +40,28 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
- * The +/− steppers either side of each number in set entry (ADR-0016).
+ * US-30: "Add set" prefills from a movement's target when the session copied one from a
+ * routine, falling back to the member's last performed set — exactly as it always has — for
+ * whichever field the target leaves unset, and for every field when there is no target at all.
  *
- * The gym reason they exist: the common edit between sets is one plate up or one rep down, and
- * that used to cost a keyboard. The rules worth pinning are what a step *means* in the member's
- * own unit, and the two floors the domain already had — reps never below 1 (US-03), and a
- * weight that steps down past the bottom becoming blank rather than zero, because a bodyweight
- * set is an absence and not a load of nothing (constitution §2).
+ * The session-side half of ADR-0027; the routine editor's own half is
+ * `RoutineEditorViewModelTest`.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class SetEntryStepperTest {
+class SetEntryTargetPrefillTest {
     private val now: Instant = Instant.parse("2026-07-26T18:00:00Z")
     private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
     private val member = UserId("alice")
+    private val bench = ExerciseId("bench")
 
     private val catalog = FakeCatalog()
     private val sessionExercises = FakeSessionExercises()
     private val sets = FakeSets(sessionOf = { id -> sessionExercises.all.firstOrNull { it.id == id }?.sessionId })
     private val units = FakeUnitPreference()
     private val restStore = FakeRestTimerStore()
-    private var nextSessionExercise = 1
     private var nextSet = 1
 
     @Before
@@ -66,16 +69,6 @@ class SetEntryStepperTest {
 
     @After
     fun tearDown() = Dispatchers.resetMain()
-
-    private fun session(id: String) =
-        WorkoutSession(
-            id = SessionId(id),
-            userId = member,
-            gymName = null,
-            startedAt = now,
-            endedAt = null,
-            metrics = null,
-        )
 
     private fun viewModel() =
         FakeSessions(listOf(session("s1"))).let { repository ->
@@ -91,8 +84,7 @@ class SetEntryStepperTest {
                 prefillFromLastSet = PrefillFromLastSet(sets),
                 unitPreference = units,
                 startSession = StartSession(repository, restStore, clock) { SessionId("new") },
-                addExerciseToSession =
-                    AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
+                addExerciseToSession = AddExerciseToSession(sessionExercises) { SessionExerciseId("unused") },
                 endSession = EndSession(repository, sets, clock),
                 workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
                 personalRecordsAchievedIn =
@@ -113,9 +105,27 @@ class SetEntryStepperTest {
             )
         }
 
-    /** Opens set entry on a fresh session, ready for a stepper to be pressed. */
-    private suspend fun openEntry(viewModel: ActiveSessionViewModel): SessionExerciseRow {
-        viewModel.onExerciseChosen(ExerciseId("bench"))
+    private fun session(id: String) =
+        WorkoutSession(
+            id = SessionId(id),
+            userId = member,
+            gymName = null,
+            startedAt = now,
+            endedAt = null,
+            metrics = null,
+        )
+
+    /**
+     * Seeds the session's one movement directly with [target] — the shape
+     * `StartSessionFromRoutine` would have left it in, rather than routing through
+     * `onExerciseChosen`, which is the catalog path and never carries a target (US-02's own
+     * call site passes none, on purpose).
+     */
+    private suspend fun openEntryWithTarget(
+        viewModel: ActiveSessionViewModel,
+        target: MovementTarget?,
+    ): SessionExerciseRow {
+        sessionExercises.add(SessionExercise(SessionExerciseId("se-1"), SessionId("s1"), bench, 1, target))
         val row =
             viewModel.uiState
                 .first { it.exercises.isNotEmpty() }
@@ -128,109 +138,75 @@ class SetEntryStepperTest {
     private suspend fun entryOf(viewModel: ActiveSessionViewModel): SetEntry? = viewModel.uiState.first().setEntry
 
     @Test
-    fun `stepping weight up from blank starts at one increment of the members unit`() =
-        runTest {
-            // The fake member reads pounds, so a step is 5 lb rather than 2.5 kg (ADR-0016).
-            val viewModel = viewModel()
-            openEntry(viewModel)
-
-            viewModel.setEntry.stepWeight(1)
-
-            assertEquals("5", entryOf(viewModel)?.weight)
-        }
-
-    @Test
-    fun `stepping weight up in kilograms moves by two and a half`() =
+    fun `with a target and no history, add set prefills from the target`() =
         runTest {
             units.set(WeightUnit.KG)
             val viewModel = viewModel()
-            openEntry(viewModel)
 
-            viewModel.setEntry.stepWeight(1)
-            viewModel.setEntry.stepWeight(1)
+            openEntryWithTarget(viewModel, MovementTarget(sets = 3, reps = 8, weightKg = 45.0))
 
-            assertEquals("5", entryOf(viewModel)?.weight, "two 2.5 kg steps, with no trailing zero")
+            val entry = entryOf(viewModel)
+            assertEquals("8", entry?.reps)
+            assertEquals("45", entry?.weight)
+            assertEquals(true, entry?.prefilled, "a target is a prefill, so this is not 'first time'")
         }
 
     @Test
-    fun `a half-step weight rounds onto the increment rather than off it`() =
+    fun `a target's missing field falls back to history for that field alone`() =
         runTest {
+            // US-30: "3 x 8, load unrecorded is a plan" — the load is unrecorded in the target,
+            // not the whole prefill.
+            val logged = ExerciseSet("s1", SessionExerciseId("se-last-week"), 1, 60.0, 5, null, now)
+            sets.seed(logged)
+            sets.lastFor[bench] = logged.id
             units.set(WeightUnit.KG)
             val viewModel = viewModel()
-            openEntry(viewModel)
-            viewModel.setEntry.change(weight = "61.23")
 
-            viewModel.setEntry.stepWeight(1)
+            openEntryWithTarget(viewModel, MovementTarget(sets = 3, reps = 8, weightKg = null))
 
-            // 61.23 is 135 lb typed by someone reading kilograms. Stepping up should land on a
-            // plate you can actually load, not carry the stray decimal forward.
-            assertEquals("62.5", entryOf(viewModel)?.weight)
+            val entry = entryOf(viewModel)
+            assertEquals("8", entry?.reps, "the target's own reps, not history's 5")
+            assertEquals("60", entry?.weight, "no target weight, so history's stands in")
         }
 
     @Test
-    fun `stepping weight below zero returns to blank, which is bodyweight`() =
+    fun `with no target, add set prefills from history exactly as before`() =
         runTest {
-            // Constitution §2: an absent load is absent, never zero. Zero would claim the bar
-            // weighed nothing.
+            val logged = ExerciseSet("s1", SessionExerciseId("se-last-week"), 1, 60.0, 8, null, now)
+            sets.seed(logged)
+            sets.lastFor[bench] = logged.id
+            units.set(WeightUnit.KG)
             val viewModel = viewModel()
-            openEntry(viewModel)
-            viewModel.setEntry.change(weight = "5")
 
-            viewModel.setEntry.stepWeight(-1)
+            openEntryWithTarget(viewModel, target = null)
 
-            assertEquals("", entryOf(viewModel)?.weight)
+            val entry = entryOf(viewModel)
+            assertEquals("8", entry?.reps)
+            assertEquals("60", entry?.weight)
         }
 
     @Test
-    fun `stepping reps down stops at one`() =
+    fun `with neither a target nor history, add set opens blank`() =
         runTest {
-            // US-03: reps are whole numbers ≥ 1, so the stepper cannot walk below the floor.
             val viewModel = viewModel()
-            openEntry(viewModel)
-            viewModel.setEntry.change(reps = "1")
 
-            viewModel.setEntry.stepReps(-1)
+            openEntryWithTarget(viewModel, target = null)
 
-            assertEquals("1", entryOf(viewModel)?.reps)
+            val entry = entryOf(viewModel)
+            assertEquals("", entry?.reps)
+            assertEquals("", entry?.weight)
+            assertEquals(false, entry?.prefilled)
         }
 
     @Test
-    fun `stepping reps up from blank starts at one`() =
+    fun `a target with only a rep count still prefills that much`() =
         runTest {
+            // US-30: each field of a target is optional on its own.
             val viewModel = viewModel()
-            openEntry(viewModel)
 
-            viewModel.setEntry.stepReps(1)
+            openEntryWithTarget(viewModel, MovementTarget(sets = null, reps = 5, weightKg = null))
 
-            assertEquals("1", entryOf(viewModel)?.reps)
-        }
-
-    @Test
-    fun `stepping sets down stops at one, so the two-tap default survives`() =
-        runTest {
-            val viewModel = viewModel()
-            openEntry(viewModel)
-
-            viewModel.setEntry.stepSets(-1)
-
-            assertEquals("1", entryOf(viewModel)?.sets)
-        }
-
-    @Test
-    fun `a stepped set saves the value the stepper showed`() =
-        runTest {
-            // The steppers are not a display: what they show is what gets written.
-            val viewModel = viewModel()
-            openEntry(viewModel)
-
-            viewModel.setEntry.stepWeight(1)
-            viewModel.setEntry.stepReps(1)
-            viewModel.setEntry.confirm()
-            viewModel.uiState.first { it.setEntry == null }
-
-            val logged = sets.all.single()
-            assertEquals(1, logged.reps)
-            // 5 lb in canonical kilograms (ADR-0006).
-            assertEquals(2.27, logged.weightKg)
+            assertEquals("5", entryOf(viewModel)?.reps)
+            assertNull(entryOf(viewModel)?.weight?.ifBlank { null }, "no target load and no history: blank")
         }
 }

@@ -9,20 +9,46 @@ import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.FakeSessionRepository
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.session.StartSessionResult
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.FakeSessionExerciseRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+private class FakeRestTimerStore : RestTimerStore {
+    private val endsAt = MutableStateFlow<Instant?>(null)
+    private val default = MutableStateFlow(Duration.ofSeconds(60))
+    private val asked = MutableStateFlow(false)
+
+    override val restEndsAt = endsAt
+    override val defaultRest = default
+    override val shouldAskForNotificationPermission = asked.map { !it }
+
+    override suspend fun setRestEndsAt(instant: Instant?) {
+        endsAt.value = instant
+    }
+
+    override suspend fun setDefaultRest(rest: Duration) {
+        default.value = rest
+    }
+
+    override suspend fun markNotificationPermissionAsked() {
+        asked.value = true
+    }
+}
 
 /**
  * US-29: starting Tuesday's routine puts Tuesday's movements on the screen.
@@ -58,7 +84,7 @@ class StartSessionFromRoutineTest {
             routines = routines,
             items = items,
             startSession =
-                StartSession(sessions, Clock.fixed(now, ZoneOffset.UTC)) { SessionId("s-1") },
+                StartSession(sessions, FakeRestTimerStore(), Clock.fixed(now, ZoneOffset.UTC)) { SessionId("s-1") },
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextAppearance++}") },
         )
@@ -216,7 +242,10 @@ class StartSessionFromRoutineTest {
     @Test
     fun `a session started without a routine carries no origin at all`() =
         runTest {
-            val result = StartSession(sessions, Clock.fixed(now, ZoneOffset.UTC)) { SessionId("freestyle") }
+            val result =
+                StartSession(sessions, FakeRestTimerStore(), Clock.fixed(now, ZoneOffset.UTC)) {
+                    SessionId("freestyle")
+                }
             val started = result(alice) as StartSessionResult.Started
 
             assertNull(started.session.routine, "US-01's ordinary start path is untouched by ADR-0028")

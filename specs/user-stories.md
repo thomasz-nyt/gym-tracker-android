@@ -504,6 +504,33 @@ per-exercise screen answers "am I getting stronger" with a chart; this adds the 
 - The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited** — nothing
   here touches the session screen.
 
+### US-35 — Log the prefilled set in one tap
+Added 2026-08-11. See `adr/0029-the-session-screen-is-a-ruled-sheet.md`, written against the
+`Redesign.dc.html` design bundle's `1a Session mid-set` and `1a Session resting` frames. The
+audit's finding — the session screen is a card stack when the design is a ruled sheet — leans
+on this: the design's one filled control per screen is the log button, and it has to actually
+log, not just open the sheet US-03 already has.
+
+- The session screen's one primary action states exactly what it will log —
+  `LOG SET 3 · 100 lb × 8` — and logging it is **one tap**, writing the set directly with no
+  sheet in between.
+- This is **additional**, not a replacement. `Add set` sits beside the log button, opens the
+  same stepper sheet US-03 already built, and is for when a number needs to change before
+  logging — not for every set. The two-tap path (`Add set` → prefilled sheet → `Save set`)
+  keeps its behaviour and its label unchanged. The redesign's frames call this control
+  `ADJUST`; the implementation keeps `Add set` because `TwoTapSetLoggingTest` matches that
+  string literally — see ADR-0029's note on this for the reasoning, which is the same
+  constraint `GymButtons.kt`'s `ButtonLabel` already documents for why labels are not
+  visually uppercased.
+- The prefill the log button writes is exactly what `Add set` would have opened showing — the
+  two controls can never disagree about what the next set is, because both read the same
+  prefill.
+- During rest, the log button stays live and its label changes to
+  `LOG SET 3 — DON'T WAIT`, so an early set never needs the rest timer skipped first
+  (ADR-0023, unchanged).
+- `TwoTapSetLoggingTest` must pass **unedited** — it exercises `Add set` → `Save set`, a path
+  this story adds to, not alters.
+
 ---
 
 ## M5 — Health Connect (optional)

@@ -45,4 +45,17 @@ class GymDimensTest {
         assertTrue(GymDimens.TightGap < GymDimens.Gap)
         assertTrue(GymDimens.Gap < GymDimens.ScreenPadding)
     }
+
+    @Test
+    fun `ADR-0029's structural rule is the same thickness as a divider, not a different weight`() {
+        // The two rules differ in colour (solid ink vs outlineVariant), not thickness — this
+        // pins that the token exists for the call site's readability, not a hidden size change.
+        assertEquals(GymDimens.DividerThickness, GymDimens.StructuralRuleThickness)
+    }
+
+    @Test
+    fun `ADR-0029's segment bar is pinned to the design's values`() {
+        assertEquals(6.dp, GymDimens.SegmentHeight)
+        assertEquals(GymDimens.HairGap, GymDimens.SegmentGap)
+    }
 }

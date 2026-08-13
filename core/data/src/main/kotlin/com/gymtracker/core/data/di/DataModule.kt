@@ -51,6 +51,7 @@ import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
 import com.gymtracker.core.domain.routine.RoutineItemRepository
 import com.gymtracker.core.domain.routine.RoutineRepository
+import com.gymtracker.core.domain.routine.SetRoutineItemTarget
 import com.gymtracker.core.domain.routine.StartSessionFromRoutine
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.EndSession
@@ -140,6 +141,9 @@ object DataModule {
 
     @Provides
     fun moveExerciseInRoutine(items: RoutineItemRepository): MoveExerciseInRoutine = MoveExerciseInRoutine(items)
+
+    @Provides
+    fun setRoutineItemTarget(items: RoutineItemRepository): SetRoutineItemTarget = SetRoutineItemTarget(items)
 
     @Provides
     fun renameRoutine(routines: RoutineRepository): RenameRoutine = RenameRoutine(routines)
@@ -286,9 +290,15 @@ object DataModule {
     @Provides
     fun startSession(
         sessions: SessionRepository,
+        restTimerStore: RestTimerStore,
         clock: Clock,
     ): StartSession =
-        StartSession(sessions = sessions, clock = clock, newId = { SessionId(UUID.randomUUID().toString()) })
+        StartSession(
+            sessions = sessions,
+            restTimerStore = restTimerStore,
+            clock = clock,
+            newId = { SessionId(UUID.randomUUID().toString()) },
+        )
 
     @Provides
     fun endSession(

@@ -6,6 +6,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.gymtracker.core.designsystem.R
 
@@ -77,6 +78,28 @@ internal val ArchivoFamily =
  * contrast by bolding only the digit runs *within* a line; if the line's own base weight were
  * already ExtraBold, that span would be invisible and the two would read identically. Every
  * other role above is either pure words or pure meta, so raising its base weight costs nothing.
+ *
+ * **Five more roles, added by ADR-0029** for pixel values the session-screen redesign needs
+ * that nothing above covers, filling previously-unused `Typography` slots rather than adding a
+ * parallel token system:
+ *
+ * - `displayLarge` — the rest/warm-up countdown. This is the role `Type.kt` always said would
+ *   be the countdown (see the comment on `displayLarge` below, which predates ADR-0029 and was
+ *   never actually wired up — `RestPanel` read `displayMedium` instead). `displayMedium` itself
+ *   is untouched at Material's default size, because `GuidedExerciseScreen`'s rep counter
+ *   (ADR-0017, a different feature) also reads it.
+ * - `headlineMedium` — the rest banner's big weight readout.
+ * - `headlineSmall` — a movement name, on the session screen or in the rest banner's "Up next".
+ * - `labelMedium` / `labelSmall` — row labels and section eyebrows. **Both sit below ADR-0011's
+ *   16sp content floor, deliberately.** `GymTypographyTest`'s "nothing smaller than sixteen sp"
+ *   test covers primary content — what a member reads under load, the reason that rule exists.
+ *   These two are wayfinding labels (`SET 1`, `NEXT`, section eyebrows), a different class of
+ *   text the same way Material's own `labelSmall` default (11sp) already treats it, and they
+ *   are deliberately left out of that test's `roles` map rather than silently exempted.
+ *
+ * The design's 15sp meta text (a session's elapsed-time line, a movement's target line) reads
+ * through the existing `bodySmall` (16sp) instead of a sixth new role — one pixel below the
+ * design and above ADR-0011's own floor is the smaller deviation.
  */
 val GymTypography: Typography =
     Typography().run {
@@ -122,17 +145,60 @@ val GymTypography: Typography =
                     lineHeight = 36.sp,
                     fontWeight = FontWeight.ExtraBold,
                 ),
-            // The roles below keep Material's sizes — ADR-0011 only raised what the app renders
-            // today. They carry the family anyway so that the next screen to reach for one gets
-            // Archivo rather than silently reintroducing Roboto. `displayLarge` is the rest
-            // countdown (ADR-0016), which is the first of these that will actually be used.
-            displayLarge = displayLarge.copy(fontFamily = ArchivoFamily),
+            // ADR-0029: the rest/warm-up countdown. Read directly from the design bundle's `1a
+            // Session resting` frame — 104sp is not a typo, it is meant to be legible from where
+            // you are actually standing, several feet from the phone.
+            displayLarge =
+                displayLarge.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 104.sp,
+                    lineHeight = 108.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.05).em,
+                ),
+            // Untouched at Material's default size: GuidedExerciseScreen's rep counter (ADR-0017)
+            // also reads this role and is out of ADR-0029's scope. Still carries Archivo so it
+            // does not silently fall back to Roboto.
             displayMedium = displayMedium.copy(fontFamily = ArchivoFamily),
             displaySmall = displaySmall.copy(fontFamily = ArchivoFamily),
             headlineLarge = headlineLarge.copy(fontFamily = ArchivoFamily),
-            headlineMedium = headlineMedium.copy(fontFamily = ArchivoFamily),
-            headlineSmall = headlineSmall.copy(fontFamily = ArchivoFamily),
-            labelMedium = labelMedium.copy(fontFamily = ArchivoFamily),
-            labelSmall = labelSmall.copy(fontFamily = ArchivoFamily),
+            // ADR-0029: the rest banner's big weight readout ("100 lb × 8 · 45.4 kg").
+            headlineMedium =
+                headlineMedium.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 44.sp,
+                    lineHeight = 48.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.03).em,
+                ),
+            // ADR-0029: a movement's name, on the session screen or in "Up next".
+            headlineSmall =
+                headlineSmall.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 27.sp,
+                    lineHeight = 30.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.02).em,
+                ),
+            // ADR-0029: "SET 1" / "NEXT" row labels. Below ADR-0011's 16sp content floor on
+            // purpose — see the class doc's "Five more roles" note.
+            labelMedium =
+                labelMedium.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            // ADR-0029: section eyebrows ("Exercise 3 of 6", "Still to come", "Rest", "Up next").
+            // Uppercased at the call site, not here — see NumeralText/ButtonLabel's precedent for
+            // why a visual-only transform is applied to the string rather than the TextStyle.
+            labelSmall =
+                labelSmall.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.12.em,
+                ),
         )
     }
