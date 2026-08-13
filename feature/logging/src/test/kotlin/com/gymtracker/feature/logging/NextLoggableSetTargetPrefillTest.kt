@@ -44,10 +44,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * US-30, US-35: the movement list's one-tap log button is a second prefill surface beside
- * `Add set` (ADR-0029), and the ViewModel's own doc on `nextLoggableSet` says both must pick up
- * a target together rather than drift apart — this is that other half, mirroring
- * `SetEntryTargetPrefillTest`.
+ * US-30, US-35, US-37: the movement list's one-tap log button is a second prefill surface
+ * beside `Add set` (ADR-0029), and the ViewModel's own doc on `nextLoggableSet` says both must
+ * pick up history and a target the same way rather than drift apart — this is that other half,
+ * mirroring `SetEntryTargetPrefillTest`. The precedence is history first (ADR-0031).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NextLoggableSetTargetPrefillTest {
@@ -137,8 +137,10 @@ class NextLoggableSetTargetPrefillTest {
         }
 
     @Test
-    fun `the target's missing weight still falls back to history for the one-tap button`() =
+    fun `history wins over a target for the one-tap button, per ADR-0031`() =
         runTest {
+            // US-37 supersedes US-30's target-first order: the last real set beats a target
+            // for both reps and weight, even though a target also exists here.
             val logged = ExerciseSet("s1", SessionExerciseId("se-last-week"), 1, 60.0, 5, null, now)
             sets.seed(logged)
             sets.lastFor[bench] = logged.id
@@ -149,7 +151,7 @@ class NextLoggableSetTargetPrefillTest {
                     SessionId("s1"),
                     bench,
                     1,
-                    MovementTarget(sets = 3, reps = 8, weightKg = null),
+                    MovementTarget(sets = 3, reps = 8, weightKg = 999.0),
                 ),
             )
             val viewModel = viewModel()
@@ -157,8 +159,36 @@ class NextLoggableSetTargetPrefillTest {
             val next = viewModel.uiState.first { it.nextLoggableSet != null }.nextLoggableSet
 
             assertNotNull(next)
-            assertEquals(8, next.prefill.reps, "the target's own reps, not history's 5")
-            assertEquals(60.0, next.prefill.weight, "no target weight, so history's stands in")
+            assertEquals(5, next.prefill.reps, "history's reps must win, not the target's 8")
+            assertEquals(60.0, next.prefill.weight, "history's weight must win, not the target's 999")
+        }
+
+    @Test
+    fun `the target's weight fills in when history's set was bodyweight`() =
+        runTest {
+            // history.reps always wins (non-null by SetPrefill's own contract); weight is the
+            // one field that can genuinely be absent from a real set, so this is where a
+            // target's weight still has a job under the new precedence.
+            val logged = ExerciseSet("s1", SessionExerciseId("se-last-week"), 1, null, 5, null, now)
+            sets.seed(logged)
+            sets.lastFor[bench] = logged.id
+            units.set(WeightUnit.KG)
+            sessionExercises.add(
+                SessionExercise(
+                    SessionExerciseId("se-1"),
+                    SessionId("s1"),
+                    bench,
+                    1,
+                    MovementTarget(sets = 3, reps = 8, weightKg = 45.0),
+                ),
+            )
+            val viewModel = viewModel()
+
+            val next = viewModel.uiState.first { it.nextLoggableSet != null }.nextLoggableSet
+
+            assertNotNull(next)
+            assertEquals(5, next.prefill.reps, "history's reps still win")
+            assertEquals(45.0, next.prefill.weight, "history's set had no load, so the target's stands in")
         }
 
     @Test

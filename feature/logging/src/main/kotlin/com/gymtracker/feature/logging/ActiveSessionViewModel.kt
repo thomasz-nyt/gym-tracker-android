@@ -33,12 +33,12 @@ import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.ResolveSetPrefill
 import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.SetInput
 import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.set.UpdateSet
-import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -262,7 +262,7 @@ class ActiveSessionViewModel
             SetEntryController(
                 logSets = logSets,
                 onSetLogged = rest::startAfterSet,
-                prefillFromLastSet = prefillFromLastSet,
+                sets = sets,
                 unitPreference = unitPreference,
                 currentMember = currentMember,
                 scope = viewModelScope,
@@ -405,11 +405,17 @@ class ActiveSessionViewModel
                 val history =
                     currentRow?.let { row -> prefillFromLastSet(row.sessionExercise.exerciseId, memberId, unit) }
                 val target = currentRow?.sessionExercise?.target
-                val targetWeight = target?.weightKg?.let { UnitConverter.fromKilograms(it, unit) }
-                val mergedReps = target?.reps ?: history?.reps
+                // US-37 (ADR-0031): history wins over the target when both exist. The 3x12
+                // floor ResolveSetPrefill adds is for the set-entry sheet's empty boxes, not
+                // for this button — it stays absent for a movement with neither history nor a
+                // target (US-35's own rule, unchanged), rather than starting to one-tap log a
+                // number nobody chose for an exercise never done before.
                 val prefill =
-                    mergedReps?.let { reps ->
-                        SetPrefill(weight = targetWeight ?: history?.weight, reps = reps)
+                    if (history != null || target != null) {
+                        val resolved = ResolveSetPrefill(history = history, target = target, unit = unit)
+                        SetPrefill(weight = resolved.weight, reps = resolved.reps)
+                    } else {
+                        null
                     }
                 val nextLoggableSet =
                     if (currentRow == null || prefill == null) {

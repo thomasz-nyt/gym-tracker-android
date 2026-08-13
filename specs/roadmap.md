@@ -461,6 +461,28 @@ excluded, since it is the role `LoggedSets` and `RestPanel`'s mixed word/number 
 and `NumeralText`'s digit-span contrast depends on the line's own base weight not already
 matching it. Verified live on device.
 
+**Set entry prefers history over a target, 2026-08-13 (US-37, ADR-0031, PR C of the follow-up
+audit).** US-30 (ADR-0027) had set entry prefer a routine's target over the member's last real
+set; the design's section 2b asks for the opposite, and the maintainer chose it once both
+readings were in front of them — a target can go stale, history never can, by construction. One
+pure function, `ResolveSetPrefill` (`:core:domain`), now carries the merge rule that
+`SetEntryController.open` and `ActiveSessionViewModel`'s one-tap prefill both used to inline
+separately, in opposite orders, which is exactly how the two had room to disagree without either
+noticing. Reps float to a floor of 12 when neither history nor a target has an opinion; weight
+never floors, since an invented load is worse than an empty field. **Sets was drafted as a
+universal floor of 3 first, exactly as the design's literal text reads, and that broke
+`TwoTapSetLoggingTest` on-device** — confirming a set for a brand-new exercise logged three rows
+instead of one, because the sheet's own default had silently changed under a test that confirms
+without checking the sheet on purpose. The floor is narrower than the brief because of that
+finding: `target?.sets ?: 3` only once a target exists at all; with no target, sets stays
+ADR-0009's original 1. The set-entry sheet says when a number is history's: "Prefilled from Tue
+4 Aug — 100 lb × 8" (the existing rest-panel date convention, not the frame's literal "last
+Tuesday" wording). The one-tap log button (US-35) picks up the same weight/reps precedence but
+keeps its existing "absent with no history and no target" gate unchanged. Verified live on
+device; all four gates green plus `verifyDomainHasNoAndroidDeps` and 11/11 instrumented tests
+including `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` **unedited** — confirmed by an
+actual on-device failure and fix, not asserted from the unit suite alone.
+
 **In progress:**
 
 - **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a
