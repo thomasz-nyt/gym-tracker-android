@@ -274,16 +274,34 @@ because it is the first place US-18's records are shown anywhere in the app.
 - [x] Weekly volume by body part (US-17). One block per week, one labelled bar per muscle,
       all bars on one scale. **Not a charting-library chart:** ADR-0019 leaves one accent on an
       achromatic ground, and the obvious rendering — a stacked column per week, one hue per
-      muscle — needs twelve hues the palette does not have. Reached from History; the window is
-      a fixed eight weeks until the selector below is built
-- [ ] PR detection and history — **unblocked 2026-08-09**, in progress. ADR-0025 settled what a
-      record is (heaviest load at a given rep count), and `PersonalRecordsOf` /
-      `DetectPersonalRecord` landed in #29 with 17 tests. US-31 is the first UI surface for it —
-      a session's records shown on its finish summary. Still missing: the inline announcement on
-      save, and a standing per-exercise record list
+      muscle — needs twelve hues the palette does not have. Reached from History; the window
+      is chosen on screen — see the selector line below
+- [x] PR detection and history — closed 2026-08-14. ADR-0025 settled what a record is (heaviest
+      load at a given rep count), and `PersonalRecordsOf` / `DetectPersonalRecord` landed in #29
+      with 17 tests. US-31 was the first UI surface for it — a session's records shown on its
+      finish summary.
+    - [x] A standing per-exercise record list, closed 2026-08-14. `PersonalRecordsOf` already
+          returned one `PersonalRecord` per rep count for one exercise; the per-exercise
+          progress screen (US-16) just never read it. A "Personal records" section, between the
+          trend chart and the log, absent rather than shown empty for a movement never done.
+    - [x] The inline announcement on save, closed 2026-08-14. Both `SetEntryController` (two-tap)
+          and `ActiveSessionViewModel.onLogNextSet` (one-tap) now run `DetectPersonalRecord`
+          against the row actually written and surface the result as `SessionUiState.
+          justSetRecord`, rendered as a filled banner above the (unchanged) rest countdown. Two
+          deliberate simplifications versus the design frame, documented inline: an additive
+          banner rather than swapping the countdown's fill, and no "beats X from Y" comparison
+          line since the previous value isn't captured anywhere in the pipeline. Persists until
+          the next set is logged, not tied to the rest cycle — simpler, and `RestController.skip`
+          already bypasses the ViewModel entirely so there is no cycle-end signal to hook.
+          `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 - [x] Empty and sparse-data states designed, not accidental (US-19)
-- [ ] Time range selector. Split from the line above, which it had been sharing: the states are
-      done and the selector is not, so one checkbox could not tell the truth about both
+- [x] Time range selector, closed 2026-08-14. `VolumeRange` (4 / 8 / 12 weeks, default 8) as a
+      chip row on the weekly-volume screen — the same `FilterChip` pattern `TrendSeries`
+      already uses on the per-exercise chart, not a new component. Scoped to weekly volume
+      only: `WeeklyVolumeByBodyPart` already took an arbitrary `from`/`to` and only the
+      ViewModel had the window hard-coded, where `ExerciseTrendOf`'s chart has no window at
+      all today (it plots full history) — giving *that* one a range would be introducing
+      windowing where none exists, a different and larger change, not exercised here
 - [x] Finish as a summary, not a confirm dialog (US-31). The confirm dialog itself is
       unchanged — only what happens after confirming, which is where the summary and any
       records set that session are shown. Shipped in `87e975c` (PR #35); this box was left
@@ -322,9 +340,13 @@ Added 2026-08-11. See `user-stories.md`'s US-34 for the full story.
       1RM, and its individual sets (`ExerciseLogOf`, new — mirrors `ExerciseTrendOf`'s
       three-read pattern so the two never disagree about which sessions counted).
       Closed 2026-08-11
-- [ ] **Deferred, not built:** rows are not tappable — neither opening the source workout
-      nor a "tap any set to see its exercise's log" entry point elsewhere in the app.
-      Reached exactly as US-16 already is: catalog, or Progress's top section
+- [x] A log row opens the source workout. `ExerciseLogEntry` gained `sessionId`
+      (`ExerciseLogOf` already had `session.id` in scope building each row; it just was not
+      kept), threaded through `ExerciseProgressRoute`/`Screen` to the existing `WorkoutDetail`
+      destination — the same one `HistoryScreen`'s rows already open. Closed 2026-08-14
+- [ ] **Still deferred:** a "tap any set to see its exercise's log" entry point elsewhere in
+      the app (from a logged set on the session screen or workout detail, say). A different
+      gap from the row-tap one above — not attempted here
 
 **Exit:** charts render correctly with 1 session, 3 sessions, and 200 sessions.
 Progression math is unit-tested against a hand-computed fixture table.

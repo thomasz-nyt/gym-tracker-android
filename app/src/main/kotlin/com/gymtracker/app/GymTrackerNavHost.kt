@@ -288,6 +288,7 @@ private fun NavGraphBuilder.catalogDestinations(navController: NavHostController
         ExerciseProgressRoute(
             exerciseId = ExerciseId(entry.toRoute<ExerciseProgress>().exerciseId),
             onBack = navController::popBackStack,
+            onOpenWorkout = { id -> navController.navigate(WorkoutDetail(id.value)) },
         )
     }
 }

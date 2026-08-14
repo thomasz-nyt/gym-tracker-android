@@ -21,6 +21,7 @@ import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SessionProgress
 import com.gymtracker.core.domain.units.UnitConverter
@@ -107,6 +108,16 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
  * today, and faking a fraction from [remaining] alone would draw a bar that resets to full every
  * time the countdown ticks. Left out rather than built wrong; the fix is threading
  * `RestTimerStore.defaultRest` through, not a layout change.
+ *
+ * **[justSetRecord] (US-18) adds a banner above the countdown, rather than replacing it** the
+ * way `Redesign.dc.html`'s `2a PR moment` frame does — that frame drops the countdown to an
+ * unfilled block so only one accent-filled surface is on screen, matching ADR-0029's "exactly
+ * one filled element" rule; reproducing that swap needs the countdown block built two ways, and
+ * a member's own history says this fires rarely. Two filled surfaces for one rest cycle, on the
+ * rare set that earns it, is the simplification — not a rule this file otherwise breaks. The
+ * frame's "Beats 95 lb from Sat 26 Jul" comparison line is left out entirely: [PersonalRecord]
+ * carries the new best, not the one it beat, and manufacturing that number here would be
+ * inventing a comparison nobody computed (constitution §2.4) rather than reading one back.
  */
 @Composable
 internal fun RestingBody(
@@ -116,12 +127,25 @@ internal fun RestingBody(
     progress: SessionProgress?,
     exercises: List<SessionExerciseRow>,
     unit: WeightUnit,
+    justSetRecord: PersonalRecord?,
     onSkipRest: () -> Unit,
     onLogNext: () -> Unit,
     onAdjust: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
+        if (justSetRecord != null) {
+            PersonalRecordBanner(
+                record = justSetRecord,
+                exerciseName =
+                    exercises
+                        .firstOrNull { it.sessionExercise.exerciseId == justSetRecord.exerciseId }
+                        ?.exercise
+                        ?.name,
+                unit = unit,
+            )
+        }
+
         RestCountdownBanner(remaining = remaining, onSkipRest = onSkipRest)
 
         if (upNext != null) {
@@ -160,6 +184,40 @@ internal fun RestingBody(
                     Text("Add set")
                 }
             }
+        }
+    }
+}
+
+/**
+ * The inline PR moment (US-18, `2a PR moment`): the accent, the new best, and which movement it
+ * was — the celebratory moment the redesign audit called "the only one in the app," which is
+ * exactly why nothing here explains itself with a full sentence. The number does the talking.
+ */
+@Composable
+private fun PersonalRecordBanner(
+    record: PersonalRecord,
+    exerciseName: String?,
+    unit: WeightUnit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        ) {
+            EyebrowLabel(text = "Personal record", color = MaterialTheme.colorScheme.onPrimary)
+            val weight = WeightFormatter.format(record.weightKg, unit)
+            NumeralText(
+                text = "${weight.primary} × ${record.reps}",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Text(
+                text = exerciseName ?: record.exerciseId.value,
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
     }
 }

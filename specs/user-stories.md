@@ -378,8 +378,15 @@ reps keep separate records, and every record is a set that actually happened. Th
 was the maintainer's call on 2026-08-08, after three sessions deferred the story rather
 than invent it.
 
-- A PR is detected on save and shown inline at the moment it happens.
-- A PR list per exercise with dates.
+- A PR is detected on save and shown inline at the moment it happens. **Closed 2026-08-14**:
+  both the two-tap sheet (`SetEntryController`) and the one-tap log button
+  (`ActiveSessionViewModel.onLogNextSet`) run `DetectPersonalRecord` against the row actually
+  written, surfacing the result as `SessionUiState.justSetRecord` — a filled banner shown above
+  the rest countdown until the next set is logged.
+- A PR list per exercise with dates. **Closed 2026-08-14**: the per-exercise progress screen
+  (US-16) gains a "Personal records" section between the chart and the log — one row per rep
+  count, ascending, each with the date it was set. Absent, not shown empty, for a movement
+  never performed — the same rule the chart and the log both already follow.
 - The **first** time a rep count is performed is not a record: a record requires a
   previous load at the same (exercise, reps) to beat. "You have not done this before" is
   a fact, not an achievement, and celebrating it makes the first workout wall-to-wall
@@ -423,9 +430,10 @@ now that its detection logic exists.
 - A session discarded for having no sets (US-06's existing `Discarded` case) shows no
   summary. There is nothing to summarize, and the screen returns to home exactly as it
   does today.
-- **This does not close US-18.** The inline announcement at the moment a record is set,
-  and a standing per-exercise list of records with dates, are both still unbuilt. This
-  is a third, additional place a record is shown, not a replacement for either.
+- **This did not close US-18** at the time it shipped. The inline announcement at the moment a
+  record is set, and a standing per-exercise list of records with dates, both closed later
+  (2026-08-14) — see US-18. The finish summary remains a third, additional place a record is
+  shown, not a replacement for either.
 
 ### US-33 — Progress replaces History
 Added 2026-08-10, from the `Redesign.dc.html` audit's section 5. History was already a
@@ -492,13 +500,15 @@ per-exercise screen answers "am I getting stronger" with a chart; this adds the 
   about which sessions counted.
 - A bodyweight set shows its reps with no weight and contributes nothing to that row's
   best set or estimate, per constitution §2.4 — the rule US-16's chart already follows.
-- **Rows are not tappable in this pass.** Opening the workout they came from, or jumping
-  from a logged set anywhere in the app straight to this screen, are both left for a
-  follow-up: the audit's frame implies the second, but doing it well means deciding what a
-  tap on a set means on every screen that already gives a set a tap target of its own
+- **A row opens the workout it came from.** Added 2026-08-14: `ExerciseLogEntry` carries the
+  session's id, and tapping a row navigates to the existing `WorkoutDetail` destination — the
+  same one `HistoryScreen`'s own rows open.
+- **Still deferred:** jumping from a logged set anywhere else in the app straight to this
+  screen. The audit's frame implies it, but doing it well means deciding what a tap on a set
+  means on every screen that already gives a set a tap target of its own
   (`WorkoutDetailScreen`'s opens the editor), which is a real design decision and not one
-  this story invents by default. This screen remains reached exactly as US-16 already
-  reaches it — from the catalog, or Progress's top section.
+  this story invents by default. This screen remains otherwise reached exactly as US-16
+  already reaches it — from the catalog, or Progress's top section.
 - With nothing ever performed (US-16's `NoData` state), the log section is absent rather
   than shown empty — the same absence pattern the chart itself already uses.
 - The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited** — nothing

@@ -11,6 +11,8 @@ import com.gymtracker.core.domain.progress.ExerciseLogOf
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.progress.ExerciseTrendPoint
+import com.gymtracker.core.domain.progress.PersonalRecord
+import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -75,6 +77,8 @@ data class ExerciseProgressUiState(
     val unit: WeightUnit = WeightUnit.LB,
     /** US-34: what was actually done, newest first. Empty when [trend] is [ExerciseTrend.NoData]. */
     val log: List<ExerciseLogEntry> = emptyList(),
+    /** US-18: the standing PR list, one per rep count ever reached, ascending. */
+    val records: List<PersonalRecord> = emptyList(),
 )
 
 /**
@@ -92,6 +96,7 @@ class ExerciseProgressViewModel
     constructor(
         private val exerciseTrendOf: ExerciseTrendOf,
         private val exerciseLogOf: ExerciseLogOf,
+        private val personalRecordsOf: PersonalRecordsOf,
         private val catalog: ExerciseCatalog,
         private val currentMember: CurrentMember,
         unitPreference: UnitPreference,
@@ -115,6 +120,7 @@ class ExerciseProgressViewModel
                             name = name ?: exerciseId.value,
                             trend = exerciseTrendOf(exerciseId, member),
                             log = exerciseLogOf(exerciseId, member),
+                            records = personalRecordsOf(exerciseId, member),
                         ),
                     )
                 }
@@ -129,6 +135,7 @@ class ExerciseProgressViewModel
                     series = series,
                     unit = unit,
                     log = loaded.log,
+                    records = loaded.records,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), ExerciseProgressUiState())
 
@@ -157,4 +164,5 @@ private data class Loaded(
     val name: String,
     val trend: ExerciseTrend,
     val log: List<ExerciseLogEntry>,
+    val records: List<PersonalRecord>,
 )

@@ -14,6 +14,7 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.progress.DetectPersonalRecord
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
@@ -113,6 +114,12 @@ data class SessionUiState(
      * computed in the ViewModel for why the two answer different questions.
      */
     val openSessionExerciseId: SessionExerciseId? = null,
+    /**
+     * The record the set just logged set, if any (US-18) — shown inline in place of the rest
+     * banner for the rest cycle it started, then cleared. Null the rest of the time, which is
+     * almost always: US-18's own rule is that most sets are not records.
+     */
+    val justSetRecord: PersonalRecord? = null,
 )
 
 /**
@@ -240,6 +247,7 @@ class ActiveSessionViewModel
         endSession: EndSession,
         workoutDetail: WorkoutDetail,
         personalRecordsAchievedIn: PersonalRecordsAchievedIn,
+        private val detectPersonalRecord: DetectPersonalRecord,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
         private val determineUpNextSet: DetermineUpNextSet,
@@ -264,7 +272,17 @@ class ActiveSessionViewModel
         val setEntry =
             SetEntryController(
                 logSets = logSets,
-                onSetLogged = rest::startAfterSet,
+                onSetLogged = { sessionExerciseId, logged ->
+                    rest.startAfterSet()
+                    justSetRecord.value =
+                        resolveJustSetRecord(
+                            sessionExerciseId,
+                            logged,
+                            sessionExercises,
+                            detectPersonalRecord,
+                            currentMember,
+                        )
+                },
                 sets = sets,
                 unitPreference = unitPreference,
                 currentMember = currentMember,
@@ -293,6 +311,19 @@ class ActiveSessionViewModel
             )
 
         private val stalePrompt = MutableStateFlow<StaleSessionPrompt?>(null)
+
+        /**
+         * US-18's inline PR moment. Overwritten (to the new result, record or null) on every set
+         * logged, from both [setEntry]'s `onSetLogged` callback ([resolveJustSetRecord]) and
+         * [onLogNextSet] — so it reads as "the record from the set just logged," not an
+         * accumulating history, and persists until the next set is logged rather than being tied
+         * to the rest cycle it started. `Redesign.dc.html`'s `2a PR moment` frame ties it to the
+         * rest cycle instead; that needs a signal this class does not have (`RestController.skip`
+         * is called directly from the route, bypassing this ViewModel — see
+         * `ActiveSessionRoute.onSkipRest`), so the simpler lifecycle is a deliberate
+         * simplification, not an oversight.
+         */
+        private val justSetRecord = MutableStateFlow<PersonalRecord?>(null)
 
         private val member: Flow<UserId> = flow { emit(currentMember.id()) }
 
@@ -486,7 +517,8 @@ class ActiveSessionViewModel
                 combine(removal.canUndo, guided.state) { canUndoRemoval, guidedState ->
                     SideTrips(canUndoRemoval, guidedState)
                 },
-            ) { computed, prompt, extras, sideTrips ->
+                justSetRecord,
+            ) { computed, prompt, extras, sideTrips, record ->
                 SessionUiState(
                     isLoading = false,
                     activeSession = computed.session,
@@ -503,6 +535,7 @@ class ActiveSessionViewModel
                     progress = computed.progress,
                     openSessionExerciseId = computed.openSessionExerciseId,
                     nextLoggableSet = computed.nextLoggableSet,
+                    justSetRecord = record,
                 )
             }
 
@@ -528,18 +561,20 @@ class ActiveSessionViewModel
          */
         fun onLogNextSet(next: UpNextSet) {
             viewModelScope.launch {
-                logSets(
-                    sessionExerciseId = next.sessionExerciseId,
-                    input =
-                        SetInput(
-                            weight = next.prefill.weight,
-                            unit = unitPreference.current(),
-                            reps = next.prefill.reps,
-                            rpe = null,
-                        ),
-                    sets = 1,
-                )
+                val logged =
+                    logSets(
+                        sessionExerciseId = next.sessionExerciseId,
+                        input =
+                            SetInput(
+                                weight = next.prefill.weight,
+                                unit = unitPreference.current(),
+                                reps = next.prefill.reps,
+                                rpe = null,
+                            ),
+                        sets = 1,
+                    )
                 rest.startAfterSet()
+                justSetRecord.value = detectPersonalRecord(logged.first(), next.exerciseId, currentMember.id())
             }
         }
 
@@ -655,3 +690,28 @@ class ActiveSessionViewModel
             const val STOP_TIMEOUT_MILLIS = 5_000L
         }
     }
+
+/**
+ * Whether the set(s) just written set a record (US-18), checked against the first row only —
+ * ADR-0025's "first time is not a record, beating must be strict" rule. A top-level function
+ * rather than a member: [ActiveSessionViewModel] delegates most work to sub-controllers already
+ * and this is the one piece [SetEntryController]'s callback needs that is not already one of
+ * them, so it stays a function instead of growing the class or a new controller for one line.
+ *
+ * The two-tap and one-tap paths only ever log one set at a time, so "first" is the only set
+ * there is. A manual "3 sets of 12" batch (ADR-0009) is the one case this undercounts:
+ * [logged]'s later rows are already on disk by the time this runs, so they would see their own
+ * identical-weight siblings as history and never register as beating it — checking the first
+ * row is exactly right for that reason, not a shortcut around it.
+ */
+private suspend fun resolveJustSetRecord(
+    sessionExerciseId: SessionExerciseId,
+    logged: List<ExerciseSet>,
+    sessionExercises: SessionExerciseRepository,
+    detectPersonalRecord: DetectPersonalRecord,
+    currentMember: CurrentMember,
+): PersonalRecord? {
+    val candidate = logged.firstOrNull()
+    val exerciseId = candidate?.let { sessionExercises.find(sessionExerciseId)?.exerciseId }
+    return exerciseId?.let { detectPersonalRecord(candidate, it, currentMember.id()) }
+}

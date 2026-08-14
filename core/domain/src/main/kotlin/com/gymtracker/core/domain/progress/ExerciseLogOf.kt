@@ -2,6 +2,7 @@ package com.gymtracker.core.domain.progress
 
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
@@ -15,6 +16,8 @@ import java.time.ZoneId
  * chart: the sets themselves are kept, not discarded into an aggregate.
  */
 data class ExerciseLogEntry(
+    /** The session this row's sets belong to, so a screen can open it (US-34). */
+    val sessionId: SessionId,
     val performedOn: LocalDate,
     val sets: List<ExerciseSet>,
     /** The heaviest set actually lifted that day. Null when nothing was loaded. */
@@ -64,14 +67,20 @@ class ExerciseLogOf(
                     appearancesBySession[session.id]
                         .orEmpty()
                         .flatMap { setsByAppearance[it.id].orEmpty() }
-                performed.takeIf { it.isNotEmpty() }?.toEntry(session.startedAt.atZone(zone).toLocalDate())
+                performed
+                    .takeIf { it.isNotEmpty() }
+                    ?.toEntry(session.id, session.startedAt.atZone(zone).toLocalDate())
             }
     }
 
-    private fun List<ExerciseSet>.toEntry(performedOn: LocalDate): ExerciseLogEntry {
+    private fun List<ExerciseSet>.toEntry(
+        sessionId: SessionId,
+        performedOn: LocalDate,
+    ): ExerciseLogEntry {
         val loaded = filter { it.weightKg != null }
 
         return ExerciseLogEntry(
+            sessionId = sessionId,
             performedOn = performedOn,
             sets = this,
             topSetKg = loaded.maxOfOrNull { it.weightKg!! },

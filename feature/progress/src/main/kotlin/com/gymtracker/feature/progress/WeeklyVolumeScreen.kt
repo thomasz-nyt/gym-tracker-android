@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,13 +59,19 @@ fun WeeklyVolumeRoute(
 
     LaunchedEffect(Unit) { viewModel.open() }
 
-    WeeklyVolumeScreen(state = state, onBack = onBack, modifier = modifier)
+    WeeklyVolumeScreen(
+        state = state,
+        onBack = onBack,
+        onRangeChanged = viewModel::onRangeChanged,
+        modifier = modifier,
+    )
 }
 
 @Composable
 internal fun WeeklyVolumeScreen(
     state: WeeklyVolumeUiState,
     onBack: () -> Unit = {},
+    onRangeChanged: (VolumeRange) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -80,10 +88,12 @@ internal fun WeeklyVolumeScreen(
         ) {
             Text("Weekly volume", style = MaterialTheme.typography.titleLarge)
             Text(
-                text = "Last $WEEKS_SHOWN weeks, by muscle. Weight moved: sets x reps x load.",
+                text = "By muscle. Weight moved: sets x reps x load.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            RangeChips(selected = state.range, onRangeChanged = onRangeChanged)
 
             if (state.hasVolume) {
                 WeekList(state = state, modifier = Modifier.fillMaxWidth().weight(1f))
@@ -91,13 +101,33 @@ internal fun WeeklyVolumeScreen(
                 // US-19: nothing logged is said, not drawn as a floor of empty bars.
                 Text(
                     text =
-                        "Nothing logged in the last $WEEKS_SHOWN weeks. Finish a workout and " +
-                            "the weeks fill in here.",
+                        "Nothing logged in the last ${state.range.weeks} weeks. Finish a " +
+                            "workout and the weeks fill in here.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             }
+        }
+    }
+}
+
+/** The window choice (M4's "time range selector"), the same chip pattern [TrendSeries] uses. */
+@Composable
+private fun RangeChips(
+    selected: VolumeRange,
+    onRangeChanged: (VolumeRange) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        VolumeRange.entries.forEach { range ->
+            FilterChip(
+                selected = range == selected,
+                onClick = { onRangeChanged(range) },
+                label = { Text(range.label) },
+                // ADR-0019: FilterChip reads CornerFull unless told otherwise.
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            )
         }
     }
 }

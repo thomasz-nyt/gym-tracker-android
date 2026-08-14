@@ -189,6 +189,56 @@ class WeeklyVolumeViewModelTest {
         }
 
     @Test
+    fun `the range defaults to eight weeks`() =
+        runTest {
+            load(TestData.twelveWeeksOfProgress())
+            val viewModel = viewModel().also { it.open() }
+
+            viewModel.uiState.test {
+                assertEquals(VolumeRange.EIGHT_WEEKS, expectMostRecentItem().range)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `choosing a wider range re-reads a wider window`() =
+        runTest {
+            load(TestData.twelveWeeksOfProgress())
+            val viewModel = viewModel().also { it.open() }
+
+            viewModel.uiState.test {
+                expectMostRecentItem()
+                viewModel.onRangeChanged(VolumeRange.TWELVE_WEEKS)
+
+                val state = expectMostRecentItem()
+                assertEquals(VolumeRange.TWELVE_WEEKS, state.range)
+                assertEquals(12, state.weeks.size)
+                assertEquals(LocalDate.parse("2026-07-20"), state.weeks.first().weekStarting)
+                assertEquals(LocalDate.parse("2026-05-04"), state.weeks.last().weekStarting)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `choosing a narrower range re-reads a narrower window`() =
+        runTest {
+            load(TestData.twelveWeeksOfProgress())
+            val viewModel = viewModel().also { it.open() }
+
+            viewModel.uiState.test {
+                expectMostRecentItem()
+                viewModel.onRangeChanged(VolumeRange.FOUR_WEEKS)
+
+                val state = expectMostRecentItem()
+                assertEquals(VolumeRange.FOUR_WEEKS, state.range)
+                assertEquals(4, state.weeks.size)
+                assertEquals(LocalDate.parse("2026-07-20"), state.weeks.first().weekStarting)
+                assertEquals(LocalDate.parse("2026-06-29"), state.weeks.last().weekStarting)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `the member's unit reaches the screen, so the loads can be labelled`() =
         runTest {
             load(TestData.twelveWeeksOfProgress())

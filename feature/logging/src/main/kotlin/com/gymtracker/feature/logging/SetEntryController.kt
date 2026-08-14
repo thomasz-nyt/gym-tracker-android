@@ -49,8 +49,11 @@ data class SetEntry(
  */
 class SetEntryController(
     private val logSets: LogSets,
-    /** Runs once the set is safely on disk — US-05's rest starts from here. */
-    private val onSetLogged: suspend () -> Unit,
+    /**
+     * Runs once the set is safely on disk — US-05's rest starts from here, and US-18's inline
+     * PR check runs from the same signal, on the rows actually written.
+     */
+    private val onSetLogged: suspend (SessionExerciseId, List<ExerciseSet>) -> Unit,
     private val sets: SetRepository,
     private val unitPreference: UnitPreference,
     private val currentMember: CurrentMember,
@@ -164,22 +167,23 @@ class SetEntryController(
         val confirmed = state.value?.validated() ?: return
 
         scope.launch {
-            logSets(
-                sessionExerciseId = confirmed.entry.sessionExerciseId,
-                input =
-                    SetInput(
-                        weight = confirmed.weight,
-                        unit = unitPreference.current(),
-                        reps = confirmed.reps,
-                        rpe = confirmed.rpe,
-                    ),
-                sets = confirmed.sets,
-            )
+            val logged =
+                logSets(
+                    sessionExerciseId = confirmed.entry.sessionExerciseId,
+                    input =
+                        SetInput(
+                            weight = confirmed.weight,
+                            unit = unitPreference.current(),
+                            reps = confirmed.reps,
+                            rpe = confirmed.rpe,
+                        ),
+                    sets = confirmed.sets,
+                )
             state.value = null
 
             // Called after the write, so a failed save cannot start a rest for a set that
             // does not exist.
-            onSetLogged()
+            onSetLogged(confirmed.entry.sessionExerciseId, logged)
         }
     }
 

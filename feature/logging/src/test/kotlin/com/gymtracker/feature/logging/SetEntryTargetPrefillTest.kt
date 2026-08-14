@@ -95,6 +95,11 @@ class SetEntryTargetPrefillTest {
                             ZoneOffset.UTC,
                         ),
                     ),
+                detectPersonalRecord =
+                    DetectPersonalRecord(
+                        PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
+                        ZoneOffset.UTC,
+                    ),
                 removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
                 restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
                 determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
