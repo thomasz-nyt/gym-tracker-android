@@ -175,6 +175,21 @@ class GuidedController(
     }
 
     /**
+     * Steps the rep count for the set about to be finished (ADR-0033, ADR-0016).
+     *
+     * Shares [finishSet]'s own fallback — the typed value if there is one, else the target —
+     * so a step before any typing moves from the number on screen, not from zero. The floor is
+     * [String.stepWholeNumber]'s, the same one set entry and set correction already share.
+     */
+    fun stepReps(direction: Int) {
+        scope.launch {
+            val plan = planStore.plan.first() ?: return@launch
+            val from = typedReps.value ?: plan.targetReps.toString()
+            typedReps.value = from.stepWholeNumber(direction)
+        }
+    }
+
+    /**
      * Writes the set that was just performed and starts the rest (US-05).
      *
      * One set, one `performed_at`. The rest starts only after the write returns, so a save
@@ -250,9 +265,6 @@ class GuidedController(
             nextUp = rows.firstOrNull { it.sessionExercise.id != row.sessionExercise.id && it.sets.isEmpty() },
         )
     }
-
-    private fun trimNumber(value: Double): String =
-        if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
 
     private companion object {
         /**

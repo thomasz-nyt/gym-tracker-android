@@ -7,19 +7,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
+import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
+import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -28,17 +34,31 @@ import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.units.UnitConverter
+import com.gymtracker.core.domain.units.WeightDisplay
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
+import com.gymtracker.feature.logging.session.EyebrowLabel
+import com.gymtracker.feature.logging.session.SegmentBar
 import java.time.Duration
 
 /**
- * Walking through one exercise, set by set (US-05a, ADR-0017).
+ * Walking through one exercise, set by set (US-05a, ADR-0017, ADR-0033).
  *
- * Everything on screen is one of three things: what you are lifting, which set you are on, and
- * the one button that ends it. The rep count is a field rather than a label because the target
- * is a prefill and not a promise — logging 12 when 9 were managed would fabricate a value
- * (constitution §2.4).
+ * Rebuilt on the shipped design system for ADR-0033: `Redesign.dc.html` has no frame for this
+ * screen, but option `1b` — the one-exercise-at-a-time direction ADR-0029 rejected for the
+ * *main* session screen — is a materially closer match to what this screen already is than to
+ * the multi-exercise screen it lost to there. Every size below reads through a `Typography`
+ * role ADR-0029 already shipped; nothing here adds a new one.
+ *
+ * Everything on screen is still one of three things: what you are lifting, which set you are
+ * on, and the one button that ends it. The rep count is a field rather than a label because the
+ * target is a prefill and not a promise — logging 12 when 9 were managed would fabricate a
+ * value (constitution §2.4).
+ *
+ * The root is a `LazyColumn`, not a `Column`, on a small enough screen that this content does
+ * not always fit — `SessionMovements.kt`'s `BottomLogBar` already documents why: a bare
+ * `Modifier.verticalScroll` gave `performScrollTo()` an ancestor but made Compose's test idling
+ * hang instead of the throw it exists to replace, and a real `LazyColumn` was the proven fix.
  */
 @Composable
 internal fun GuidedExerciseScreen(
@@ -46,86 +66,177 @@ internal fun GuidedExerciseScreen(
     unit: WeightUnit,
     restRemaining: Duration?,
     onRepsChanged: (String) -> Unit,
+    onRepsStepped: (Int) -> Unit,
     onFinishSet: () -> Unit,
     onStartNext: (SessionExerciseRow) -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(GymDimens.ScreenPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
-        ) {
-            Text(
-                text = running.exerciseName,
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = running.weightKg.describe(unit),
-                style = MaterialTheme.typography.titleMedium,
-            )
-
+        // No root padding, and nothing centred (ADR-0033): every other rebuilt screen is
+        // flush-left, and the resting hero needs to be full-bleed, which a root padding would
+        // prevent. Each state below applies its own.
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (running.isComplete) {
-                ExerciseSummary(running, unit, onStartNext, onStop)
+                item { ExerciseSummary(running, unit, onStartNext, onStop) }
             } else {
-                SetInProgress(running, restRemaining, onRepsChanged, onFinishSet, onStop)
+                item {
+                    if (restRemaining != null) {
+                        RestHero(running, unit, restRemaining)
+                    } else {
+                        MidSetHeader(running, unit)
+                    }
+                }
+                item { GuidedControls(running, onRepsChanged, onRepsStepped, onFinishSet, onStop) }
             }
         }
     }
 }
 
-/** The set you are about to do, or the rest before it. */
+/**
+ * Mid-set, not resting (`1b Focus mid-set`). The hero reads [GuidedRunning.reps] — the number
+ * about to be written — not the target: the literal fix for a member seeing a number on screen
+ * that was not the one [onFinishSet] would log.
+ */
 @Composable
-private fun SetInProgress(
+private fun MidSetHeader(
     running: GuidedRunning,
-    restRemaining: Duration?,
+    unit: WeightUnit,
+) {
+    Column(
+        modifier = Modifier.padding(GymDimens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
+    ) {
+        EyebrowLabel(
+            text = "Set ${running.setsDone + 1} of ${running.targetSets}",
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
+        HorizontalDivider(
+            thickness = GymDimens.StructuralRuleThickness,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        val weight = WeightFormatter.format(running.weightKg, unit)
+        // A mid-typing empty field would otherwise draw "135 lb × " — onFinishSet is already
+        // disabled in that state, so this is display-only, not a second validation.
+        NumeralText(
+            text = "${weight.primary} × ${running.reps.ifBlank { "—" }}",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        weight.secondary?.let {
+            NumeralText(
+                text = it,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Resting (`1b Focus resting`) — the red hero a member asked for by name: the movement, its
+ * load, its rep count and which set it is, together on one line inside the accent block, rather
+ * than as separate lines on the bare ground the way the main session screen's rest banner draws
+ * them (`RestPanel.kt`'s `UpNext`). That is a deliberate difference, not a missed reuse: this
+ * screen holds exactly one exercise, so there is nothing else on screen the combined line would
+ * be competing with the way the session screen's "Up next" would be.
+ *
+ * No skip-rest control is drawn here — [GuidedControls]'s `Log set {n}` is already live
+ * throughout the countdown (ADR-0023's rule, held structurally on this screen exactly as on the
+ * session screen), so there is no action a skip button would unblock.
+ */
+@Composable
+private fun RestHero(
+    running: GuidedRunning,
+    unit: WeightUnit,
+    remaining: Duration,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        ) {
+            EyebrowLabel(text = "Rest", color = MaterialTheme.colorScheme.onPrimary)
+            Text(
+                text = remaining.asMinutesSeconds(),
+                style = MaterialTheme.typography.displayLarge,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining"
+                    },
+            )
+            HorizontalDivider(
+                thickness = GymDimens.StructuralRuleThickness,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            EyebrowLabel(text = "Then", color = MaterialTheme.colorScheme.onPrimary)
+            Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
+            val weight = WeightFormatter.format(running.weightKg, unit)
+            Text(
+                text = restHeroLine(weight, running),
+                // Deliberately a plain Text, not NumeralText: titleLarge's base weight is
+                // already ExtraBold, so NumeralText's digit-bolding span would draw nothing —
+                // the same reasoning Type.kt documents for why titleMedium stays unbolded.
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+    }
+}
+
+private fun restHeroLine(
+    weight: WeightDisplay,
+    running: GuidedRunning,
+): String =
+    buildString {
+        append("${weight.primary} × ${running.reps}")
+        weight.secondary?.let { append("  ·  $it") }
+        append("  ·  set ${running.setsDone + 1} of ${running.targetSets}")
+    }
+
+/** The set-progress dots, the rep stepper, and the log/stop row — shared by both non-complete states. */
+@Composable
+private fun GuidedControls(
+    running: GuidedRunning,
     onRepsChanged: (String) -> Unit,
+    onRepsStepped: (Int) -> Unit,
     onFinishSet: () -> Unit,
     onStop: () -> Unit,
 ) {
-    Text(
-        text = "Set ${running.setsDone + 1} of ${running.targetSets}",
-        style = MaterialTheme.typography.titleLarge,
-    )
+    Column(
+        modifier = Modifier.padding(GymDimens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
+    ) {
+        SegmentBar(total = running.targetSets, done = running.setsDone)
 
-    // Display-size, at the size you can read from where you are actually standing (ADR-0016) —
-    // the same treatment the session screen's rest banner gets. The countdown gates nothing:
-    // "Finish set" stays live throughout, which is US-05's "it never blocks logging the next
-    // set" held to structurally.
-    Text(
-        text = restRemaining?.let { "Rest ${it.asMinutesSeconds()}" } ?: "Go",
-        style = MaterialTheme.typography.displayMedium,
-    )
+        StepperField(
+            label = "Reps",
+            value = running.reps,
+            onValueChange = onRepsChanged,
+            onStep = onRepsStepped,
+            supporting = "Target ${running.targetReps} — change it if you managed a different number.",
+        )
 
-    OutlinedTextField(
-        value = running.reps,
-        onValueChange = onRepsChanged,
-        label = { Text("Reps") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Text(
-        text = "Target ${running.targetReps}. Change it if you managed a different number.",
-        style = MaterialTheme.typography.bodySmall,
-        textAlign = TextAlign.Center,
-    )
-
-    // The one primary action this screen state exists for (ADR-0016).
-    PrimaryActionButton(
-        text = "Finish set",
-        onClick = onFinishSet,
-        enabled = running.reps.toIntOrNull()?.let { it >= 1 } == true,
-    )
-
-    TextButton(onClick = onStop, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
-        Text("Stop")
+        Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+            // The single-string overload, not eyebrow/detail: the hero above already shows the
+            // numbers, so the two-line overload the session screen uses would repeat them.
+            PrimaryActionButton(
+                text = "Log set ${running.setsDone + 1}",
+                onClick = onFinishSet,
+                enabled = running.reps.toIntOrNull()?.let { it >= 1 } == true,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(
+                onClick = onStop,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
+            ) {
+                Text("Stop")
+            }
+        }
     }
 }
 
@@ -137,30 +248,53 @@ private fun ExerciseSummary(
     onStartNext: (SessionExerciseRow) -> Unit,
     onStop: () -> Unit,
 ) {
-    Text(text = "Done", style = MaterialTheme.typography.titleLarge)
-    Text(
-        text = "${running.setsDone} ${"set".orPlural(running.setsDone)} of ${running.targetReps}",
-        style = MaterialTheme.typography.titleMedium,
-    )
-    Text(
-        text =
-            buildString {
-                WeightFormatter.formatVolume(running.volumeKg, unit)?.let { append("$it  ·  ") }
-                append(running.elapsed.asMinutesSeconds())
-            },
-        style = MaterialTheme.typography.bodyMedium,
-    )
-
-    val next = running.nextUp
-    if (next != null) {
-        PrimaryActionButton(
-            text = "Next: ${next.exercise?.name ?: next.sessionExercise.exerciseId.value}",
-            onClick = { onStartNext(next) },
+    Column(
+        modifier = Modifier.padding(GymDimens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
+    ) {
+        EyebrowLabel(text = "Done", color = MaterialTheme.colorScheme.primary)
+        Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
+        HorizontalDivider(
+            thickness = GymDimens.StructuralRuleThickness,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-    }
+        NumeralText(
+            text = "${running.setsDone} ${"set".orPlural(running.setsDone)} of ${running.targetReps}",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        NumeralText(
+            text =
+                buildString {
+                    WeightFormatter.formatVolume(running.volumeKg, unit)?.let { append("$it  ·  ") }
+                    append(running.elapsed.asMinutesSeconds())
+                },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SegmentBar(total = running.targetSets, done = running.setsDone)
 
-    TextButton(onClick = onStop, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
-        Text(if (next == null) "Back to workout" else "Stop here")
+        val next = running.nextUp
+        if (next != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+                PrimaryActionButton(
+                    text = "Next: ${next.exercise?.name ?: next.sessionExercise.exerciseId.value}",
+                    onClick = { onStartNext(next) },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(
+                    onClick = onStop,
+                    shape = MaterialTheme.shapes.large,
+                    modifier =
+                        Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
+                ) {
+                    Text("Stop here")
+                }
+            }
+        } else {
+            // With nothing left to start, leaving is the screen's most frequent action —
+            // exactly what PrimaryActionButton's own doc reserves the role for.
+            PrimaryActionButton(text = "Back to workout", onClick = onStop)
+        }
     }
 }
 
@@ -168,7 +302,8 @@ private fun ExerciseSummary(
  * The dialog that starts the flow (US-05a).
  *
  * Separate from [SetEntryDialog] on purpose: "Add set" and "Save set" keep their exact
- * behaviour, so the two-tap path of US-03 cannot be changed from here (ADR-0017).
+ * behaviour, so the two-tap path of US-03 cannot be changed from here (ADR-0017). Unchanged by
+ * ADR-0033 — see that ADR's "what this does not touch" for why.
  */
 @Composable
 internal fun GuidedSetupDialog(
@@ -236,15 +371,6 @@ internal fun GuidedSetupDialog(
     )
 }
 
-/** Both units, or "Bodyweight" when none was recorded — never "0 lb" (ADR-0008). */
-private fun Double?.describe(unit: WeightUnit): String {
-    val weight = WeightFormatter.format(this, unit)
-    return buildString {
-        append(weight.primary)
-        weight.secondary?.let { append("  ·  $it") }
-    }
-}
-
 /**
  * mm:ss. Arithmetic on [Duration.getSeconds] rather than `toMinutesPart`, which is API 31 and
  * would crash on the API 26 devices `tech-stack.md` supports.
@@ -258,41 +384,77 @@ private const val SECONDS_IN_MINUTE = 60
 
 @GymPreviews
 @Composable
-private fun GuidedRunningPreview() {
-    val row =
-        SessionExerciseRow(
-            sessionExercise =
-                SessionExercise(
-                    SessionExerciseId("se-1"),
-                    SessionId("preview"),
-                    ExerciseId("bench"),
-                    1,
-                ),
-            exercise = null,
-        )
-
+private fun GuidedMidSetPreview() {
     GymTrackerTheme {
         GuidedExerciseScreen(
-            running =
-                GuidedRunning(
-                    row = row,
-                    exerciseName = "Bench Press",
-                    weightKg = 61.23,
-                    targetSets = 3,
-                    targetReps = 12,
-                    setsDone = 1,
-                    reps = "12",
-                    isComplete = false,
-                    volumeKg = 734.8,
-                    elapsed = Duration.ofMinutes(4),
-                    nextUp = null,
-                ),
+            running = previewRunning(),
             unit = WeightUnit.LB,
-            restRemaining = Duration.ofSeconds(45),
+            restRemaining = null,
             onRepsChanged = {},
+            onRepsStepped = {},
             onFinishSet = {},
             onStartNext = {},
             onStop = {},
         )
     }
 }
+
+@GymPreviews
+@Composable
+private fun GuidedRestingPreview() {
+    GymTrackerTheme {
+        GuidedExerciseScreen(
+            running = previewRunning(),
+            unit = WeightUnit.LB,
+            restRemaining = Duration.ofSeconds(45),
+            onRepsChanged = {},
+            onRepsStepped = {},
+            onFinishSet = {},
+            onStartNext = {},
+            onStop = {},
+        )
+    }
+}
+
+@GymPreviews
+@Composable
+private fun GuidedCompletePreview() {
+    GymTrackerTheme {
+        GuidedExerciseScreen(
+            running = previewRunning(setsDone = 3, isComplete = true),
+            unit = WeightUnit.LB,
+            restRemaining = null,
+            onRepsChanged = {},
+            onRepsStepped = {},
+            onFinishSet = {},
+            onStartNext = {},
+            onStop = {},
+        )
+    }
+}
+
+private fun previewRunning(
+    setsDone: Int = 1,
+    isComplete: Boolean = false,
+): GuidedRunning {
+    val row =
+        SessionExerciseRow(
+            sessionExercise = SessionExercise(SessionExerciseId("se-1"), SessionId("preview"), ExerciseId("bench"), 1),
+            exercise = null,
+        )
+    return GuidedRunning(
+        row = row,
+        exerciseName = "Bench Press",
+        weightKg = 61.23,
+        targetSets = 3,
+        targetReps = 12,
+        setsDone = setsDone,
+        reps = "12",
+        isComplete = isComplete,
+        volumeKg = 734.8,
+        elapsed = Duration.ofMinutes(PREVIEW_ELAPSED_MINUTES),
+        nextUp = null,
+    )
+}
+
+private const val PREVIEW_ELAPSED_MINUTES = 4L

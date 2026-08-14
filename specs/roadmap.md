@@ -567,6 +567,33 @@ bodyweight sets never count) and a `WorkoutHistoryTest` case pinning the two-ses
 behaviour end to end. Verified live on device; all four gates green plus
 `verifyDomainHasNoAndroidDeps` and the full instrumented suite.
 
+**The guided exercise screen joins the ruled sheet, 2026-08-14 (US-39, ADR-0033, PR E of the
+follow-up audit).** A gap, not a regression: `GuidedExerciseScreen` (ADR-0017's guided flow,
+US-05a) predates the redesign, `Redesign.dc.html` draws no frame for it, ADR-0029 explicitly
+scoped it out, and this section never listed it — nobody had looked at it since the redesign
+shipped, until a member reported still seeing "Go", a bare rep field and a "Finish set" button
+on Material defaults. `Redesign.dc.html`'s `1b` — the one-exercise-at-a-time direction ADR-0029
+rejected for the *main* session screen — is the closest source material for a screen that
+genuinely is one exercise at a time, and every size in it is re-expressed through a `Typography`
+role ADR-0029 already shipped rather than a new one: the resting state's countdown, movement name
+and one combined `"135 lb × 12 · 61.2 kg · set 3 of 3"` line (`displayLarge`/`headlineSmall`/
+`titleLarge`) all sit on the same full-bleed `primary`/`onPrimary` `Surface` shape `RestPanel`
+already ships; the mid-set state's weight×reps hero reads the typed rep count, not the target
+(`headlineMedium`, `RestPanel`'s own `UpNext` call-site shape); set progress reuses the session
+header's `SegmentBar`, promoted to take a plain `total`/`done` pair instead of a
+`SessionProgress`. The rep count gained the app's `StepperField` (+/− buttons) — the one
+behavioural change, covered by three new `GuidedFlowTest` cases written first, and the reason
+this needed a failing test rather than only a visual diff; ADR-0017's editable-before-commit
+guarantee is proved unchanged by its own two tests staying unedited. `"Finish set"` became
+`"Log set {n}"` — no test asserts the old string anywhere, and unlike ADR-0029's refused `ADJUST`
+rename, both labels name the same operation. `displayMedium`, protected by ADR-0029 specifically
+because this screen read it, is now read nowhere in the app; `GymTypographyTest`'s test naming
+that reason was renamed rather than left with a false premise. `GuidedSetupDialog` stays
+unchanged and is now the one guided-mode surface still on Material defaults — logged as a named
+follow-up, not a silent gap. New instrumented coverage: `GuidedFlowScreenTest`, the first UI test
+to reach guided mode at all. Verified live on device; all four gates green plus
+`TwoTapSetLoggingTest`/`OneTapSetLoggingTest` unedited.
+
 **In progress:**
 
 - **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a
