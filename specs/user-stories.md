@@ -533,6 +533,35 @@ log, not just open the sheet US-03 already has.
 
 ---
 
+### US-36 — Three tabs, and a routine on Train home
+Added 2026-08-12. See `adr/0030-three-tabs-and-a-hand-built-bottom-bar.md`, written against
+`Redesign.dc.html`'s section 2a. Closes the redesign audit's nav-bar-pill deviation and finding
+01 ("a session has no plan") on Train home specifically.
+
+- The bottom bar shows exactly three destinations — **Train**, **Exercises**, **Progress** —
+  and its selected-item indicator is square, not a pill: `NavigationBarItem`'s own indicator
+  token cannot be overridden (confirmed against the compiled `material3-api.jar`), so this is a
+  hand-built bar from primitives, not a restyle.
+- **Routines is reached one way only**: an outlined button labelled `Routines` in the Train
+  header, present whether or not a workout is running, whether or not the member has any
+  routines yet.
+- **Train home, with no workout running, names the routine due next** — whichever the member has
+  gone longest without doing, or has never done at all — and offers `Start <name>` beside the
+  existing `Freestyle` action. With no routines at all, the screen is unchanged from today
+  ("Start workout," no routine named).
+- **Never fabricated.** There is no weekday or split model in the data, so "due next" means
+  "least recently performed" — an honest read of history, not an invented schedule
+  (constitution §2.4). The exact wording stays clear that it is a suggestion, not a plan the app
+  is asserting exists.
+- Starting from Train home behaves exactly as starting the same routine from the Routines screen
+  already does (`StartSessionFromRoutine`, US-29): if a workout is already running, nothing is
+  copied into it, and the running workout's own state does not change to reflect the tap that
+  was ignored.
+- `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` must pass **unedited** — neither exercises
+  the no-session state this story changes.
+
+---
+
 ### US-37 — Set entry prefers history over a target
 Added 2026-08-13. See `adr/0031-set-entry-prefers-history-over-a-target.md`, written against
 `Redesign.dc.html`'s section 2b. Supersedes only US-30's target-first prefill order — every

@@ -36,6 +36,10 @@ import javax.inject.Inject
  * The rule these tests pin: **a top-level destination is always reached as a tab**, never
  * pushed, wherever the tap comes from. Drill-downs (exercise detail, workout detail, picking an
  * exercise into a running session) are still pushes, and are not what this is about.
+ *
+ * ADR-0030 moved Routines out of that top-level set entirely — it is a drill-down now, reached
+ * from Train's header rather than the bar, and [routinesIsAPushFromTrainsHeaderButtonNotATab]
+ * pins that it behaves like one.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -103,6 +107,25 @@ class TabNavigationTest {
     }
 
     @Test
+    fun routinesIsAPushFromTrainsHeaderButtonNotATab() {
+        // ADR-0030: Routines dropped out of the bottom bar and is reached only from Train's
+        // outlined header button now — a drill-down, exited the same way the browse detail
+        // screen is in the test above, not a tab the bar remembers.
+        awaitHome()
+
+        compose.onNodeWithText(ROUTINES_BUTTON).performClick()
+        awaitLeftHome()
+
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText(NEW_ROUTINE).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(BACK).performClick()
+
+        awaitHome()
+        compose.onNodeWithText(START).assertIsDisplayed()
+    }
+
+    @Test
     fun aDetailScreenCanBeLeftWithoutTheSystemBackGesture() {
         // ADR-0024 removed the dead-end "Done" from the drill-downs and left them with no
         // affordance at all: no bar (they are drill-downs) and no up arrow, so an edge swipe was
@@ -151,5 +174,11 @@ class TabNavigationTest {
         /** Only on the browse screen, so it is the signal that the list is what is showing. */
         const val SEARCH_FIELD = "Search exercises"
         const val BACK = "Back"
+
+        /** Train's one entry point to Routines (ADR-0030), present regardless of routine count. */
+        const val ROUTINES_BUTTON = "Routines"
+
+        /** Present on the Routines screen whether or not it has any routines yet. */
+        const val NEW_ROUTINE = "New routine"
     }
 }

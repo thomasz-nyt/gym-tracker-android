@@ -22,16 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
+import com.gymtracker.core.designsystem.component.GymPhoto
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.YouTubeSearch
@@ -146,14 +144,13 @@ internal fun ExerciseDetailScreen(
 private fun MovementPhoto(imageAsset: String?) {
     if (imageAsset == null) return
 
-    AsyncImage(
+    GymPhoto(
         model = "file:///android_asset/exercise_images/$imageAsset",
         contentDescription = "Photo of the movement",
-        contentScale = ContentScale.Crop,
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(PHOTO_HEIGHT)
+                .height(GymDimens.PhotoHeight)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -163,7 +160,13 @@ private fun MovementPhoto(imageAsset: String?) {
 private fun MuscleTags(exercise: Exercise) {
     Text("Works", style = MaterialTheme.typography.titleMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(TAG_GAP)) {
-        AssistChip(onClick = {}, label = { Text(exercise.equipment.label()) })
+        AssistChip(
+            onClick = {},
+            label = { Text(exercise.equipment.label()) },
+            // ADR-0019: AssistChip reads CornerFull unless told otherwise — redesign audit,
+            // PR A finding 1.
+            shape = MaterialTheme.shapes.large,
+        )
     }
     Text(
         text = exercise.primaryMuscles.joinToString { it.label() }.ifEmpty { "Not recorded" },
@@ -209,7 +212,6 @@ private val DETAIL_PADDING = GymDimens.ScreenPadding
 private val DETAIL_GAP = GymDimens.Gap
 private val TAG_GAP = GymDimens.TightGap
 private val MIN_TARGET = GymDimens.MinTouchTarget
-private val PHOTO_HEIGHT = 220.dp
 
 @Preview
 @Composable

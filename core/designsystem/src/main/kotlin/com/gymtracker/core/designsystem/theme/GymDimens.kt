@@ -64,4 +64,29 @@ object GymDimens {
 
     /** ADR-0029: the fixed-width label column a set row and a still-to-come row both align to. */
     val RowLabelWidth = 44.dp
+
+    /** ADR-0030: the hand-built bottom bar's height — taller than [MinTouchTarget] on purpose. */
+    val NavigationBarHeight = 76.dp
+
+    /** ADR-0030: each tab's icon in the hand-built bottom bar. */
+    val NavigationBarIconSize = 24.dp
+
+    /**
+     * The exercise detail screen's full-width hero photo (ADR-0007, ADR-0014). Redesign audit,
+     * PR A finding 4: this and the four tokens below used to be private `= N.dp` vals in the
+     * feature module that drew them, which is exactly the rule this file's own class doc names.
+     */
+    val PhotoHeight = 220.dp
+
+    /** US-16's trend chart on the exercise progress screen. */
+    val ChartHeight = 240.dp
+
+    /** One muscle's bar in the weekly volume screen (US-17). */
+    val VolumeBarHeight = 12.dp
+
+    /** A result row on the catalog browse screen (US-12). */
+    val CatalogRowHeight = 88.dp
+
+    /** Room for the "Done · N added" floating button so the last browse result clears it. */
+    val FabClearance = 88.dp
 }

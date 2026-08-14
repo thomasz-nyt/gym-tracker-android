@@ -1,11 +1,8 @@
 package com.gymtracker.app
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -21,6 +18,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.gymtracker.core.designsystem.R
+import com.gymtracker.core.designsystem.component.GymNavItem
+import com.gymtracker.core.designsystem.component.GymNavigationBar
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionId
@@ -110,20 +110,23 @@ internal data class WorkoutDetail(
 )
 
 /**
- * The four top-level destinations the bottom bar shows (ADR-0024), in the order they appear.
+ * The three top-level destinations the bottom bar shows (ADR-0030, superseding ADR-0024's
+ * four), in the order they appear.
  *
- * Routines is the fourth this file said would arrive with ADR-0020, and it sits next to Train
- * because starting one is how a workout begins when you have a plan. The editor is not here:
- * it is a drill-down, reached from this tab and exited through the top bar.
+ * Routines is not here. ADR-0024 anticipated it arriving as a fourth tab; `Redesign.dc.html`'s
+ * section 2a asks for the opposite — "a setup surface you touch monthly, not a daily
+ * destination" — and it is now reached the same way `RoutineEditor` always has been: a
+ * drill-down, pushed from Train's one outlined `Routines` button, exited through the system
+ * back gesture.
  */
 private enum class TopLevelDestination(
     val route: Any,
     val label: String,
+    @param:DrawableRes val icon: Int,
 ) {
-    TRAIN(Logging, "Train"),
-    ROUTINES(Routines, "Routines"),
-    EXERCISES(Browse(pickForSession = false), "Exercises"),
-    HISTORY(History, "Progress"),
+    TRAIN(Logging, "Train", R.drawable.ic_nav_train),
+    EXERCISES(Browse(pickForSession = false), "Exercises", R.drawable.ic_nav_exercises),
+    HISTORY(History, "Progress", R.drawable.ic_nav_progress),
 }
 
 /**
@@ -198,6 +201,9 @@ private fun GymTrackerNavGraph(
                 // Not a tab: this is Browse in its picking mode (US-02a), reached from a running
                 // session and genuinely a drill-down, so it stays a push.
                 onAddExercise = { navController.navigate(Browse(pickForSession = true)) },
+                // Routines is a drill-down now (ADR-0030), reached only from here — a push,
+                // like RoutineEditor and Browse's picking mode above.
+                onOpenRoutines = { navController.navigate(Routines) },
                 pickedExerciseIds = picked,
                 onPicksHandled = { entry.savedStateHandle[PICKED_EXERCISES] = ArrayList<String>() },
             )
@@ -208,6 +214,7 @@ private fun GymTrackerNavGraph(
         composable<Routines> {
             RoutinesRoute(
                 onEditRoutine = { id -> navController.navigate(RoutineEditor(id.value)) },
+                onBack = navController::popBackStack,
                 // Starting a routine puts you in a workout, which lives on Train. A tab switch
                 // rather than a push, for the reason the Logging route's shortcuts document.
                 onWorkoutStarted = { navController.navigateToTab(TopLevelDestination.TRAIN) },
@@ -307,43 +314,34 @@ private fun NavHostController.onExerciseChosenInBrowse(
 }
 
 /**
- * Text-only, per the constitution's §7 dependency rule: there is no icon dependency in this
- * app, and `StepperField` already draws its own +/− as text for the same reason. Adding one
- * for three tab labels would need an ADR this feature does not otherwise need.
- *
- * **Known deviation from ADR-0019.** `NavigationBarItem` (material3 1.4.0) reads the fixed
- * `CornerFull` token for its selected-item indicator and, unlike `PrimaryActionButton` /
- * `SecondaryActionButton` and the outlined "Delete set" button, exposes no `shape` parameter to
- * override it with `MaterialTheme.shapes.large` the way `Shape.kt` documents doing elsewhere.
- * The indicator pill will render as a stadium regardless of `GymShapes` until Material3 adds
- * that hook, or until this bar is replaced with a hand-built one. Flagged rather than silently
- * accepted — this is the exact footgun `Shape.kt` warns has bitten the project before.
+ * Built from primitives rather than `NavigationBar` (ADR-0030) — see [GymNavigationBar]'s own
+ * doc comment for why restyling is not an option. The icons are hand-authored vector drawables
+ * in `:core:designsystem/res/drawable`, not an icon library: no new dependency, the same
+ * reasoning `StepperField`'s +/− glyphs and `DrillDownTopBar`'s "Back" label already use.
  */
 @Composable
 private fun GymBottomBar(
     selected: TopLevelDestination?,
     onSelect: (TopLevelDestination) -> Unit,
 ) {
-    NavigationBar {
-        TopLevelDestination.entries.forEach { tab ->
-            NavigationBarItem(
-                selected = selected == tab,
-                onClick = { onSelect(tab) },
-                icon = { Text(tab.label, style = MaterialTheme.typography.labelLarge) },
-                label = null,
-                alwaysShowLabel = false,
-            )
-        }
-    }
+    val entries = TopLevelDestination.entries
+    GymNavigationBar(
+        items = entries.map { tab -> GymNavItem(icon = tab.icon, label = tab.label) },
+        selectedIndex = entries.indexOf(selected),
+        onSelect = { index -> onSelect(entries[index]) },
+    )
 }
 
 /**
- * Whether the bar shows over [this] destination, and the running session (ADR-0024).
+ * Whether the bar shows over [this] destination, and the running session (ADR-0030, superseding
+ * ADR-0024's list).
  *
- * Three places show it: Train (only when no workout is running), Exercises in its non-picking
- * mode, and History. Everything else — exercise detail, workout detail, and browse *picking*
- * an exercise into a running session — is a drill-down, and drill-downs exit through the system
- * back gesture like every other Android screen, not through the bar.
+ * Two places show it: Train (only when no workout is running) and Exercises in its non-picking
+ * mode — Progress reads `History` and its own check stays below. Everything else — exercise
+ * detail, workout detail, Routines, and browse *picking* an exercise into a running session —
+ * is a drill-down, and drill-downs exit through the system back gesture like every other Android
+ * screen, not through the bar. Routines moved into that group with this ADR; it used to be a
+ * tab.
  */
 private fun NavBackStackEntry?.showsBottomBar(hasActiveSession: Boolean): Boolean {
     val entry = this ?: return false
@@ -351,7 +349,6 @@ private fun NavBackStackEntry?.showsBottomBar(hasActiveSession: Boolean): Boolea
     return when {
         destination.hasRoute<Logging>() -> !hasActiveSession
         destination.hasRoute<Browse>() -> !entry.toRoute<Browse>().pickForSession
-        destination.hasRoute<Routines>() -> true
         destination.hasRoute<History>() -> true
         else -> false
     }
@@ -363,7 +360,6 @@ private fun NavBackStackEntry?.topLevelDestinationOrNull(): TopLevelDestination?
     return when {
         destination.hasRoute<Logging>() -> TopLevelDestination.TRAIN
         destination.hasRoute<Browse>() -> TopLevelDestination.EXERCISES
-        destination.hasRoute<Routines>() -> TopLevelDestination.ROUTINES
         destination.hasRoute<History>() -> TopLevelDestination.HISTORY
         else -> null
     }

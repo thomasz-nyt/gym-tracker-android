@@ -23,14 +23,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.GymPhoto
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -309,10 +308,9 @@ private fun DetailThumbnail(imageAsset: String?) {
         return
     }
 
-    AsyncImage(
+    GymPhoto(
         model = "file:///android_asset/exercise_images/$imageAsset",
         contentDescription = null,
-        contentScale = ContentScale.Crop,
         modifier =
             Modifier
                 .size(GymDimens.Thumbnail)

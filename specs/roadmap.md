@@ -424,13 +424,14 @@ un-gated by `GymColorSchemeTest`; and "numbers carry weight 800" (ADR-0019's own
 applied anywhere. Closed 2026-08-09, plus a `NumeralText` component (bolds digit runs via
 `AnnotatedString` spans, decoupled from button-label uppercasing which cannot be done safely —
 see `GymButtons.kt`'s `ButtonLabel` doc comment — without risking `TwoTapSetLoggingTest`'s
-case-sensitive `onNodeWithText` matches). The nav-bar selected-item pill is **not** closed:
-confirmed via the compiled `material3-api.jar` that `NavigationBarItem` still exposes no `shape`
-parameter and its indicator token (`ShapeKeyTokens.CornerFull`) resolves to a hardcoded
-`CircleShape`, never one of `Shapes`'s five roles. Fixing it means reimplementing
-`NavigationBarItem` from primitives, which is a custom widget — out of bounds per the redesign
-brief's own constraints. Revisit if Material3 ever adds the hook, or if a custom widget is
-explicitly authorised.
+case-sensitive `onNodeWithText` matches). The nav-bar selected-item pill was **not** closed at
+the time: confirmed via the compiled `material3-api.jar` that `NavigationBarItem` exposed no
+`shape` parameter and its indicator token (`ShapeKeyTokens.CornerFull`) resolved to a hardcoded
+`CircleShape`, never one of `Shapes`'s five roles, and fixing it meant reimplementing
+`NavigationBarItem` from primitives — a custom widget, out of bounds per the redesign brief's
+own constraints as they read then. **Closed 2026-08-13 by ADR-0030**, once the brief's own text
+was read again and found to authorise exactly that exception in as many words ("Material 3 +
+Compose components only, with one deliberate exception: the bottom bar"). See that entry below.
 
 **Destructive actions off the row (ADR-0019), closed 2026-08-10.** `Delete routine` sat on the
 Routines list row beside `Start`, styled as a plain `TextButton` despite a comment claiming it
@@ -460,6 +461,47 @@ weight hierarchy on `titleLarge`/`titleSmall` and the body roles — `titleMediu
 excluded, since it is the role `LoggedSets` and `RestPanel`'s mixed word/number lines render,
 and `NumeralText`'s digit-span contrast depends on the line's own base weight not already
 matching it. Verified live on device.
+
+**Four more ADR-0019 compliance gaps closed 2026-08-12 (PR A of the follow-up audit).**
+`FilterChip` (Browse's body-part/equipment rows, the exercise progress series picker) and
+`AssistChip` (exercise detail's equipment tag) never passed `shape`, so all three still read
+Material's `CornerFull` token regardless of `GymShapes` — the exact trap `Shape.kt` documents,
+now closed by passing `shape = MaterialTheme.shapes.large` at each call site the same way
+`PrimaryActionButton` and the outlined buttons already did. The three bundled-photo call sites
+(Browse's thumbnail, exercise detail's hero, workout detail's thumbnail) rendered in full
+colour; the Modernist design system's `.grayscale` treatment (`filter: grayscale(1)
+contrast(1.08)`) was never applied anywhere, against its own "do not tint or colorize imagery"
+rule. A new `GymPhoto` composable in `:core:designsystem` wraps `AsyncImage` with that filter as
+one affine `ColorMatrix` (pinned by `GymPhotoTest`), and all three call sites now go through it
+so a future one cannot forget the treatment the way these three did. Nine `ColorScheme` slots —
+`errorContainer`, `onErrorContainer`, `tertiaryContainer`, `onTertiaryContainer`,
+`inverseSurface`, `inverseOnSurface`, `inversePrimary`, `surfaceTint`, `scrim` — were never
+passed to `lightColorScheme()`/`darkColorScheme()`, so each still inherited Material's own
+baseline (violet-tinted) default; `GymColorSchemeTest` now gates all nine the same way it
+already gated `outlineVariant`. And the five raw `dp` literals ADR-0011's "feature code never
+names a raw sp" rule has a `dp` counterpart for — `WeeklyVolumeScreen`'s bar height,
+`ExerciseProgressScreen`'s chart height, `ExerciseDetailScreen`'s photo height, and
+`BrowseScreen`'s row height and FAB clearance — are now named `GymDimens` tokens, pinned by
+`GymDimensTest`. All four gates green; 11/11 instrumented tests pass unedited.
+
+**The nav-bar pill closed, and Routines got its own entry point, 2026-08-13 (US-36, ADR-0030,
+PR B of the follow-up audit).** Three top-level destinations now, not four — Train, Exercises,
+Progress — with a hand-built `GymNavigationBar` (`:core:designsystem`) replacing
+`NavigationBar` entirely rather than restyling it, per the brief's own explicit exception.
+Routines moved from a tab to a drill-down, reached by one outlined button in Train's header,
+present on every Train state; it gained a `DrillDownTopBar` the same way `RoutineEditor` already
+had one, since it lost the bottom bar it used to exit through. Train home, with no workout
+running, now names the routine due next — the one least recently performed, or never performed
+at all — and offers `Start <name>` beside the unchanged `Freestyle` action; a new domain class,
+`NextRoutineToTrain`, is the first reader of `RoutineOrigin.id` (ADR-0028), used only to match a
+finished session back to a routine's identity, never rendered — exactly the sanctioned future
+use that ADR's own text names. With no routines at all, the screen is byte-for-byte what it said
+before this story, so `TabNavigationTest`'s `"Start workout"` signal and every existing
+instrumented test kept passing unedited. New coverage:
+`TabNavigationTest.routinesIsAPushFromTrainsHeaderButtonNotATab` (a push, not a tab-switch — Back
+returns to Train). `RoutineDeletionTest` needed no code change at all: its own `"Routines"`
+click target happens to match the new header button's label. Verified live on device; all four
+gates green plus `verifyDomainHasNoAndroidDeps` and 12/12 instrumented tests.
 
 **Set entry prefers history over a target, 2026-08-13 (US-37, ADR-0031, PR C of the follow-up
 audit).** US-30 (ADR-0027) had set entry prefer a routine's target over the member's last real
