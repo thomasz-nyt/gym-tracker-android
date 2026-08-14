@@ -58,4 +58,10 @@ class GymDimensTest {
         assertEquals(6.dp, GymDimens.SegmentHeight)
         assertEquals(GymDimens.HairGap, GymDimens.SegmentGap)
     }
+
+    @Test
+    fun `a ruled list row is at least as tall as the accessibility floor`() {
+        assertEquals(72.dp, GymDimens.MinListRowHeight)
+        assertTrue(GymDimens.MinListRowHeight >= GymDimens.MinTouchTarget)
+    }
 }

@@ -308,10 +308,10 @@ call to rename ahead of the range selector below.
       existing per-exercise trend screen (US-16) unchanged. Closed 2026-08-10
 - [x] "Weekly volume by muscle" restyled as a labelled row in the top section, replacing the
       bare `TextButton`; same destination. Closed 2026-08-10
-- [ ] **Deferred, not built:** a "PR" badge on session rows. `PersonalRecordsAchievedIn` reads
-      the member's entire session history per row it is asked about — fine for
-      `FinishSummaryScreen`'s one row, not for every visible row of a 200-session list. Needs
-      a purpose-built O(sets) read, not a call to the existing use case per row
+- [x] A "PR" badge on session rows. `PersonalRecordsAchievedIn` read the member's entire
+      session history per row it was asked about — fine for `FinishSummaryScreen`'s one row,
+      not for every visible row of a 200-session list. `SessionsWithRecords`, new, answers it
+      in one O(sets) pass instead (US-38, ADR-0032). Closed 2026-08-14
 
 ### US-34 — Exercise log
 
@@ -460,6 +460,26 @@ weight hierarchy on `titleLarge`/`titleSmall` and the body roles — `titleMediu
 excluded, since it is the role `LoggedSets` and `RestPanel`'s mixed word/number lines render,
 and `NumeralText`'s digit-span contrast depends on the line's own base weight not already
 matching it. Verified live on device.
+
+**Progress rows earn a hierarchy, and the deferred PR badge, 2026-08-14 (US-38, ADR-0032, PR D
+of the follow-up audit).** US-33 shipped Progress but named one gap explicitly and left it: *"a
+'PR' badge on session rows… needs a purpose-built O(sets) read"* — `PersonalRecordsAchievedIn`
+re-reads a member's entire lifting history per set, fine for one finish-summary row, not for 200
+visible rows at once. `SessionsWithRecords` (`:core:domain`) answers it in one pass instead:
+every loaded set read once, grouped by (exercise, reps), walked chronologically to find where
+each group's running best was first strictly beaten — `DetectPersonalRecord`'s own rule
+(ADR-0025), computed once rather than per set. Alongside it, the row itself moves off `ListItem`
+onto a plain ruled two-line `Row` (ADR-0029's ruled-sheet precedent): the routine name and date
+share one line at two weights, the four-metric summary drops to a second, smaller, muted line —
+answering audit finding 06's "reads as a bug" complaint through hierarchy, without touching the
+duration/volume computation itself, which was already honest. No new `Typography` role added —
+all fifteen `Typography` slots were already spoken for by ADR-0029, so the row reuses `titleSmall`
+and `bodySmall` rather than overloading a role every other screen depends on for a 1–2sp
+difference. New tests: `SessionsWithRecordsTest` (JUnit 5, the merge rule in isolation — first
+appearance is not a record, ties are not records, a different rep count is a separate track,
+bodyweight sets never count) and a `WorkoutHistoryTest` case pinning the two-session badge
+behaviour end to end. Verified live on device; all four gates green plus
+`verifyDomainHasNoAndroidDeps` and the full instrumented suite.
 
 **In progress:**
 

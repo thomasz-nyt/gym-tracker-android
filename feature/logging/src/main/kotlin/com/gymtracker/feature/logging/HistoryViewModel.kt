@@ -9,6 +9,7 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
+import com.gymtracker.core.domain.progress.SessionsWithRecords
 import com.gymtracker.core.domain.session.DeleteSession
 import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.RestoreSession
@@ -21,10 +22,12 @@ import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.UpdateSet
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Everything the history and workout-detail destinations render (ADR-0024). */
@@ -43,6 +46,8 @@ data class HistoryUiState(
     val canUndoSetDelete: Boolean = false,
     /** The Progress tab's top section (US-33). */
     val topLift: TopLift = TopLift.None,
+    /** Which of [sessions] earns the `PR` badge (US-38). */
+    val sessionsWithRecords: Set<SessionId> = emptySet(),
 )
 
 /**
@@ -70,13 +75,14 @@ class HistoryViewModel
         workoutDetail: WorkoutDetail,
         deleteSession: DeleteSession,
         restoreSession: RestoreSession,
-        currentMember: CurrentMember,
+        private val currentMember: CurrentMember,
         updateSet: UpdateSet,
         deleteSet: DeleteSet,
         restoreSet: RestoreSet,
         mostRecentlyTrainedExercise: MostRecentlyTrainedExercise,
         exerciseTrendOf: ExerciseTrendOf,
         catalog: ExerciseCatalog,
+        private val sessionsWithRecords: SessionsWithRecords,
         private val unitPreference: UnitPreference,
     ) : ViewModel() {
         /** History and deleting from it; unchanged from when `ActiveSessionViewModel` owned it. */
@@ -100,13 +106,22 @@ class HistoryViewModel
                 scope = viewModelScope,
             )
 
+        /**
+         * Which sessions earn the `PR` badge (US-38). A separate flow rather than something
+         * [HistoryController] computes: it is an O(all loaded sets) read over the member's whole
+         * history, unrelated to what makes a row's own fields load, and there is no reason to
+         * recompute it every time a delete or an undo touches [history]'s state.
+         */
+        private val recordSessions = MutableStateFlow<Set<SessionId>>(emptySet())
+
         val uiState: StateFlow<HistoryUiState> =
             combine(
                 history.state,
                 unitPreference.observe(),
                 setEdit.edit,
                 setEdit.canUndo,
-            ) { historyState, unit, edit, canUndoSetDelete ->
+                recordSessions,
+            ) { historyState, unit, edit, canUndoSetDelete, records ->
                 HistoryUiState(
                     isOpen = historyState.isOpen,
                     sessions = historyState.sessions,
@@ -116,11 +131,15 @@ class HistoryViewModel
                     setEdit = edit,
                     canUndoSetDelete = canUndoSetDelete,
                     topLift = historyState.topLift,
+                    sessionsWithRecords = records,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), HistoryUiState())
 
-        /** Starts loading the list (US-06). Nothing is read before this is called. */
-        fun open() = history.open()
+        /** Starts loading the list (US-06), and which of it is badged (US-38). */
+        fun open() {
+            history.open()
+            viewModelScope.launch { recordSessions.value = sessionsWithRecords(currentMember.id()) }
+        }
 
         /** Leaves the list. Not needed for navigating away — see the class doc — kept for parity. */
         fun close() = history.close()

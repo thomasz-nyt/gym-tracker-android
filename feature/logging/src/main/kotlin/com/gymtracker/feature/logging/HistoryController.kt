@@ -67,6 +67,8 @@ data class HistoryState(
     /** The workout opened from the list, or null while the list itself is on screen (US-06b). */
     val detail: SessionDetail? = null,
     val topLift: TopLift = TopLift.None,
+    /** Which of [sessions] earns the `PR` badge (US-38). */
+    val sessionsWithRecords: Set<SessionId> = emptySet(),
 )
 
 /**

@@ -533,6 +533,30 @@ log, not just open the sheet US-03 already has.
 
 ---
 
+### US-38 — Progress rows earn a hierarchy
+Added 2026-08-14. See `adr/0032-progress-rows-earn-a-hierarchy.md`, written against
+`Redesign.dc.html`'s section 5 and audit finding 06. Closes the one bullet US-33 explicitly
+deferred: *"a 'PR' badge on session rows… needs a purpose-built O(sets) read."*
+
+- **A session row is two lines, not three.** Line one: the routine name (or `Freestyle`),
+  weight ExtraBold, with `· Tue 4 Aug` appended in a lighter weight — one line, two weights, not
+  a separate date row. Line two: the existing duration/exercises/sets/volume summary, muted and
+  smaller. One hierarchy, not four numbers at equal weight.
+- **A session that set a personal record carries a `PR` badge** — outlined, never filled, in the
+  accent colour. Answered by `SessionsWithRecords` (`:core:domain`), a purpose-built read: every
+  loaded set the member has ever logged, read once, grouped by (exercise, reps), and walked in
+  chronological order to find where each group's running best was first strictly beaten — the
+  same rule `DetectPersonalRecord` already defines (ADR-0025), computed as one pass rather than
+  one query per set.
+- **The duration/volume computation is unchanged.** `"3m · 34 sets"` is what bulk set entry
+  (ADR-0009) against a real timestamp window actually produces — the number is honest, and this
+  story's smaller, muted metric line is the fix for how it reads, not a change to how it is
+  computed.
+- The row itself moves off `ListItem` onto a plain ruled `Row`, matching ADR-0029's ruled-sheet
+  precedent — a `GymDivider` beneath each row rather than `ListItem`'s implicit surface.
+
+---
+
 ## M5 — Health Connect (optional)
 
 ### US-20 — Availability

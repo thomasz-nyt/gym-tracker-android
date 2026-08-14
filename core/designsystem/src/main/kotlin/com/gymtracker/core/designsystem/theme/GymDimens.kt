@@ -64,4 +64,11 @@ object GymDimens {
 
     /** ADR-0029: the fixed-width label column a set row and a still-to-come row both align to. */
     val RowLabelWidth = 44.dp
+
+    /**
+     * A ruled list row's floor (US-38): big enough for a two-line row plus its badge to sit
+     * comfortably above [MinTouchTarget], matching the design's own workout-log and exercise-log
+     * row rhythm.
+     */
+    val MinListRowHeight = 72.dp
 }
