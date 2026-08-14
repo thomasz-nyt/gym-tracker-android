@@ -198,8 +198,12 @@ class SetEntryStepperTest {
     @Test
     fun `stepping reps up from blank starts at one`() =
         runTest {
+            // US-37 (ADR-0031): reps no longer opens blank (it floors at 12) — this is now a
+            // test of stepWholeNumber's own blank handling, reached by clearing the field
+            // first, which the sheet's own text input can still do.
             val viewModel = viewModel()
             openEntry(viewModel)
+            viewModel.setEntry.change(reps = "")
 
             viewModel.setEntry.stepReps(1)
 
@@ -230,7 +234,8 @@ class SetEntryStepperTest {
             viewModel.uiState.first { it.setEntry == null }
 
             val logged = sets.all.single()
-            assertEquals(1, logged.reps)
+            // Reps opened at the 12-floor and stepped up once.
+            assertEquals(13, logged.reps)
             // 5 lb in canonical kilograms (ADR-0006).
             assertEquals(2.27, logged.weightKg)
         }

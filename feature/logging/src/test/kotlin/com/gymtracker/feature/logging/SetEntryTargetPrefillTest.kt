@@ -153,21 +153,38 @@ class SetEntryTargetPrefillTest {
         }
 
     @Test
-    fun `a target's missing field falls back to history for that field alone`() =
+    fun `history wins over a target for weight and reps, per ADR-0031`() =
         runTest {
-            // US-30: "3 x 8, load unrecorded is a plan" — the load is unrecorded in the target,
-            // not the whole prefill.
+            // US-37 supersedes US-30's target-first order: the last real set beats a target.
             val logged = ExerciseSet("s1", SessionExerciseId("se-last-week"), 1, 60.0, 5, null, now)
             sets.seed(logged)
             sets.lastFor[bench] = logged.id
             units.set(WeightUnit.KG)
             val viewModel = viewModel()
 
-            openEntryWithTarget(viewModel, MovementTarget(sets = 3, reps = 8, weightKg = null))
+            openEntryWithTarget(viewModel, MovementTarget(sets = 3, reps = 8, weightKg = 999.0))
 
             val entry = entryOf(viewModel)
-            assertEquals("8", entry?.reps, "the target's own reps, not history's 5")
-            assertEquals("60", entry?.weight, "no target weight, so history's stands in")
+            assertEquals("5", entry?.reps, "history's reps must win, not the target's 8")
+            assertEquals("60", entry?.weight, "history's weight must win, not the target's 999")
+        }
+
+    @Test
+    fun `a target's weight fills in when history's set was bodyweight`() =
+        runTest {
+            // US-30: "3 x 8, load unrecorded is a plan" — a target's load still has a job when
+            // history has no weight to prefer (US-37).
+            val logged = ExerciseSet("s1", SessionExerciseId("se-last-week"), 1, null, 5, null, now)
+            sets.seed(logged)
+            sets.lastFor[bench] = logged.id
+            units.set(WeightUnit.KG)
+            val viewModel = viewModel()
+
+            openEntryWithTarget(viewModel, MovementTarget(sets = 3, reps = 8, weightKg = 60.0))
+
+            val entry = entryOf(viewModel)
+            assertEquals("5", entry?.reps, "history's reps still win")
+            assertEquals("60", entry?.weight, "history's set had no load, so the target's stands in")
         }
 
     @Test
@@ -187,14 +204,18 @@ class SetEntryTargetPrefillTest {
         }
 
     @Test
-    fun `with neither a target nor history, add set opens blank`() =
+    fun `with neither a target nor history, reps float to 12, sets and weight stay at ADR-0009's defaults`() =
         runTest {
+            // US-37 (ADR-0031): reps float to 12 rather than opening blank; weight never
+            // floors — an invented load is worse than an empty field. Sets stays at 1 with no
+            // target to floor it from, confirmed against TwoTapSetLoggingTest on-device.
             val viewModel = viewModel()
 
             openEntryWithTarget(viewModel, target = null)
 
             val entry = entryOf(viewModel)
-            assertEquals("", entry?.reps)
+            assertEquals("12", entry?.reps)
+            assertEquals("1", entry?.sets)
             assertEquals("", entry?.weight)
             assertEquals(false, entry?.prefilled)
         }

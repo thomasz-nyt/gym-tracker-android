@@ -25,6 +25,10 @@ import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Set entry (US-03), as a bottom sheet with a stepper on every number (ADR-0016).
@@ -228,6 +232,15 @@ private fun SetEntryFields(
 
         if (!entry.prefilled) {
             Text("First time logging this one.", style = MaterialTheme.typography.bodyMedium)
+        } else if (entry.fromHistory && entry.lastPerformedAt != null) {
+            // US-37 (ADR-0031): only when the prefill came from a real past set — a target
+            // already renders labelled as one, elsewhere on this same sheet, so it needs no
+            // second line saying so here.
+            Text(
+                text = "Prefilled from ${entry.lastPerformedAt.asDay()} — ${entry.prefillSummary(unit)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         StepperField(
@@ -300,3 +313,14 @@ private fun String.otherUnit(unit: WeightUnit): String? =
     trim()
         .toDoubleOrNull()
         ?.let { typed -> WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary }
+
+/** "100 lb × 8", or "8 reps" for a bodyweight prefill — the sheet's own provenance line (US-37). */
+private fun SetEntry.prefillSummary(unit: WeightUnit): String =
+    weight
+        .takeIf { it.isNotBlank() }
+        ?.let { "$it ${unit.name.lowercase()} × $reps" }
+        ?: "$reps reps"
+
+/** The same "EEE d MMM" convention the rest panel's comparison line already uses. */
+private fun Instant.asDay(): String =
+    DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault()).format(this)
