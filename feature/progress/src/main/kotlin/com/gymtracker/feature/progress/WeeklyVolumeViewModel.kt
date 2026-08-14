@@ -23,8 +23,27 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
-/** How many weeks the screen shows. See [WeeklyVolumeViewModel] for why this is fixed for now. */
+/** How many weeks the screen shows by default, before a range is chosen. */
 internal const val WEEKS_SHOWN = 8
+
+private const val FOUR = 4
+private const val TWELVE = 12
+
+/**
+ * The window choices for the weekly-volume chart (M4's "time range selector" line).
+ *
+ * Three, not a free-form picker: a phone-width bar chart has room for roughly a dozen weeks
+ * before the bars stop being readable, so the range is a small fixed set rather than an
+ * arbitrary date range nobody could read anyway.
+ */
+enum class VolumeRange(
+    val weeks: Int,
+    val label: String,
+) {
+    FOUR_WEEKS(FOUR, "4 weeks"),
+    EIGHT_WEEKS(WEEKS_SHOWN, "8 weeks"),
+    TWELVE_WEEKS(TWELVE, "12 weeks"),
+}
 
 /**
  * Everything the weekly-volume screen renders (US-17, US-19).
@@ -38,6 +57,7 @@ data class WeeklyVolumeUiState(
     val isLoading: Boolean = true,
     val weeks: List<VolumeWeek> = emptyList(),
     val unit: WeightUnit = WeightUnit.LB,
+    val range: VolumeRange = VolumeRange.EIGHT_WEEKS,
 ) {
     /**
      * The busiest single muscle-week in the window, which every bar is drawn against.
@@ -58,9 +78,8 @@ data class WeeklyVolumeUiState(
  * and the member, and reverses the result so the most recent week is first — the order the
  * history list already reads in, and the week you opened the screen to see.
  *
- * **The window is a fixed eight weeks.** US-17 says "for a chosen range" and the choosing is the
- * roadmap's own separate M4 line, "time range selector"; that selector belongs to both charts,
- * so it is not built here. Eight weeks is long enough to show a block of training and short
+ * **The window is [VolumeRange], chosen on screen** (M4's "time range selector" line, closed
+ * 2026-08-14) — defaulting to eight weeks, long enough to show a block of training and short
  * enough to stay readable on a phone.
  */
 @HiltViewModel
@@ -74,21 +93,24 @@ class WeeklyVolumeViewModel
         private val zone: ZoneId,
     ) : ViewModel() {
         private val opened = MutableStateFlow(false)
+        private val chosenRange = MutableStateFlow(VolumeRange.EIGHT_WEEKS)
 
         @OptIn(ExperimentalCoroutinesApi::class)
         private val loaded: Flow<List<VolumeWeek>> =
             opened.filter { it }.flatMapLatest {
-                flow {
-                    // Today in the member's zone, not UTC: which week a late Sunday session
-                    // falls in is the same question `WeeklyVolumeByBodyPart` documents.
-                    val today = clock.instant().atZone(zone).toLocalDate()
-                    emit(volumeSince(today))
+                chosenRange.flatMapLatest { range ->
+                    flow {
+                        // Today in the member's zone, not UTC: which week a late Sunday session
+                        // falls in is the same question `WeeklyVolumeByBodyPart` documents.
+                        val today = clock.instant().atZone(zone).toLocalDate()
+                        emit(volumeSince(today, range))
+                    }
                 }
             }
 
         val uiState: StateFlow<WeeklyVolumeUiState> =
-            combine(loaded, unitPreference.observe()) { weeks, unit ->
-                WeeklyVolumeUiState(isLoading = false, weeks = weeks, unit = unit)
+            combine(loaded, unitPreference.observe(), chosenRange) { weeks, unit, range ->
+                WeeklyVolumeUiState(isLoading = false, weeks = weeks, unit = unit, range = range)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), WeeklyVolumeUiState())
 
         /** Starts reading. Idempotent, so recomposition does not re-query. */
@@ -96,11 +118,19 @@ class WeeklyVolumeViewModel
             opened.value = true
         }
 
+        /** Switches the window and re-reads it. */
+        fun onRangeChanged(range: VolumeRange) {
+            chosenRange.value = range
+        }
+
         /** Most recent week first — [WeeklyVolumeByBodyPart] returns them oldest first. */
-        private suspend fun volumeSince(today: LocalDate): List<VolumeWeek> =
+        private suspend fun volumeSince(
+            today: LocalDate,
+            range: VolumeRange,
+        ): List<VolumeWeek> =
             weeklyVolume(
                 member = currentMember.id(),
-                from = today.minusWeeks(WEEKS_SHOWN - 1L),
+                from = today.minusWeeks(range.weeks - 1L),
                 to = today,
             ).reversed()
 

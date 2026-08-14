@@ -13,6 +13,7 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.progress.ExerciseLogOf
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendOf
+import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.session.FakeSessionRepository
 import com.gymtracker.core.domain.sessionexercise.FakeSessionExerciseRepository
 import com.gymtracker.core.domain.set.FakeSetRepository
@@ -28,6 +29,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -74,6 +76,7 @@ class ExerciseProgressViewModelTest {
         ExerciseProgressViewModel(
             exerciseTrendOf = ExerciseTrendOf(sessions, sessionExercises, sets, ZoneOffset.UTC),
             exerciseLogOf = ExerciseLogOf(sessions, sessionExercises, sets, ZoneOffset.UTC),
+            personalRecordsOf = PersonalRecordsOf(sessions, sessionExercises, sets, ZoneOffset.UTC),
             catalog = catalog,
             currentMember = FakeCurrentMember(member),
             unitPreference = FakeUnitPreference(),
@@ -220,6 +223,38 @@ class ExerciseProgressViewModelTest {
             }
         }
 
+    // ---- US-18: the standing per-exercise PR list ----
+
+    @Test
+    fun `the record list reaches the screen, one per rep count`() =
+        runTest {
+            // Twelve weeks of linear progress at the same rep count means one record: the
+            // final, heaviest week — 60 + 1.25 x 11 = 73.75 kg at 5 reps, set 2026-07-20.
+            loadTwelveWeeks()
+            val viewModel = viewModel().also { it.open(TestData.BENCH) }
+
+            viewModel.uiState.test {
+                val records = expectMostRecentItem().records
+                val record = records.single()
+                assertEquals(5, record.reps)
+                assertEquals(73.75, record.weightKg, TOLERANCE)
+                assertEquals(LocalDate.parse("2026-07-20"), record.achievedOn)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a movement never performed has no records`() =
+        runTest {
+            loadTwelveWeeks()
+            val viewModel = viewModel().also { it.open(neverPerformed.id) }
+
+            viewModel.uiState.test {
+                assertEquals(emptyList(), expectMostRecentItem().records)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     private class FakeCurrentMember(
         private val id: UserId,
     ) : CurrentMember {
@@ -236,5 +271,9 @@ class ExerciseProgressViewModelTest {
         override suspend fun set(unit: WeightUnit) {
             state.value = unit
         }
+    }
+
+    private companion object {
+        const val TOLERANCE = 0.001
     }
 }

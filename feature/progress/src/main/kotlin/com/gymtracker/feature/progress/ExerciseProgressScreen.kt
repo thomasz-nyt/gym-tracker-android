@@ -1,5 +1,6 @@
 package com.gymtracker.feature.progress
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,9 +29,11 @@ import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.progress.ExerciseLogEntry
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendPoint
+import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -61,6 +64,7 @@ fun ExerciseProgressRoute(
     exerciseId: ExerciseId,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenWorkout: (SessionId) -> Unit = {},
     viewModel: ExerciseProgressViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(exerciseId) { viewModel.open(exerciseId) }
@@ -71,6 +75,7 @@ fun ExerciseProgressRoute(
         state = state,
         onBack = onBack,
         onSeriesChanged = viewModel::onSeriesChanged,
+        onOpenWorkout = onOpenWorkout,
         modifier = modifier,
     )
 }
@@ -80,6 +85,7 @@ internal fun ExerciseProgressScreen(
     state: ExerciseProgressUiState,
     onBack: () -> Unit = {},
     onSeriesChanged: (TrendSeries) -> Unit = {},
+    onOpenWorkout: (SessionId) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -112,12 +118,59 @@ internal fun ExerciseProgressScreen(
                 is ExerciseTrend.Series -> TrendChart(trend, state.series, state.unit)
             }
 
+            // US-18: the standing PR list, absent rather than shown empty — the movement's
+            // never been done at all, or never beaten a rep count more than once.
+            if (state.records.isNotEmpty()) {
+                RecordList(state.records, state.unit)
+            }
+
             // US-34: absent rather than shown empty, the same rule NoData's chart follows.
             if (state.log.isNotEmpty()) {
-                ExerciseLog(state.log, state.unit)
+                ExerciseLog(state.log, state.unit, onOpenWorkout)
             }
         }
     }
+}
+
+/**
+ * The standing PR list (US-18): one row per rep count the member has ever reached, ascending —
+ * bench at 5 and bench at 8 are separate records, so this can be several rows even for a
+ * movement someone thinks of as "one number".
+ */
+@Composable
+private fun RecordList(
+    records: List<PersonalRecord>,
+    unit: WeightUnit,
+) {
+    Text("Personal records", style = MaterialTheme.typography.titleMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        records.forEach { record -> RecordRow(record, unit) }
+    }
+}
+
+/** "5 reps — 165 lb, 20 Jul 2026" — a record that actually happened, never an estimate. */
+@Composable
+private fun RecordRow(
+    record: PersonalRecord,
+    unit: WeightUnit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(record.describe(unit), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = record.achievedOn.readable(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** "5 reps — 165 lb". Always a lifted weight — a record is never a bodyweight row (ADR-0025). */
+private fun PersonalRecord.describe(unit: WeightUnit): String {
+    val weight = WeightFormatter.format(weightKg, unit)
+    return "$reps ${if (reps == 1) "rep" else "reps"} — ${weight.primary}"
 }
 
 /**
@@ -128,20 +181,28 @@ internal fun ExerciseProgressScreen(
 private fun ExerciseLog(
     log: List<ExerciseLogEntry>,
     unit: WeightUnit,
+    onOpenWorkout: (SessionId) -> Unit,
 ) {
     Text("Log", style = MaterialTheme.typography.titleMedium)
     Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-        log.forEach { entry -> LogEntryRow(entry, unit) }
+        log.forEach { entry -> LogEntryRow(entry, unit, onClick = { onOpenWorkout(entry.sessionId) }) }
     }
 }
 
-/** One session's date, best set / estimate, and its individual sets. */
+/** One session's date, best set / estimate, and its individual sets — opens the workout it came from. */
 @Composable
 private fun LogEntryRow(
     entry: ExerciseLogEntry,
     unit: WeightUnit,
+    onClick: () -> Unit,
 ) {
-    Column {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                .clickable(onClick = onClick),
+    ) {
         Text(entry.performedOn.readable(), style = MaterialTheme.typography.titleMedium)
         Text(entry.summary(unit), style = MaterialTheme.typography.bodyMedium)
         entry.sets.forEach { set ->

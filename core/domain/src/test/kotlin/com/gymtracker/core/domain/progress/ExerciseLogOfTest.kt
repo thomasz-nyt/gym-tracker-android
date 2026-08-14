@@ -94,6 +94,18 @@ class ExerciseLogOfTest {
         }
 
     @Test
+    fun `a row carries the id of the session it came from, for opening the workout it belongs to`() =
+        runTest {
+            // US-34's other deferred bullet: a row needs its session's id before a screen can
+            // open it, the same way ExerciseTrendOf's points never needed to.
+            val sessionId = session("2026-08-01", bench, 100.0 to 5)
+
+            val row = logOf(bench, alice).single()
+
+            assertEquals(sessionId, row.sessionId)
+        }
+
+    @Test
     fun `only the chosen exercise is counted`() =
         runTest {
             session("2026-08-01", bench, 100.0 to 5)

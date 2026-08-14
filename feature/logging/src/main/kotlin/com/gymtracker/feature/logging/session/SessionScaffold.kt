@@ -36,6 +36,7 @@ import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SessionProgress
 import com.gymtracker.core.domain.units.WeightUnit
@@ -106,6 +107,7 @@ internal fun SessionBody(
                     progress = state.progress,
                     openSessionExerciseId = state.openSessionExerciseId,
                     nextLoggableSet = state.nextLoggableSet,
+                    justSetRecord = state.justSetRecord,
                     onAddExercise = onAddExercise,
                     onAddSet = onAddSet,
                     onRemoveExercise = onRemoveExercise,
@@ -225,6 +227,7 @@ private fun ActiveSession(
     progress: SessionProgress?,
     openSessionExerciseId: SessionExerciseId?,
     nextLoggableSet: UpNextSet?,
+    justSetRecord: PersonalRecord?,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
@@ -262,6 +265,7 @@ private fun ActiveSession(
                 progress = progress,
                 exercises = exercises,
                 unit = unit,
+                justSetRecord = justSetRecord,
                 onSkipRest = onSkipRest,
                 onLogNext = { upNext?.let(onLogNextSet) },
                 onAdjust = {
