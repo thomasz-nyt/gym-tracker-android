@@ -73,6 +73,22 @@ private val ErrorLight = Color(0xFFBA1A1A)
 private val ErrorDark = Color(0xFFFFB4AB)
 private val OnErrorDark = Color(0xFF690005)
 
+// ── Redesign audit, PR A finding 3 ─────────────────────────────────────────────────────
+// Nine roles `lightColorScheme()`/`darkColorScheme()` accept but this file never passed,
+// so each one silently kept Material's own baseline (violet-tinted) default — the same class
+// of bug finding 08 caught in `outlineVariant`, just not yet in a divider anyone had drawn.
+// `errorContainer`/`onErrorContainer` are the M3 spec's own accessible pair for the existing
+// error red; `tertiaryContainer`/`onTertiaryContainer` mirror `secondaryContainer` because
+// `tertiary` already equals `secondary` (ink, not a third hue) two lines up; `inverseSurface`/
+// `inverseOnSurface` are literally the other scheme's own background/onBackground, so Snackbar
+// still renders on a real, already-tested pair; `inversePrimary` and `surfaceTint` are the
+// accent — `surfaceTint` is not derived from `primary` by the scheme constructors, it is its
+// own parameter.
+private val ErrorContainerLight = Color(0xFFFFDAD6)
+private val OnErrorContainerLight = Color(0xFF410002)
+private val ErrorContainerDark = Color(0xFF93000A)
+private val OnErrorContainerDark = Color(0xFFFFDAD6)
+
 val GymLightColorScheme =
     lightColorScheme(
         primary = Red,
@@ -100,6 +116,14 @@ val GymLightColorScheme =
         outlineVariant = OutlineVariantLight,
         error = ErrorLight,
         onError = Color.White,
+        errorContainer = ErrorContainerLight,
+        onErrorContainer = OnErrorContainerLight,
+        tertiaryContainer = GreyLight,
+        onTertiaryContainer = InkLight,
+        inverseSurface = GroundDark,
+        inverseOnSurface = InkDark,
+        inversePrimary = RedBright,
+        surfaceTint = Red,
     )
 
 val GymDarkColorScheme =
@@ -129,4 +153,12 @@ val GymDarkColorScheme =
         outlineVariant = OutlineVariantDark,
         error = ErrorDark,
         onError = OnErrorDark,
+        errorContainer = ErrorContainerDark,
+        onErrorContainer = OnErrorContainerDark,
+        tertiaryContainer = GreyDark,
+        onTertiaryContainer = GreyLight,
+        inverseSurface = GroundLight,
+        inverseOnSurface = InkLight,
+        inversePrimary = Red,
+        surfaceTint = RedBright,
     )

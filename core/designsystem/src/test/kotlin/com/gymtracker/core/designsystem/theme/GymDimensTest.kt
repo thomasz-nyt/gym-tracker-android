@@ -58,4 +58,18 @@ class GymDimensTest {
         assertEquals(6.dp, GymDimens.SegmentHeight)
         assertEquals(GymDimens.HairGap, GymDimens.SegmentGap)
     }
+
+    @Test
+    fun `the five sizes that used to be raw dp in feature code are now named tokens`() {
+        // Redesign audit, PR A finding 4: ADR-0011's "feature code never names a raw sp" rule
+        // has a dp counterpart (this file's own class doc), and five call sites broke it —
+        // ExerciseDetailScreen's photo, ExerciseProgressScreen's chart, WeeklyVolumeScreen's
+        // bar, and BrowseScreen's row height and FAB clearance. Pinned here so a future private
+        // `= 88.dp` in feature code has somewhere it should have looked first.
+        assertEquals(220.dp, GymDimens.PhotoHeight)
+        assertEquals(240.dp, GymDimens.ChartHeight)
+        assertEquals(12.dp, GymDimens.VolumeBarHeight)
+        assertEquals(88.dp, GymDimens.CatalogRowHeight)
+        assertEquals(88.dp, GymDimens.FabClearance)
+    }
 }
