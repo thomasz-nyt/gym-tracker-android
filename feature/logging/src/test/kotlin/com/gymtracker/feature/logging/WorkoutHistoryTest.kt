@@ -13,6 +13,7 @@ import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.progress.PersonalRecordsOf
+import com.gymtracker.core.domain.progress.SessionsWithRecords
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.session.DeleteSession
@@ -139,6 +140,7 @@ class WorkoutHistoryTest {
             mostRecentlyTrainedExercise = MostRecentlyTrainedExercise(repository, sessionExercises, sets),
             exerciseTrendOf = ExerciseTrendOf(repository, sessionExercises, sets, ZoneOffset.UTC),
             catalog = catalog,
+            sessionsWithRecords = SessionsWithRecords(repository, sessionExercises, sets),
         )
 
     /** [ActiveSessionViewModel]: still drives the session itself, including finishing it. */
@@ -465,4 +467,50 @@ class WorkoutHistoryTest {
                 )
             }
         }
+
+    // ---- US-38: which sessions the Progress list should badge as containing a PR -------------
+
+    @Test
+    fun `the session holding the new heaviest set is badged, the earlier one is not`() =
+        runTest {
+            val repository =
+                sessionsOf(
+                    finished("older", now.minus(Duration.ofDays(14))),
+                    finished("newer", now.minus(Duration.ofDays(7))),
+                )
+            seedRecordSet(
+                SessionId("older"),
+                "se-older",
+                "set-older",
+                weight = 100.0,
+                at = now.minus(Duration.ofDays(14)),
+            )
+            seedRecordSet(
+                SessionId("newer"),
+                "se-newer",
+                "set-newer",
+                weight = 105.0,
+                at = now.minus(Duration.ofDays(7)),
+            )
+            val viewModel = historyViewModel(repository)
+
+            viewModel.open()
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem()
+                assertEquals(setOf(SessionId("newer")), state.sessionsWithRecords)
+            }
+        }
+
+    private suspend fun seedRecordSet(
+        session: SessionId,
+        sessionExerciseId: String,
+        setId: String,
+        weight: Double,
+        at: Instant,
+    ) {
+        val appearance = SessionExercise(SessionExerciseId(sessionExerciseId), session, ExerciseId("bench"), 1)
+        sessionExercises.add(appearance)
+        sets.add(ExerciseSet(setId, appearance.id, 1, weight, 8, null, at))
+    }
 }

@@ -1,7 +1,10 @@
 package com.gymtracker.feature.logging
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -23,8 +25,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.em
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.GymDivider
@@ -68,7 +75,13 @@ fun HistoryRoute(
     LaunchedEffect(Unit) { viewModel.open() }
 
     HistoryScreen(
-        state = HistoryState(sessions = state.sessions, canUndo = state.canUndo, topLift = state.topLift),
+        state =
+            HistoryState(
+                sessions = state.sessions,
+                canUndo = state.canUndo,
+                topLift = state.topLift,
+                sessionsWithRecords = state.sessionsWithRecords,
+            ),
         unit = state.unit,
         onDelete = viewModel::delete,
         onUndo = viewModel::undo,
@@ -136,6 +149,7 @@ internal fun HistoryScreen(
                 WorkoutList(
                     sessions = state.sessions,
                     unit = unit,
+                    sessionsWithRecords = state.sessionsWithRecords,
                     onDelete = onDelete,
                     onOpen = onOpenWorkout,
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -256,70 +270,129 @@ private fun Double.asChangeOver8Weeks(unit: WeightUnit): String {
     return "$arrow $magnitude in 8 weeks"
 }
 
-/** One row per finished workout, newest first, each with the way to delete it (US-06a). */
+/**
+ * One row per finished workout, newest first (US-06a, US-38).
+ *
+ * A ruled `Row`, not a `ListItem` (redesign audit section 5 / ADR-0029's ruled-sheet precedent):
+ * the old three-line `ListItem` gave the routine name, the date and the summary metrics equal
+ * visual weight, which is what made "3m · 34 sets" and "47m · 1 set" both read as unremarkable.
+ * The name and date now share one line; the metrics move to a second, smaller and muted line —
+ * one hierarchy, not four equal numbers.
+ */
 @Composable
 private fun WorkoutList(
     sessions: List<SessionSummary>,
     unit: WeightUnit,
+    sessionsWithRecords: Set<SessionId>,
     onDelete: (SessionId) -> Unit,
     onOpen: (SessionId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier) {
         items(sessions, key = { it.session.id.value }) { summary ->
-            ListItem(
-                // Tapping the row opens what it contained (US-06b); "Delete" is a button of
-                // its own, so opening cannot be mistaken for deleting.
-                modifier =
-                    Modifier
-                        .sizeIn(minHeight = GymDimens.MinTouchTarget)
-                        .clickable { onOpen(summary.session.id) },
-                headlineContent = {
-                    // US-32 (ADR-0028): the routine this session was started from leads the
-                    // row, falling back to "Freestyle" for an ordinary "Start workout". Never
-                    // resolved through routine_id — this reads the name copied onto the
-                    // session at start, so a rename or delete afterward cannot change it.
-                    Text(
-                        text = summary.session.routine?.name ?: "Freestyle",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                },
-                supportingContent = {
-                    Column {
-                        Text(
-                            text = summary.session.startedAt.asWorkoutDate(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = summary.describe(unit),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                trailingContent = {
-                    // ADR-0019: a destructive control is outlined, never filled — this was a
-                    // filled-looking TextButton until it was fixed here. The row's own tap
-                    // target opens the workout, which is a navigation, not a save, so this
-                    // does not "share a surface with a save" in the letter of that rule; it is
-                    // outlined regardless, to read as destructive the same way SetEditSheet's
-                    // and the routine editor's delete controls do. Kept on the row rather than
-                    // moved (unlike Routines' delete): moving it to WorkoutDetailScreen would
-                    // lose US-06a's five-second undo, since that window lives in this screen's
-                    // HistoryViewModel instance and would not survive a navigation away from it.
-                    OutlinedButton(
-                        onClick = { onDelete(summary.session.id) },
-                        shape = MaterialTheme.shapes.large,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
-                    ) {
-                        Text("Delete")
-                    }
-                },
+            WorkoutRow(
+                summary = summary,
+                unit = unit,
+                hasRecord = summary.session.id in sessionsWithRecords,
+                onOpen = { onOpen(summary.session.id) },
+                onDelete = { onDelete(summary.session.id) },
             )
             GymDivider()
         }
+    }
+}
+
+@Composable
+private fun WorkoutRow(
+    summary: SessionSummary,
+    unit: WeightUnit,
+    hasRecord: Boolean,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        // Tapping the row opens what it contained (US-06b); "Delete" is a button of its own,
+        // so opening cannot be mistaken for deleting.
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .sizeIn(minHeight = GymDimens.MinListRowHeight)
+                .clickable(onClick = onOpen)
+                .padding(vertical = GymDimens.TightGap),
+        horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+            Text(
+                text =
+                    buildAnnotatedString {
+                        // US-32 (ADR-0028): the routine this session was started from leads the
+                        // row, falling back to "Freestyle" for an ordinary "Start workout".
+                        // Never resolved through routine_id — this reads the name copied onto
+                        // the session at start, so a rename or delete afterward cannot change
+                        // it. One text node with two weights, not two rows — line one is the
+                        // whole point of this redesign: the name is what you remember it by.
+                        append(summary.session.routine?.name ?: "Freestyle")
+                        withStyle(
+                            SpanStyle(
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        ) {
+                            append(" · ${summary.session.startedAt.asRowDate()}")
+                        }
+                    },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = summary.describe(unit),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (hasRecord) {
+            PrBadge()
+        }
+
+        // ADR-0019: a destructive control is outlined, never filled — this was a filled-looking
+        // TextButton until it was fixed here. The row's own tap target opens the workout, which
+        // is a navigation, not a save, so this does not "share a surface with a save" in the
+        // letter of that rule; it is outlined regardless, to read as destructive the same way
+        // SetEditSheet's and the routine editor's delete controls do. Kept on the row rather
+        // than moved (unlike Routines' delete): moving it to WorkoutDetailScreen would lose
+        // US-06a's five-second undo, since that window lives in this screen's HistoryViewModel
+        // instance and would not survive a navigation away from it.
+        OutlinedButton(
+            onClick = onDelete,
+            shape = MaterialTheme.shapes.large,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+        ) {
+            Text("Delete")
+        }
+    }
+}
+
+/**
+ * The `PR` badge (US-38): outlined, never filled — the accent is spent on the log button
+ * elsewhere in the app (ADR-0029's "exactly one filled accent element" rule), and a badge is
+ * emphasis, not the screen's one action. [GymDimens.DividerThickness] rather than a new border
+ * token — the same 2px weight every rule in this system draws with.
+ */
+@Composable
+private fun PrBadge() {
+    Box(
+        modifier =
+            Modifier
+                .border(BorderStroke(GymDimens.DividerThickness, MaterialTheme.colorScheme.primary))
+                .padding(horizontal = GymDimens.TightGap, vertical = GymDimens.HairGap),
+    ) {
+        Text(
+            text = "PR",
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em),
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
@@ -372,10 +445,10 @@ private fun Duration.asWorkoutLength(): String {
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
-private fun Instant.asWorkoutDate(): String = WORKOUT_DATE.format(atZone(ZoneId.systemDefault()))
+/** "Tue 4 Aug" — no time. Matches `RestPanel`'s own comparison-line date, not a new convention. */
+private fun Instant.asRowDate(): String = ROW_DATE.format(atZone(ZoneId.systemDefault()))
 
-/** "Fri 1 Aug, 17:10" — the day and the time, which is how a workout is remembered. */
-private val WORKOUT_DATE = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())
+private val ROW_DATE = DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
 
 private const val MINUTES_PER_HOUR = 60L
 
@@ -430,6 +503,7 @@ private fun HistoryPreview() {
                             estimatedOneRepMaxKg = 56.2,
                             deltaKg = 3.2,
                         ),
+                    sessionsWithRecords = setOf(SessionId("preview-routine")),
                 ),
             unit = WeightUnit.LB,
             onDelete = {},

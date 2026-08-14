@@ -89,4 +89,11 @@ object GymDimens {
 
     /** Room for the "Done · N added" floating button so the last browse result clears it. */
     val FabClearance = 88.dp
+
+    /**
+     * A ruled list row's floor (US-38): big enough for a two-line row plus its badge to sit
+     * comfortably above [MinTouchTarget], matching the design's own workout-log and exercise-log
+     * row rhythm.
+     */
+    val MinListRowHeight = 72.dp
 }

@@ -39,6 +39,7 @@ import com.gymtracker.core.domain.progress.ExerciseTrendOf
 import com.gymtracker.core.domain.progress.MostRecentlyTrainedExercise
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.progress.PersonalRecordsOf
+import com.gymtracker.core.domain.progress.SessionsWithRecords
 import com.gymtracker.core.domain.progress.WeeklyVolumeByBodyPart
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
@@ -244,6 +245,13 @@ object DataModule {
     @Provides
     fun personalRecordsAchievedIn(detect: DetectPersonalRecord): PersonalRecordsAchievedIn =
         PersonalRecordsAchievedIn(detect)
+
+    @Provides
+    fun sessionsWithRecords(
+        sessions: SessionRepository,
+        sessionExercises: SessionExerciseRepository,
+        sets: SetRepository,
+    ): SessionsWithRecords = SessionsWithRecords(sessions, sessionExercises, sets)
 
     @Provides
     fun weeklyVolumeByBodyPart(
