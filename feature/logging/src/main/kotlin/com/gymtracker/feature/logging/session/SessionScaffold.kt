@@ -316,7 +316,11 @@ private fun SessionTopBar(
     SessionHeader(session = session, progress = progress, onFinishWorkout = onFinishWorkout)
 
     if (progress?.orderIsAPlan == true) {
-        SegmentBar(progress = progress, modifier = Modifier.padding(horizontal = GymDimens.ScreenPadding))
+        SegmentBar(
+            total = progress.movementsTotal,
+            done = progress.movementsDone,
+            modifier = Modifier.padding(horizontal = GymDimens.ScreenPadding),
+        )
     }
 
     // The structural rule (ADR-0029): solid ink, the heavier of the two rule weights this
@@ -485,30 +489,33 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 private const val SECONDS_PER_MINUTE = 60L
 
 /**
- * One 6dp bar per movement, three states (ADR-0029): done (solid accent), current (accent at
+ * One 6dp bar per [total], three states (ADR-0029): done (solid accent), current (accent at
  * 55% alpha — the design's third red, `#EC3013`, would reopen ADR-0019's one-accent system for
  * a single decorative detail, so this reads the same accent at reduced opacity instead), and
- * upcoming (ink at 20%). Shown only for a session started from a routine
+ * upcoming (ink at 20%). On the session header, shown only for a session started from a routine
  * ([SessionProgress.orderIsAPlan]) — see [RestingBody]'s "then X" clause for the other half of
  * that same rule.
+ *
+ * Takes a plain count rather than [SessionProgress] (ADR-0033): the guided screen's per-set
+ * progress has no [SessionProgress] to read one out of, only a target and a done count, so this
+ * reads the same two numbers either caller already has instead of asking one of them to wrap
+ * theirs in a type built for the other.
  */
 @Composable
-private fun SegmentBar(
-    progress: SessionProgress,
+internal fun SegmentBar(
+    total: Int,
+    done: Int,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth().padding(bottom = GymDimens.TightGap),
         horizontalArrangement = Arrangement.spacedBy(GymDimens.SegmentGap),
     ) {
-        repeat(progress.movementsTotal) { index ->
+        repeat(total) { index ->
             val color =
                 when {
-                    index < progress.movementsDone -> MaterialTheme.colorScheme.primary
-                    index == progress.movementsDone ->
-                        MaterialTheme.colorScheme.primary.copy(
-                            alpha = CURRENT_SEGMENT_ALPHA,
-                        )
+                    index < done -> MaterialTheme.colorScheme.primary
+                    index == done -> MaterialTheme.colorScheme.primary.copy(alpha = CURRENT_SEGMENT_ALPHA)
                     else -> MaterialTheme.colorScheme.onSurface.copy(alpha = UPCOMING_SEGMENT_ALPHA)
                 }
             SegmentBarSegment(color = color, modifier = Modifier.weight(1f))

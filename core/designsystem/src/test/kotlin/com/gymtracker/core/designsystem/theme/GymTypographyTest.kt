@@ -129,10 +129,14 @@ class GymTypographyTest {
     }
 
     @Test
-    fun `displayMedium is untouched, because GuidedExerciseScreen's rep counter also reads it`() {
-        // ADR-0029 gave the countdown its own role (displayLarge) rather than resizing this one,
-        // specifically so GuidedExerciseScreen (ADR-0017, a different feature) is not affected.
+    fun `displayMedium stays at Material's size, because no role reads it`() {
+        // ADR-0029 gave the countdown its own role (displayLarge) rather than resizing this one;
+        // ADR-0033 later moved GuidedExerciseScreen's countdown to displayLarge too, so this slot
+        // is unclaimed rather than protected. Left at Material's default rather than pre-committed
+        // to a screen that does not exist, and still carries Archivo (below) so an accidental
+        // future use does not silently fall back to Roboto.
         assertEquals(material.displayMedium.fontSize, GymTypography.displayMedium.fontSize)
+        assertEquals(ArchivoFamily, GymTypography.displayMedium.fontFamily)
     }
 
     @Test

@@ -349,4 +349,49 @@ class GuidedFlowTest {
             }
             assertEquals(emptyList(), sets.all)
         }
+
+    // ADR-0033: the guided screen's rep count gains the app's steppers, the one behavioural
+    // change bundled with the visual rebuild. `stepReps` must share `finishSet`'s own fallback
+    // (typed value, else the target) so the two cannot disagree about what "one down" means.
+
+    @Test
+    fun `stepping the rep count down logs the stepped count, not the target`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, targetReps = "12")
+
+            viewModel.guided.stepReps(-1)
+            viewModel.guided.finishSet()
+
+            assertEquals(listOf(11), sets.all.map { it.reps })
+        }
+
+    @Test
+    fun `the rep count never steps below one`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, targetReps = "1")
+
+            viewModel.guided.stepReps(-1)
+
+            viewModel.uiState.test {
+                assertEquals("1", checkNotNull(expectMostRecentItem().guided.running).reps)
+            }
+
+            viewModel.guided.finishSet()
+            assertEquals(listOf(1), sets.all.map { it.reps })
+        }
+
+    @Test
+    fun `stepping before typing steps from the target, not from zero`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, targetReps = "12")
+
+            viewModel.guided.stepReps(1)
+
+            viewModel.uiState.test {
+                assertEquals("13", checkNotNull(expectMostRecentItem().guided.running).reps)
+            }
+        }
 }

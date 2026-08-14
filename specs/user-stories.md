@@ -124,6 +124,9 @@ prescription option ADR-0009 rejected. "Rep" in the original request means *set*
   far intact. Killing the app does the same.
 - Starting an exercise is an **additional** action. "Add set" keeps its place and its
   behaviour, and the two-tap path of US-03 is unchanged.
+- **Added 2026-08-14:** the screen's visual treatment is US-39's, not this story's — these
+  acceptance criteria are the unchanged behavioural source of truth; US-39 only changes how it
+  looks and adds `+`/`−` steppers to the rep count.
 
 ### US-06 — End a session and see history
 - Ending a session sets `ended_at` and returns me to home.
@@ -622,6 +625,29 @@ deferred: *"a 'PR' badge on session rows… needs a purpose-built O(sets) read."
   computed.
 - The row itself moves off `ListItem` onto a plain ruled `Row`, matching ADR-0029's ruled-sheet
   precedent — a `GymDivider` beneath each row rather than `ListItem`'s implicit surface.
+
+### US-39 — The guided exercise screen is one exercise, sized for the bench
+Added 2026-08-14. See `adr/0033-the-guided-screen-is-one-exercise-at-a-time.md`, written against
+`Redesign.dc.html`'s `1b Focus mid-set` and `1b Focus resting` frames — the direction ADR-0029
+rejected for the *multi*-exercise session screen, and the only frames in the bundle drawn for a
+screen that holds one exercise at a time, which is what guided mode (US-05a) already is. Reported
+by a member still seeing "Go", a plain rep field and a "Finish set" button on Material defaults.
+
+- Resting, the countdown fills a full-width accent block, and the movement, its load, its rep
+  count and which set it is read as **one line inside that block** — not as separate lines on a
+  bare ground.
+- Mid-set, the load and rep count are the screen's largest element, and the number shown is the
+  one that will be written — it tracks the field, not the target.
+- The rep count keeps its `+`/`−` steppers and stays typeable; US-05a's "editable before I finish
+  each set" is unchanged and its test (`GuidedFlowTest`) is unedited.
+- The primary action says `Log set {n}`, naming the set it will write — the same verb the session
+  screen's one-tap button uses for the same operation.
+- Set progress is one bar per target set, in the accent at the three weights the session header's
+  own segment bar already uses. No third accent colour is introduced.
+- Nothing on the screen is centred; every label is flush left.
+- The start dialog (`GuidedSetupDialog`) is unchanged, and `TwoTapSetLoggingTest` /
+  `OneTapSetLoggingTest` must pass **unedited** — nothing here touches the session screen or the
+  two-tap path.
 
 ---
 

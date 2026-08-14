@@ -85,9 +85,13 @@ internal val ArchivoFamily =
  *
  * - `displayLarge` — the rest/warm-up countdown. This is the role `Type.kt` always said would
  *   be the countdown (see the comment on `displayLarge` below, which predates ADR-0029 and was
- *   never actually wired up — `RestPanel` read `displayMedium` instead). `displayMedium` itself
- *   is untouched at Material's default size, because `GuidedExerciseScreen`'s rep counter
- *   (ADR-0017, a different feature) also reads it.
+ *   never actually wired up — `RestPanel` read `displayMedium` instead). ADR-0029 left
+ *   `displayMedium` alone specifically because `GuidedExerciseScreen`'s rep counter (ADR-0017,
+ *   a different feature) also read it; ADR-0033 moved that screen's countdown to `displayLarge`
+ *   too, so `displayMedium` is now read nowhere in the app. It stays at Material's default size
+ *   with Archivo wired — the same treatment `displaySmall`/`headlineLarge` get — rather than
+ *   being claimed for something that does not yet exist, so an accidental future use does not
+ *   silently fall back to the system font.
  * - `headlineMedium` — the rest banner's big weight readout.
  * - `headlineSmall` — a movement name, on the session screen or in the rest banner's "Up next".
  * - `labelMedium` / `labelSmall` — row labels and section eyebrows. **Both sit below ADR-0011's
@@ -156,9 +160,10 @@ val GymTypography: Typography =
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.05).em,
                 ),
-            // Untouched at Material's default size: GuidedExerciseScreen's rep counter (ADR-0017)
-            // also reads this role and is out of ADR-0029's scope. Still carries Archivo so it
-            // does not silently fall back to Roboto.
+            // Untouched at Material's default size (ADR-0033): no role reads this slot since
+            // GuidedExerciseScreen's countdown moved to displayLarge. Left unclaimed rather than
+            // pre-committed to a screen that does not exist, and still carries Archivo so an
+            // accidental future use does not silently fall back to Roboto.
             displayMedium = displayMedium.copy(fontFamily = ArchivoFamily),
             displaySmall = displaySmall.copy(fontFamily = ArchivoFamily),
             headlineLarge = headlineLarge.copy(fontFamily = ArchivoFamily),

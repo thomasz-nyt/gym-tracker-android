@@ -159,6 +159,7 @@ private fun ActiveSessionViewModel.guidedActions() =
         onWeightChanged = { guided.changeSetup(weight = it) },
         onSetupRepsChanged = { guided.changeSetup(reps = it) },
         onRepsChanged = guided::changeReps,
+        onRepsStepped = guided::stepReps,
         onSetsChanged = { guided.changeSetup(sets = it) },
         onBegin = guided::begin,
         onDismissSetup = guided::dismissSetup,
@@ -181,6 +182,8 @@ data class GuidedActions(
     val onSetupRepsChanged: (String) -> Unit = {},
     /** The count actually managed on the set about to be finished — not the same thing. */
     val onRepsChanged: (String) -> Unit = {},
+    /** Steps that same count by -1 or +1 (ADR-0033), sharing [onFinishSet]'s own fallback. */
+    val onRepsStepped: (Int) -> Unit = {},
     val onSetsChanged: (String) -> Unit = {},
     val onBegin: () -> Unit = {},
     val onDismissSetup: () -> Unit = {},
@@ -282,6 +285,7 @@ private fun GuidedRoute(
         unit = state.unit,
         restRemaining = state.restRemaining,
         onRepsChanged = guided.onRepsChanged,
+        onRepsStepped = guided.onRepsStepped,
         onFinishSet = guided.onFinishSet,
         onStartNext = guided.onStartNext,
         onStop = guided.onStop,
