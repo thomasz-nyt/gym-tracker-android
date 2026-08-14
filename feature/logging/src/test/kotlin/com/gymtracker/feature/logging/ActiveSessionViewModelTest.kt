@@ -111,6 +111,7 @@ class ActiveSessionViewModelTest {
             prefillFromLastSet = PrefillFromLastSet(sets),
             unitPreference = units,
             startSession = StartSession(repository, restStore, clock) { SessionId("new") },
+            startSessionFromRoutine = fakeStartSessionFromRoutine(),
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),
@@ -420,8 +421,12 @@ class ActiveSessionViewModelTest {
         }
 
     @Test
-    fun `set entry opens empty for an exercise never performed`() =
+    fun `set entry opens reps at the 12 floor for a new exercise, weight and sets stay at ADR-0009's default`() =
         runTest {
+            // US-37 (ADR-0031): reps float to 12 with neither history nor a target; weight
+            // never floors — an invented load is worse than empty. Sets stays at ADR-0009's
+            // original 1 with no target to floor it from — confirmed against
+            // TwoTapSetLoggingTest on-device, which would log extra sets if this changed.
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
             viewModel.onExerciseChosen(ExerciseId("bench"))
@@ -432,8 +437,10 @@ class ActiveSessionViewModelTest {
 
                 val entry = expectMostRecentItem().setEntry
                 assertEquals("", entry?.weight)
-                assertEquals("", entry?.reps)
+                assertEquals("12", entry?.reps)
+                assertEquals("1", entry?.sets)
                 assertEquals(false, entry?.prefilled)
+                assertEquals(false, entry?.fromHistory)
             }
         }
 
@@ -503,6 +510,9 @@ class ActiveSessionViewModelTest {
     @Test
     fun `set entry defaults to one set so the two-tap path is unchanged`() =
         runTest {
+            // US-37 (ADR-0031) leaves this exact case alone: with no target to floor sets
+            // from, it stays ADR-0009's original 1 — confirmed against TwoTapSetLoggingTest
+            // on-device, which confirms without checking the sheet.
             val repository = FakeSessions(listOf(session("s1")))
             val viewModel = viewModel(repository)
             viewModel.onExerciseChosen(ExerciseId("bench"))

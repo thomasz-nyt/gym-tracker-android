@@ -2,16 +2,21 @@ package com.gymtracker.feature.logging
 
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.set.LogSets
-import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.ResolveSetPrefill
 import com.gymtracker.core.domain.set.SetInput
+import com.gymtracker.core.domain.set.SetPrefill
+import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.UnitConverter
+import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.core.domain.units.weightIncrement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 /** The set-entry sheet for one exercise in the session (US-03). */
 data class SetEntry(
@@ -19,12 +24,20 @@ data class SetEntry(
     val exerciseName: String,
     val weight: String,
     val reps: String,
-    /** How many identical sets to record — "3 sets of 12" (ADR-0009). Defaults to "1". */
+    /** How many identical sets to record — "3 sets of 12" (ADR-0009). Defaults to the target's count, then 3. */
     val sets: String,
     /** Optional, 5.0–10.0 in half steps. Blank means not recorded, which is not the same as easy. */
     val rpe: String,
-    /** True when the fields came from a previous set rather than being empty (US-03). */
+    /** True when the fields came from a previous set or a target rather than being empty (US-03). */
     val prefilled: Boolean,
+    /**
+     * True when [weight] and [reps] came from a real past set (US-37, ADR-0031) — the sheet
+     * shows "Prefilled from {date} — {weight} × {reps}" only in this case, since a target
+     * already renders labelled as a target elsewhere on the same sheet.
+     */
+    val fromHistory: Boolean,
+    /** When [fromHistory], the date that set happened — null otherwise. */
+    val lastPerformedAt: Instant? = null,
 )
 
 /**
@@ -38,7 +51,7 @@ class SetEntryController(
     private val logSets: LogSets,
     /** Runs once the set is safely on disk — US-05's rest starts from here. */
     private val onSetLogged: suspend () -> Unit,
-    private val prefillFromLastSet: PrefillFromLastSet,
+    private val sets: SetRepository,
     private val unitPreference: UnitPreference,
     private val currentMember: CurrentMember,
     private val scope: CoroutineScope,
@@ -48,41 +61,36 @@ class SetEntryController(
     val entry: StateFlow<SetEntry?> = state
 
     /**
-     * Opens entry prefilled from the movement's target if the session copied one, falling back
-     * per-field to the member's most recent set of this exercise otherwise (US-03, US-30).
+     * Opens entry prefilled per [ResolveSetPrefill] (US-37, ADR-0031): the member's most recent
+     * set of this exact movement first, then the movement's target if the session copied one,
+     * then a floor of 3 sets × 12 reps.
      *
-     * A target's fields are each independently optional — "3 x 8, load unrecorded" is a valid
-     * plan (ADR-0027) — so this is a per-field merge, not a switch: whichever of weight/reps the
-     * target leaves unset still reads from history, exactly as it would with no target at all.
-     * Nothing here writes a target anywhere; it only decides what the two text fields start at.
+     * The raw [ExerciseSet] is read directly here, rather than through
+     * [com.gymtracker.core.domain.set.PrefillFromLastSet], because its `performedAt` is what
+     * lets the sheet say *when* — "Prefilled from Tue 4 Aug" — not just what.
      */
     fun open(row: SessionExerciseRow) {
         scope.launch {
             val exerciseId = row.sessionExercise.exerciseId
             val unit = unitPreference.current()
             val target = row.sessionExercise.target
-            val history = prefillFromLastSet(exerciseId, currentMember.id(), unit)
+            val lastSet = sets.lastSetOf(exerciseId, currentMember.id())
 
-            val targetWeight = target?.weightKg?.let { UnitConverter.fromKilograms(it, unit) }
-            val weight = targetWeight ?: history?.weight
-            val reps = target?.reps ?: history?.reps
+            val resolved = ResolveSetPrefill(history = lastSet?.asPrefill(unit), target = target, unit = unit)
 
             state.value =
                 SetEntry(
                     sessionExerciseId = row.sessionExercise.id,
                     exerciseName = row.exercise?.name ?: exerciseId.value,
-                    // Already in the member's unit; both UnitConverter and PrefillFromLastSet
-                    // converted their half.
-                    weight = weight?.let(::trimNumber).orEmpty(),
-                    reps = reps?.toString().orEmpty(),
-                    // Not prefilled from either source: how many sets you did or planned is not
-                    // a claim about today's count, and defaulting to 1 keeps the two-tap path
-                    // intact (ADR-0009).
-                    sets = "1",
+                    weight = resolved.weight?.let(::trimNumber).orEmpty(),
+                    reps = resolved.reps.toString(),
+                    sets = resolved.sets.toString(),
                     // Never carried forward: RPE is how hard *that* set felt (US-03 prefills
                     // weight and reps only), so repeating it would invent a measurement.
                     rpe = "",
-                    prefilled = target != null || history != null,
+                    prefilled = lastSet != null || target != null,
+                    fromHistory = resolved.fromHistory,
+                    lastPerformedAt = lastSet?.performedAt,
                 )
         }
     }
@@ -212,3 +220,7 @@ class SetEntryController(
 
 // The stepper arithmetic these use lives in SetSteppers.kt, shared with US-04's editor so a
 // corrected set and a freshly logged one cannot disagree about what one press means.
+
+/** The same conversion `DetermineUpNextSet.asPrefill` uses, for the same reason: RPE is never carried forward. */
+private fun ExerciseSet.asPrefill(unit: WeightUnit) =
+    SetPrefill(weight = weightKg?.let { UnitConverter.fromKilograms(it, unit) }, reps = reps)
