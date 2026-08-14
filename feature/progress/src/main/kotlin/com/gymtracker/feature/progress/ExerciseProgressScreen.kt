@@ -22,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
@@ -174,6 +173,9 @@ private fun SeriesChips(
                 selected = series == selected,
                 onClick = { onSeriesChanged(series) },
                 label = { Text(series.label) },
+                // ADR-0019: FilterChip reads CornerFull unless told otherwise — redesign
+                // audit, PR A finding 1.
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
             )
         }
@@ -235,7 +237,7 @@ private fun TrendChart(
                 startAxis = VerticalAxis.rememberStart(),
             ),
         modelProducer = modelProducer,
-        modifier = Modifier.fillMaxWidth().height(CHART_HEIGHT),
+        modifier = Modifier.fillMaxWidth().height(GymDimens.ChartHeight),
     )
 
     Text(
@@ -299,5 +301,3 @@ private fun ExerciseTrendPoint.summary(
 private fun LocalDate.readable(): String = DAY_FORMAT.format(this)
 
 private val DAY_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
-
-private val CHART_HEIGHT = 240.dp

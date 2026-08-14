@@ -462,6 +462,28 @@ excluded, since it is the role `LoggedSets` and `RestPanel`'s mixed word/number 
 and `NumeralText`'s digit-span contrast depends on the line's own base weight not already
 matching it. Verified live on device.
 
+**Four more ADR-0019 compliance gaps closed 2026-08-12 (PR A of the follow-up audit).**
+`FilterChip` (Browse's body-part/equipment rows, the exercise progress series picker) and
+`AssistChip` (exercise detail's equipment tag) never passed `shape`, so all three still read
+Material's `CornerFull` token regardless of `GymShapes` — the exact trap `Shape.kt` documents,
+now closed by passing `shape = MaterialTheme.shapes.large` at each call site the same way
+`PrimaryActionButton` and the outlined buttons already did. The three bundled-photo call sites
+(Browse's thumbnail, exercise detail's hero, workout detail's thumbnail) rendered in full
+colour; the Modernist design system's `.grayscale` treatment (`filter: grayscale(1)
+contrast(1.08)`) was never applied anywhere, against its own "do not tint or colorize imagery"
+rule. A new `GymPhoto` composable in `:core:designsystem` wraps `AsyncImage` with that filter as
+one affine `ColorMatrix` (pinned by `GymPhotoTest`), and all three call sites now go through it
+so a future one cannot forget the treatment the way these three did. Nine `ColorScheme` slots —
+`errorContainer`, `onErrorContainer`, `tertiaryContainer`, `onTertiaryContainer`,
+`inverseSurface`, `inverseOnSurface`, `inversePrimary`, `surfaceTint`, `scrim` — were never
+passed to `lightColorScheme()`/`darkColorScheme()`, so each still inherited Material's own
+baseline (violet-tinted) default; `GymColorSchemeTest` now gates all nine the same way it
+already gated `outlineVariant`. And the five raw `dp` literals ADR-0011's "feature code never
+names a raw sp" rule has a `dp` counterpart for — `WeeklyVolumeScreen`'s bar height,
+`ExerciseProgressScreen`'s chart height, `ExerciseDetailScreen`'s photo height, and
+`BrowseScreen`'s row height and FAB clearance — are now named `GymDimens` tokens, pinned by
+`GymDimensTest`. All four gates green; 11/11 instrumented tests pass unedited.
+
 **The nav-bar pill closed, and Routines got its own entry point, 2026-08-13 (US-36, ADR-0030,
 PR B of the follow-up audit).** Three top-level destinations now, not four — Train, Exercises,
 Progress — with a hand-built `GymNavigationBar` (`:core:designsystem`) replacing

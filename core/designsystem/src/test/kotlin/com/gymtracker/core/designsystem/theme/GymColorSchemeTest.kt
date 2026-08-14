@@ -42,6 +42,13 @@ class GymColorSchemeTest {
             "surfaceContainerHigh" to (surfaceContainerHigh to onSurface),
             "surfaceContainerHighest" to (surfaceContainerHighest to onSurface),
             "error" to (error to onError),
+            // Redesign audit, PR A finding 3: these three were never in the suite, so they
+            // still inherited Material's baseline pairs — not necessarily illegible, but
+            // ungated, which is exactly how outlineVariant shipped as lavender first time.
+            "errorContainer" to (errorContainer to onErrorContainer),
+            "tertiaryContainer" to (tertiaryContainer to onTertiaryContainer),
+            // Standard-library Snackbar reads this pair.
+            "inverseSurface" to (inverseSurface to inverseOnSurface),
         )
 
     /**
@@ -61,6 +68,16 @@ class GymColorSchemeTest {
             "surfaceVariant" to surfaceVariant,
             "outline" to outline,
             "outlineVariant" to outlineVariant,
+            // Redesign audit, PR A finding 3: tertiary already mirrors secondary (both are ink,
+            // not a third hue), so its container should measure grey the same way
+            // secondaryContainer does — left unset, it would inherit Material's tinted default.
+            "tertiaryContainer" to tertiaryContainer,
+            "onTertiaryContainer" to onTertiaryContainer,
+            // The "other" scheme's ground, for Snackbar. Still mono — inverting light/dark
+            // does not introduce a second hue.
+            "inverseSurface" to inverseSurface,
+            "inverseOnSurface" to inverseOnSurface,
+            "scrim" to scrim,
         )
 
     @Test
@@ -99,6 +116,28 @@ class GymColorSchemeTest {
                 "$name primary has saturation ${saturation(scheme.primary)}, " +
                     "too washed out to read as the accent",
             )
+        }
+    }
+
+    @Test
+    fun `surfaceTint and inversePrimary carry the accent, not Material's default violet`() {
+        // Redesign audit, PR A finding 3. `surfaceTint` and `inversePrimary` are not derived
+        // from `primary` by the `lightColorScheme()`/`darkColorScheme()` constructors — they
+        // are separate parameters that default to Material's baseline violet if the caller
+        // does not pass them, same trap as `outlineVariant` (finding 08).
+        schemes.forEach { (name, scheme) ->
+            mapOf("surfaceTint" to scheme.surfaceTint, "inversePrimary" to scheme.inversePrimary)
+                .forEach { (role, color) ->
+                    val hue = hueDegrees(color)
+                    assertTrue(
+                        hue <= RED_BAND_END || hue >= RED_BAND_START,
+                        "$name $role has hue $hue°, outside the red band ADR-0019 chose",
+                    )
+                    assertTrue(
+                        saturation(color) >= ACCENT_SATURATION_FLOOR,
+                        "$name $role has saturation ${saturation(color)}, too washed out to read as the accent",
+                    )
+                }
         }
     }
 

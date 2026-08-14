@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
@@ -184,7 +183,7 @@ private fun VolumeBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(BAR_HEIGHT)
+                    .height(GymDimens.VolumeBarHeight)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clearAndSetSemantics {},
         ) {
@@ -224,8 +223,6 @@ private fun BodyPartVolume.fractionOf(peakVolumeKg: Double): Float =
 private fun BodyPart.label(): String = name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
 
 private val WEEK_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
-
-private val BAR_HEIGHT = 12.dp
 
 /** Small, but never zero — see [fractionOf]. */
 private const val MIN_BAR_FRACTION = 0.02f

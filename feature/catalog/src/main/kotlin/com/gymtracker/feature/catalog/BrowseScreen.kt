@@ -27,14 +27,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.GymPhoto
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.CatalogFilter
@@ -212,6 +210,9 @@ private fun FilterChips(
                     selected = part in filter.bodyParts,
                     onClick = { onBodyPartToggled(part) },
                     label = { Text(part.label()) },
+                    // ADR-0019: FilterChip reads CornerFull unless told otherwise (Shape.kt's
+                    // documented trap) — redesign audit, PR A finding 1.
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
                 )
             }
@@ -225,6 +226,7 @@ private fun FilterChips(
                     selected = kit in filter.equipment,
                     onClick = { onEquipmentToggled(kit) },
                     label = { Text(kit.label()) },
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET),
                 )
             }
@@ -243,7 +245,7 @@ private fun Results(
         modifier = modifier,
         // The floating button sits over the list, so the last result would be unreachable
         // underneath it without this.
-        contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
+        contentPadding = PaddingValues(bottom = GymDimens.FabClearance),
     ) {
         items(results, key = { it.id.value }) { exercise ->
             val added = timesAdded(exercise.id)
@@ -266,7 +268,7 @@ private fun Results(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .sizeIn(minHeight = ROW_HEIGHT)
+                        .sizeIn(minHeight = GymDimens.CatalogRowHeight)
                         .clickable { onChosen(exercise.id) },
             )
             GymDivider()
@@ -285,11 +287,10 @@ internal fun ExerciseThumbnail(imageAsset: String?) {
         return
     }
 
-    AsyncImage(
+    GymPhoto(
         model = "file:///android_asset/exercise_images/$imageAsset",
         // The name is right beside it, so repeating it would only add noise for TalkBack.
         contentDescription = null,
-        contentScale = ContentScale.Crop,
         modifier =
             Modifier
                 .size(THUMBNAIL)
@@ -313,10 +314,6 @@ private val GAP = GymDimens.Gap
 private val CHIP_GAP = GymDimens.TightGap
 private val MIN_TOUCH_TARGET = GymDimens.MinTouchTarget
 private val THUMBNAIL = GymDimens.Thumbnail
-private val ROW_HEIGHT = 88.dp
-
-/** Enough for the extended FAB plus its margin, so the last result clears it. */
-private val FAB_CLEARANCE = 88.dp
 
 @Preview
 @Composable
