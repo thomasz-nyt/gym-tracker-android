@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ADR-0030: the Exercises tab's glyph — three list rules and their bullets, hand-authored
+     from Redesign.dc.html's list icon. Six subpaths in one stroked path: the three zero-length
+     "bullet" segments render as small squares because the stroke line cap is square, the same
+     trick the source SVG uses. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M8,6 L21,6 M8,12 L21,12 M8,18 L21,18 M3,6 L3.01,6 M3,12 L3.01,12 M3,18 L3.01,18"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="square"
+        android:fillColor="#00000000" />
+</vector>

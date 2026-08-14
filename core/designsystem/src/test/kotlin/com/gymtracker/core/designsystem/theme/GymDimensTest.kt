@@ -60,6 +60,13 @@ class GymDimensTest {
     }
 
     @Test
+    fun `ADR-0030's hand-built navigation bar is pinned to the design's values`() {
+        assertEquals(76.dp, GymDimens.NavigationBarHeight)
+        assertEquals(24.dp, GymDimens.NavigationBarIconSize)
+        assertTrue(GymDimens.NavigationBarHeight >= GymDimens.MinTouchTarget)
+    }
+
+    @Test
     fun `the five sizes that used to be raw dp in feature code are now named tokens`() {
         // Redesign audit, PR A finding 4: ADR-0011's "feature code never names a raw sp" rule
         // has a dp counterpart (this file's own class doc), and five call sites broke it —

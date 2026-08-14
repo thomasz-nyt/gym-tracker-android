@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
@@ -40,14 +41,16 @@ import com.gymtracker.core.domain.model.RoutineId
 /**
  * The member's routines (US-29).
  *
- * A top-level destination, the fourth the bottom bar shows. `GymTrackerNavHost` anticipated it
- * in so many words — "Routines (ADR-0020) would be a fourth, and is not built" — so this is
- * that tab arriving, not an amendment to ADR-0024's three.
+ * A drill-down reached from Train's one outlined `Routines` entry point (US-36, ADR-0030) —
+ * not a tab. It carries a [DrillDownTopBar] now for the same reason `RoutineEditor` already
+ * has one: a drill-down has no bottom bar to exit through, and this screen stopped being a
+ * tab-bar destination the bar could no longer hide behind.
  */
 @Composable
 fun RoutinesRoute(
     onEditRoutine: (RoutineId) -> Unit,
     onWorkoutStarted: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RoutinesViewModel = hiltViewModel(),
 ) {
@@ -73,6 +76,7 @@ fun RoutinesRoute(
         onCreateRoutine = viewModel::onCreateRoutine,
         onEditRoutine = onEditRoutine,
         onStartRoutine = viewModel::onStartRoutine,
+        onBack = onBack,
         modifier = modifier,
     )
 }
@@ -86,11 +90,15 @@ internal fun RoutinesScreen(
     onCreateRoutine: (String) -> Unit = {},
     onEditRoutine: (RoutineId) -> Unit = {},
     onStartRoutine: (RoutineId) -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var naming by remember { mutableStateOf(false) }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { padding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = { DrillDownTopBar(onBack = onBack) },
+    ) { padding ->
         Column(
             modifier = Modifier.padding(padding).padding(GymDimens.ScreenPadding).fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),

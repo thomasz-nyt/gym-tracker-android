@@ -111,6 +111,7 @@ class ActiveSessionViewModelTest {
             prefillFromLastSet = PrefillFromLastSet(sets),
             unitPreference = units,
             startSession = StartSession(repository, restStore, clock) { SessionId("new") },
+            startSessionFromRoutine = fakeStartSessionFromRoutine(),
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
             endSession = EndSession(repository, sets, clock),
