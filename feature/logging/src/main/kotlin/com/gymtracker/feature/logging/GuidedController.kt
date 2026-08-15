@@ -101,7 +101,14 @@ class GuidedController(
         }
 
     /**
-     * Opens the start dialog with the same numbers US-03's set entry would show.
+     * Opens the start dialog: weight from the last time this exercise was done, same as US-03's
+     * set entry; reps and sets at a fixed walkthrough length instead.
+     *
+     * Reps and sets deliberately do **not** follow history here, unlike weight. Each set guided
+     * mode writes gets its own real `performed_at` regardless of the target count (see the class
+     * doc), so a fixed starting point costs nothing the way raising the two-tap sheet's Sets
+     * floor above 1 would — that would let confirming without editing fabricate a shared
+     * timestamp across several rows, exactly what ADR-0031 found and reverted on-device.
      *
      * The prefill is looked up by the caller rather than here, so this class does not need the
      * member and the catalog as well — and so the prefilling rule lives in one place.
@@ -115,7 +122,7 @@ class GuidedController(
                 row = row,
                 exerciseName = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
                 weight = prefill?.weight?.let(::trimNumber).orEmpty(),
-                reps = prefill?.reps?.toString().orEmpty(),
+                reps = DEFAULT_TARGET_REPS,
                 sets = DEFAULT_TARGET_SETS,
             )
     }
@@ -268,9 +275,13 @@ class GuidedController(
 
     private companion object {
         /**
-         * One, matching set entry's default (ADR-0009). Guided mode is worth using for a
-         * single set too — the rest still starts and the summary still lands.
+         * A fixed walkthrough length (3 sets of 12), not read from history or a routine target.
+         * Safe to default above ADR-0009's single-set floor here specifically because each set
+         * is logged as it finishes with its own real timestamp — unlike the two-tap sheet, whose
+         * own Sets field stays at 1 for exactly the reason this one does not need to (see
+         * [start]'s doc).
          */
-        const val DEFAULT_TARGET_SETS = "1"
+        const val DEFAULT_TARGET_SETS = "3"
+        const val DEFAULT_TARGET_REPS = "12"
     }
 }

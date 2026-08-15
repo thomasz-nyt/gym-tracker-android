@@ -108,8 +108,11 @@ mistake; there was no way to take one back out.
 ### US-05a — Be walked through an exercise
 Added 2026-08-02. See `adr/0017-guided-exercise-flow.md`, which revisits the
 prescription option ADR-0009 rejected. "Rep" in the original request means *set*.
-- Given an exercise in the active session, I can start it. Weight, reps and a sets
-  count are prefilled exactly as in US-03, and confirming begins the exercise.
+- Given an exercise in the active session, I can start it. **Weight is prefilled from
+  my last session of it, as in US-03.** Reps and the sets count are **not** — they
+  start at a fixed 12 reps × 3 sets, a walkthrough length picked once rather than
+  drawn from the last time, and editable before confirming. **Changed 2026-08-14:**
+  this deliberately diverges from US-03's history-driven reps prefill; see below.
 - While an exercise is running I see its name, the weight in both units, which set I
   am on out of how many, the rep count for this set, and the timer.
 - The rep count is **editable before I finish each set**. If I planned 12 and managed
@@ -124,6 +127,12 @@ prescription option ADR-0009 rejected. "Rep" in the original request means *set*
   far intact. Killing the app does the same.
 - Starting an exercise is an **additional** action. "Add set" keeps its place and its
   behaviour, and the two-tap path of US-03 is unchanged.
+- **12×3 default, not history, and not the two-tap sheet.** The two-tap sheet's own
+  Sets field stays at ADR-0009's floor of 1 with no target — raising it there would
+  mean confirming without editing fabricates a shared `performed_at` across several
+  sets, exactly the regression ADR-0031 found and reverted on-device. Guided mode has
+  no such risk: each set it writes always gets its own real timestamp regardless of
+  the target count (see above), so a fixed 3-set walkthrough costs nothing there.
 - **Added 2026-08-14:** the screen's visual treatment is US-39's, not this story's — these
   acceptance criteria are the unchanged behavioural source of truth; US-39 only changes how it
   looks and adds `+`/`−` steppers to the rep count.
