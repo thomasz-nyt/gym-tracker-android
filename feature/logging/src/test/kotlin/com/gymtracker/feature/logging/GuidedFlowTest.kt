@@ -153,8 +153,12 @@ class GuidedFlowTest {
     }
 
     @Test
-    fun `starting an exercise offers the target, prefilled as set entry would be`() =
+    fun `starting an exercise prefills weight from history, but reps and sets at a fixed 12x3`() =
         runTest {
+            // Weight still comes from the last time this exercise was done (US-03's own rule).
+            // Reps and sets deliberately do not — each set guided mode writes gets its own real
+            // timestamp regardless of the target count, so a fixed walkthrough length costs
+            // nothing here the way raising the two-tap sheet's Sets floor would (ADR-0031).
             sets.seed(ExerciseSet("old", SessionExerciseId("se-old"), 1, 61.23, 8, null, now))
             sets.lastFor[ExerciseId("bench")] = "old"
             val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
@@ -167,8 +171,25 @@ class GuidedFlowTest {
                 val setup = checkNotNull(expectMostRecentItem().guided.setup)
                 assertEquals("Bench Press", setup.exerciseName)
                 assertEquals("135", setup.weight, "prefilled in the member's unit, as US-03 does")
-                assertEquals("8", setup.reps)
-                assertEquals("1", setup.sets)
+                assertEquals("12", setup.reps, "the fixed default, not history's 8")
+                assertEquals("3", setup.sets, "the fixed default")
+            }
+        }
+
+    @Test
+    fun `starting an exercise with no history at all still offers the fixed 12x3, weight blank`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+
+            viewModel.uiState.test {
+                val row = expectMostRecentItem().exercises.single()
+                viewModel.onStartExercise(row)
+
+                val setup = checkNotNull(expectMostRecentItem().guided.setup)
+                assertEquals("", setup.weight, "no history to invent a weight from")
+                assertEquals("12", setup.reps)
+                assertEquals("3", setup.sets)
             }
         }
 

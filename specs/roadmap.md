@@ -594,6 +594,20 @@ follow-up, not a silent gap. New instrumented coverage: `GuidedFlowScreenTest`, 
 to reach guided mode at all. Verified live on device; all four gates green plus
 `TwoTapSetLoggingTest`/`OneTapSetLoggingTest` unedited.
 
+**Guided mode's start dialog defaults to 12 reps × 3 sets, weight still from history,
+2026-08-15 (US-05a).** Requested directly: a predictable walkthrough length to start
+from and adjust, rather than reps quietly tracking whatever the last session happened
+to be. Weight is untouched — it still prefills from the last time the exercise was
+done, same as the two-tap sheet. **The two-tap sheet's own Sets field was
+deliberately left at ADR-0009's floor of 1 with no target** — raising it there would
+let confirming without editing fabricate a shared `performed_at` across several sets,
+the exact regression ADR-0031 found and reverted on-device the first time this was
+tried. Guided mode carries no such risk: each set it writes gets its own real
+timestamp regardless of the target count, so a fixed 3-set default costs nothing
+there specifically. Two new `GuidedFlowTest` cases (with history, and with none at
+all); `GuidedFlowScreenTest` simplified, since the dialog no longer needs a manual
+bump past a 1-set default to reach the resting state it tests. All four gates green.
+
 **In progress:**
 
 - **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a

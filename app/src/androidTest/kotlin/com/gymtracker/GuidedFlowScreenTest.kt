@@ -6,7 +6,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -141,12 +140,10 @@ class GuidedFlowScreenTest {
             awaitSetupDialogOpen()
 
             compose.onNodeWithText(EXERCISE).assertExists("the exercise name reaches the running screen")
-            // The setup dialog defaults to a target of one set (GuidedController.
-            // DEFAULT_TARGET_SETS) — with that target, finishing set 1 also completes the
-            // exercise, which skips straight to the Done summary and never rests. Bumping the
-            // target to two is what makes the resting hero, the state this test exists to prove
-            // renders, actually reachable.
-            compose.onNodeWithText("1").performTextReplacement("2")
+            // The setup dialog defaults to a 3-set target (GuidedController.DEFAULT_TARGET_SETS)
+            // — more than one, so finishing set 1 of 3 rests rather than completing the exercise,
+            // which is what makes the resting hero, the state this test exists to prove renders,
+            // actually reachable without editing the dialog first.
             compose.onNodeWithText("Start").performClick()
             awaitRunningScreen()
 
