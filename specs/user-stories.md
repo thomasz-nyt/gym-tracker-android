@@ -373,6 +373,73 @@ without reopening the join ADR-0020 and ADR-0027 both declined.
 
 ---
 
+## M3c — Backup and restore
+
+See `adr/0034-backup-is-a-file-you-own.md`. Uninstalling deletes the Room database **and**
+DataStore. The maintainer reinstalls several times a week to test on device and logs real
+training in the same app, so today testing destroys training history.
+
+These stories do **not** replace US-11, which stays at M2 and keeps meaning what it says: a
+data-rights export paired with account deletion. This is the round trip that survives a
+reinstall, and it needs no account, no backend and no network.
+
+### US-40 — Export everything I have logged to a file
+- From Settings, I can export my data to a file. I choose where it goes through the system
+  file picker, so putting it somewhere cloud-synced is my decision, not the app's.
+- The file is JSON, human-readable, and contains every session, exercise appearance, set,
+  routine and routine item I have logged.
+- It also carries my **unit preference** and **rest default**, so a restore does not leave me
+  re-picking kg or lb.
+- It does **not** contain the exercise catalog. The catalog ships in the APK and re-seeds
+  identically on reinstall, because its ids are UUIDv5 over a fixed source slug — the same
+  argument migrations v5 and v6 already make when they wipe and re-seed it.
+- It does **not** contain a running rest countdown, an in-flight guided exercise, or a
+  warm-up in progress. Those describe this install (ADR-0005) and end when it does.
+- The file names its own format version, when it was exported, and which app build wrote it.
+- Export works with no network, like everything else in M1 (constitution §2.2).
+- Exporting changes nothing. Running it twice in a row produces two files with identical
+  contents, and my data is untouched either way.
+
+### US-41 — Restore a file after a reinstall
+- From Settings, I can import a file I exported earlier, and get back **exactly** what I had:
+  every workout, every set, every routine, every target, every personal record, and the same
+  unit preference and rest default.
+- Charts and history read the restored data the same as if it had never left. A restored
+  personal record is still a personal record, because it is still the set that was performed.
+- **Import replaces everything.** Before it runs, I am told in real numbers what I am about
+  to lose and what I am about to gain — "Replace 12 workouts and 3 routines on this device
+  with 9 and 2 from this file?" — and nothing happens until I confirm.
+- **Import is all-or-nothing.** If anything goes wrong partway through, I still have exactly
+  what I had before I started. There is no state where both the old data and the new are gone.
+- **A file that cannot be fully restored is refused, and the app says what is missing.** If it
+  references an exercise this build no longer has, nothing is written and my current data is
+  untouched — so the same file still restores cleanly on a build that has it.
+- A file from a **newer** format version than this build understands is refused by name,
+  rather than partially read. A file missing a field added after it was written still
+  restores; the fields it does have are enough.
+- **Import is refused while a workout is running**, and says so. Finishing or discarding the
+  workout first is the fix. A session must never disappear out from under the screen logging
+  it (constitution §2.1).
+- The two-tap path is untouched: `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` must pass
+  **unedited**.
+
+### US-42 — Settings, and the two preferences that were never settable
+The app has no Settings screen. `UnitPreference` is read at nine call sites and set at none;
+US-05 promises a rest default "until changed in settings" and ADR-0008 promises a unit
+preference. Both controls are built here, alongside the home export and import needed anyway.
+
+- There is a Settings screen, reached from Train's header — a drill-down, **not** a fourth
+  tab. US-36 and ADR-0030 settled the bottom bar at three items; this does not reopen it.
+- I can switch between **kg and lb**, and every screen that shows a weight follows
+  immediately: the session screen, set entry, the trend chart, weekly volume, routine targets
+  and history. Nothing stored changes — kilograms remain canonical, per `data-model.md`.
+- I can change the **default rest** between sets, and the next rest I start uses it. A rest
+  already running is not retimed underneath me.
+- Export and Import live here (US-40, US-41), with Import visibly unavailable, and the reason
+  given, while a workout is running.
+
+---
+
 ## M4 — Progress
 
 ### US-16 — Per-exercise trend
