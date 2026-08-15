@@ -89,6 +89,21 @@ interface SetDao {
     @Query("SELECT COALESCE(MAX(set_index), 0) FROM sets WHERE session_exercise_id = :sessionExerciseId")
     suspend fun maxSetIndex(sessionExerciseId: String): Int
 
+    /**
+     * Every set belonging to any of the member's sessions (US-40, ADR-0034) — reached through
+     * `session_exercises` and `sessions` the same way [lastSetOf] reaches an exercise, since
+     * `sets` carries neither a `user_id` nor an `exercise_id` of its own (ADR-0004).
+     */
+    @Query(
+        """
+        SELECT s.* FROM sets s
+        JOIN session_exercises se ON se.id = s.session_exercise_id
+        JOIN sessions ss ON ss.id = se.session_id
+        WHERE ss.user_id = :userId
+        """,
+    )
+    suspend fun allForUser(userId: String): List<SetEntity>
+
     @Insert
     suspend fun insert(set: SetEntity)
 

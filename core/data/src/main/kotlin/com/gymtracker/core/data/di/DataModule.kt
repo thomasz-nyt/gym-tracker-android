@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
+import com.gymtracker.core.data.backup.RoomBackupStore
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.AndroidCatalogAssetReader
 import com.gymtracker.core.data.exercise.CatalogAssetReader
@@ -25,6 +26,8 @@ import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.data.warmup.DataStoreWarmUpTimerStore
+import com.gymtracker.core.domain.backup.BackupStore
+import com.gymtracker.core.domain.backup.ExportBackup
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
@@ -378,6 +381,9 @@ object DataModule {
 
     @Provides
     fun restoreSet(sets: SetRepository): RestoreSet = RestoreSet(sets)
+
+    @Provides
+    fun exportBackup(store: BackupStore): ExportBackup = ExportBackup(store)
 }
 
 @Module
@@ -415,6 +421,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun sets(impl: RoomSetRepository): SetRepository
+
+    @Binds
+    abstract fun backupStore(impl: RoomBackupStore): BackupStore
 }
 
 private val Context.gymTrackerPreferences: DataStore<Preferences> by preferencesDataStore(name = "gym-tracker")
