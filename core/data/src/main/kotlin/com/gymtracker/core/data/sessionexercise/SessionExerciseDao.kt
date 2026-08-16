@@ -27,4 +27,20 @@ interface SessionExerciseDao {
     /** US-02c. The row's sets go with it via `ON DELETE CASCADE` on `sets`. */
     @Query("DELETE FROM session_exercises WHERE id = :id")
     suspend fun delete(id: String)
+
+    /**
+     * Every appearance across any of the member's sessions (US-40, ADR-0034).
+     *
+     * `session_exercises` carries no `user_id` of its own, so this reaches it through
+     * `sessions` — the same join [com.gymtracker.core.data.set.SetDao.lastSetOf] uses to reach
+     * an exercise, per ADR-0004.
+     */
+    @Query(
+        """
+        SELECT se.* FROM session_exercises se
+        JOIN sessions s ON s.id = se.session_id
+        WHERE s.user_id = :userId
+        """,
+    )
+    suspend fun allForUser(userId: String): List<SessionExerciseEntity>
 }

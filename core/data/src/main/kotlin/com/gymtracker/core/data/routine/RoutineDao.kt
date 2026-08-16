@@ -32,6 +32,10 @@ interface RoutineDao {
     /** The items go with it via `ON DELETE CASCADE`. No session is touched (ADR-0020). */
     @Query("DELETE FROM routines WHERE id = :id")
     suspend fun delete(id: String)
+
+    /** Every routine the member has, in order (US-40, ADR-0034) — [observeRoutines] read once. */
+    @Query("SELECT * FROM routines WHERE user_id = :userId ORDER BY position ASC")
+    suspend fun allForUser(userId: String): List<RoutineEntity>
 }
 
 /** Queries over `routine_items` — a separate table, so a separate DAO. */
@@ -62,6 +66,19 @@ interface RoutineItemDao {
         position: Int,
         updatedAt: Long,
     )
+
+    /**
+     * Every movement across any of the member's routines (US-40, ADR-0034), reached through
+     * `routines` since `routine_items` carries no `user_id` of its own.
+     */
+    @Query(
+        """
+        SELECT ri.* FROM routine_items ri
+        JOIN routines r ON r.id = ri.routine_id
+        WHERE r.user_id = :userId
+        """,
+    )
+    suspend fun allForUser(userId: String): List<RoutineItemEntity>
 
     /**
      * Applies a whole reordering in one transaction.

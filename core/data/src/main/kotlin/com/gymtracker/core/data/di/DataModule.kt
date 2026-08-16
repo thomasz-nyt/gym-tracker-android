@@ -5,6 +5,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
+import com.gymtracker.core.data.backup.AndroidAppVersion
+import com.gymtracker.core.data.backup.AndroidBackupFileWriter
+import com.gymtracker.core.data.backup.BackupCodec
+import com.gymtracker.core.data.backup.RoomBackupStore
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.AndroidCatalogAssetReader
 import com.gymtracker.core.data.exercise.CatalogAssetReader
@@ -25,6 +29,12 @@ import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.data.warmup.DataStoreWarmUpTimerStore
+import com.gymtracker.core.domain.backup.AppVersion
+import com.gymtracker.core.domain.backup.BackupEncoder
+import com.gymtracker.core.domain.backup.BackupFileWriter
+import com.gymtracker.core.domain.backup.BackupStore
+import com.gymtracker.core.domain.backup.ExportBackup
+import com.gymtracker.core.domain.backup.ExportBackupToFile
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
@@ -378,6 +388,18 @@ object DataModule {
 
     @Provides
     fun restoreSet(sets: SetRepository): RestoreSet = RestoreSet(sets)
+
+    @Provides
+    fun exportBackup(store: BackupStore): ExportBackup = ExportBackup(store)
+
+    @Provides
+    fun exportBackupToFile(
+        exportBackup: ExportBackup,
+        encoder: BackupEncoder,
+        fileWriter: BackupFileWriter,
+        appVersion: AppVersion,
+        clock: Clock,
+    ): ExportBackupToFile = ExportBackupToFile(exportBackup, encoder, fileWriter, appVersion, clock)
 }
 
 @Module
@@ -415,6 +437,18 @@ abstract class DataBindings {
 
     @Binds
     abstract fun sets(impl: RoomSetRepository): SetRepository
+
+    @Binds
+    abstract fun backupStore(impl: RoomBackupStore): BackupStore
+
+    @Binds
+    abstract fun backupEncoder(impl: BackupCodec): BackupEncoder
+
+    @Binds
+    abstract fun appVersion(impl: AndroidAppVersion): AppVersion
+
+    @Binds
+    abstract fun backupFileWriter(impl: AndroidBackupFileWriter): BackupFileWriter
 }
 
 private val Context.gymTrackerPreferences: DataStore<Preferences> by preferencesDataStore(name = "gym-tracker")

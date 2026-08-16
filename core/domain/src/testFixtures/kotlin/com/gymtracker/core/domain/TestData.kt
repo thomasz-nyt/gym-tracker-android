@@ -5,6 +5,11 @@ import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
+import com.gymtracker.core.domain.model.Routine
+import com.gymtracker.core.domain.model.RoutineId
+import com.gymtracker.core.domain.model.RoutineItem
+import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
@@ -96,11 +101,19 @@ object TestData {
         val weeklyGainKg: Double,
     )
 
-    /** Rows to load into repositories, in the shape the domain reads them. */
+    /**
+     * Rows to load into repositories, in the shape the domain reads them.
+     *
+     * [routines] and [routineItems] default to empty and were added for US-40, which is the
+     * first thing that reads *every* table a member owns at once. Every fixture built before
+     * them is unaffected.
+     */
     data class Fixture(
         val sessions: List<WorkoutSession> = emptyList(),
         val sessionExercises: List<SessionExercise> = emptyList(),
         val sets: List<ExerciseSet> = emptyList(),
+        val routines: List<Routine> = emptyList(),
+        val routineItems: List<RoutineItem> = emptyList(),
     )
 
     /**
@@ -151,6 +164,60 @@ object TestData {
         }
 
         return Fixture(sessions, appearances, sets)
+    }
+
+    /**
+     * One member with a little of everything: a session with sets, and a routine with a
+     * target — the smallest fixture that touches all five tables a backup carries (US-40,
+     * ADR-0034). Kept separate from [twelveWeeksOfProgress] rather than folded into it: a
+     * round-trip test wants to state every row it expects back, and twelve weeks of five lifts
+     * is too many rows to list by hand in an assertion.
+     */
+    fun memberWithARoutineAndASession(member: UserId = PROGRESSING): Fixture {
+        val sessionId = SessionId("fixture-backup-session")
+        val appearance = SessionExerciseId("fixture-backup-se")
+        val routineId = RoutineId("fixture-backup-routine")
+
+        return Fixture(
+            sessions =
+                listOf(
+                    WorkoutSession(
+                        id = sessionId,
+                        userId = member,
+                        gymName = null,
+                        startedAt = FIRST_SESSION,
+                        endedAt = FIRST_SESSION.plus(Duration.ofMinutes(SESSION_MINUTES)),
+                        metrics = null,
+                    ),
+                ),
+            sessionExercises =
+                listOf(
+                    SessionExercise(appearance, sessionId, BENCH, position = 1, target = null),
+                ),
+            sets =
+                listOf(
+                    ExerciseSet(
+                        id = "fixture-backup-set",
+                        sessionExerciseId = appearance,
+                        setIndex = 1,
+                        weightKg = 60.0,
+                        reps = 5,
+                        rpe = null,
+                        performedAt = FIRST_SESSION,
+                    ),
+                ),
+            routines = listOf(Routine(routineId, member, name = "Upper A", position = 1)),
+            routineItems =
+                listOf(
+                    RoutineItem(
+                        id = RoutineItemId("fixture-backup-item"),
+                        routineId = routineId,
+                        exerciseId = BENCH,
+                        position = 1,
+                        target = MovementTarget(sets = 3, reps = 8, weightKg = 61.25),
+                    ),
+                ),
+        )
     }
 
     /**

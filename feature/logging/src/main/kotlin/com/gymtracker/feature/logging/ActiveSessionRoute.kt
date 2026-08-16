@@ -57,6 +57,7 @@ fun LoggingRoute(
     onOpenHistory: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     onOpenRoutines: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     pickedExerciseIds: List<String> = emptyList(),
     onPicksHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -114,6 +115,7 @@ fun LoggingRoute(
         nextRoutine = nextRoutine,
         onStartFromRoutine = viewModel::onStartFromRoutine,
         onOpenRoutines = onOpenRoutines,
+        onOpenSettings = onOpenSettings,
         warmUp =
             WarmUp(
                 elapsed = warmUpElapsed,
@@ -231,6 +233,7 @@ internal fun LoggingScreen(
     nextRoutine: Routine? = null,
     onStartFromRoutine: (RoutineId) -> Unit = {},
     onOpenRoutines: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     warmUp: WarmUp = WarmUp(),
     modifier: Modifier = Modifier,
 ) {
@@ -265,6 +268,7 @@ internal fun LoggingScreen(
             nextRoutine = nextRoutine,
             onStartFromRoutine = onStartFromRoutine,
             onOpenRoutines = onOpenRoutines,
+            onOpenSettings = onOpenSettings,
             warmUp = warmUp,
             modifier = modifier,
         )
@@ -317,6 +321,7 @@ private fun SessionScreen(
     nextRoutine: Routine?,
     onStartFromRoutine: (RoutineId) -> Unit,
     onOpenRoutines: () -> Unit,
+    onOpenSettings: () -> Unit,
     warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
@@ -340,6 +345,7 @@ private fun SessionScreen(
             nextRoutine = nextRoutine,
             onStartFromRoutine = onStartFromRoutine,
             onOpenRoutines = onOpenRoutines,
+            onOpenSettings = onOpenSettings,
             warmUp = warmUp,
             modifier = Modifier.padding(padding),
         )

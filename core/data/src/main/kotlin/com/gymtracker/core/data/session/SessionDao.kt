@@ -30,6 +30,15 @@ interface SessionDao {
     @Insert
     suspend fun insert(session: SessionEntity)
 
+    /**
+     * Every session the member has, active or finished (US-40, ADR-0034).
+     *
+     * Unlike [observeFinished], the session in progress is **included** — a backup is a
+     * complete copy of what the member has logged, not history in US-06's sense.
+     */
+    @Query("SELECT * FROM sessions WHERE user_id = :userId")
+    suspend fun allForUser(userId: String): List<SessionEntity>
+
     @Query(
         "UPDATE sessions SET ended_at = :endedAt, updated_at = :updatedAt, " +
             "sync_state = '$SYNC_STATE_PENDING' WHERE id = :id",
