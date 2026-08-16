@@ -107,6 +107,9 @@ interface SetDao {
     @Insert
     suspend fun insert(set: SetEntity)
 
+    @Insert
+    suspend fun insertAll(sets: List<SetEntity>)
+
     /** One set by id, or null — used to snapshot a row before [deleteById] takes it (US-04). */
     @Query("SELECT * FROM sets WHERE id = :id")
     suspend fun find(id: String): SetEntity?

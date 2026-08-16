@@ -251,9 +251,13 @@ class WeeklyVolumeViewModelTest {
         }
 
     private class FakeCurrentMember(
-        private val id: UserId,
+        private var id: UserId,
     ) : CurrentMember {
         override suspend fun id(): UserId = id
+
+        override suspend fun restore(id: UserId) {
+            this.id = id
+        }
     }
 
     private class FakeUnitPreference : UnitPreference {

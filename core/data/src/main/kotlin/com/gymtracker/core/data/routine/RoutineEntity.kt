@@ -81,6 +81,25 @@ internal fun RoutineEntity.toDomain(): Routine =
         position = position,
     )
 
+/**
+ * [Routine] carries no `createdAt` — it is schema bookkeeping the domain model was never given,
+ * the same "no meaning until M2" status `updated_at` and `sync_state` already have. A restore
+ * (US-41, ADR-0034) has no original value to put back, so it gets one exactly as [add] does.
+ */
+internal fun Routine.toEntity(
+    createdAt: Long = Instant.now().toEpochMilli(),
+    updatedAt: Long = createdAt,
+): RoutineEntity =
+    RoutineEntity(
+        id = id.value,
+        userId = userId.value,
+        name = name,
+        position = position,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        syncState = SYNC_STATE_PENDING,
+    )
+
 internal fun RoutineItemEntity.toDomain(): RoutineItem =
     RoutineItem(
         id = RoutineItemId(id),

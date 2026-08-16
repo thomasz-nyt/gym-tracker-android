@@ -99,14 +99,3 @@ internal data class RoutineItemDto(
 )
 
 internal const val CURRENT_FORMAT_VERSION = 1
-
-/**
- * Thrown by [BackupCodec.decode] when a file names a [BackupEnvelopeDto.formatVersion] newer
- * than this build understands.
- */
-class UnsupportedBackupFormatException(
-    val fileVersion: Int,
-    val supportedVersion: Int,
-) : Exception(
-        "backup file is format version $fileVersion, this build only understands up to $supportedVersion",
-    )

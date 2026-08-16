@@ -5,12 +5,14 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.data.session.SessionEntity
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import java.time.Instant
 
 /**
  * The `session_exercises` table from `data-model.md` (ADR-0004).
@@ -54,6 +56,19 @@ internal fun SessionExerciseEntity.toDomain(): SessionExercise =
         exerciseId = ExerciseId(exerciseId),
         position = position,
         target = toTarget(targetSets, targetReps, targetWeightKg),
+    )
+
+internal fun SessionExercise.toEntity(updatedAt: Instant = Instant.now()): SessionExerciseEntity =
+    SessionExerciseEntity(
+        id = id.value,
+        sessionId = sessionId.value,
+        exerciseId = exerciseId.value,
+        position = position,
+        updatedAt = updatedAt.toEpochMilli(),
+        syncState = SYNC_STATE_PENDING,
+        targetSets = target?.sets,
+        targetReps = target?.reps,
+        targetWeightKg = target?.weightKg,
     )
 
 /**

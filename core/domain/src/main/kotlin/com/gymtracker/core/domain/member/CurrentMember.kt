@@ -12,4 +12,14 @@ import com.gymtracker.core.domain.model.UserId
 interface CurrentMember {
     /** The member's id, generating and persisting one on first call if needed. */
     suspend fun id(): UserId
+
+    /**
+     * Overwrites the stored id (US-41, ADR-0034) — restoring a backup's identity rather than
+     * rewriting the rows under a freshly generated one, which is the whole reason a restored
+     * backup is visible to any screen: every read filters on this id.
+     *
+     * The one deliberate exception to [id]'s "generated once and never regenerated" — see
+     * `DataStoreCurrentMember`'s own KDoc.
+     */
+    suspend fun restore(id: UserId)
 }

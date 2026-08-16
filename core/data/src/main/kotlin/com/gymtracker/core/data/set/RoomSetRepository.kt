@@ -1,6 +1,5 @@
 package com.gymtracker.core.data.set
 
-import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -50,18 +49,4 @@ class RoomSetRepository
         }
 
         override suspend fun delete(id: String): ExerciseSet? = dao.deleteAndReturn(id)?.toDomain()
-
-        /** Every write stamps `updated_at` and marks the row pending, exactly as [add] does. */
-        private fun ExerciseSet.toEntity() =
-            SetEntity(
-                id = id,
-                sessionExerciseId = sessionExerciseId.value,
-                setIndex = setIndex,
-                weightKg = weightKg,
-                reps = reps,
-                rpe = rpe,
-                performedAt = performedAt.toEpochMilli(),
-                updatedAt = Instant.now().toEpochMilli(),
-                syncState = SYNC_STATE_PENDING,
-            )
     }

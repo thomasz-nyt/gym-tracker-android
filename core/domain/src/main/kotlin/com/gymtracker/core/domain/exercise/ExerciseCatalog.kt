@@ -1,6 +1,7 @@
 package com.gymtracker.core.domain.exercise
 
 import com.gymtracker.core.domain.model.Exercise
+import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.UserId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -45,4 +46,11 @@ interface ExerciseCatalog {
         query: String,
         forMember: UserId,
     ): Flow<List<Exercise>> = browse(query, CatalogFilter(), forMember)
+
+    /**
+     * Every id this build's catalog has (US-41, ADR-0034) — what `ValidateBackup` checks a
+     * backup's exercise references against before anything is written. A plain read, not
+     * ranked or filtered: unlike [observeRanked] this needs no member.
+     */
+    suspend fun knownExerciseIds(): Set<ExerciseId>
 }

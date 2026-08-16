@@ -39,6 +39,13 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE user_id = :userId")
     suspend fun allForUser(userId: String): List<SessionEntity>
 
+    /** US-41's replace-all: everything else the member owns cascades from these two deletes. */
+    @Query("DELETE FROM sessions WHERE user_id = :userId")
+    suspend fun deleteAllForUser(userId: String)
+
+    @Insert
+    suspend fun insertAll(sessions: List<SessionEntity>)
+
     @Query(
         "UPDATE sessions SET ended_at = :endedAt, updated_at = :updatedAt, " +
             "sync_state = '$SYNC_STATE_PENDING' WHERE id = :id",

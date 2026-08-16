@@ -14,7 +14,8 @@ import javax.inject.Inject
  * The local member UUID, in DataStore (ADR-0005, `data-model.md` § "Identity before M2").
  *
  * Generated once and never regenerated: it is stamped on every session and set, so losing it
- * would orphan everything already logged.
+ * would orphan everything already logged. [restore] is the one deliberate exception (US-41,
+ * ADR-0034) — overwriting it with a backup's own id, never a freshly generated one.
  */
 class DataStoreCurrentMember
     @Inject
@@ -32,6 +33,10 @@ class DataStoreCurrentMember
                     }
                 }
             return UserId(requireNotNull(stored[MEMBER_ID]))
+        }
+
+        override suspend fun restore(id: UserId) {
+            preferences.edit { it[MEMBER_ID] = id.value }
         }
 
         private companion object {
