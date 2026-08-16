@@ -4,11 +4,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -21,15 +23,16 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
+import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Clock
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
  * Settings (US-40, US-41, US-42) — a drill-down reached from Train's header, the same shape
- * ADR-0030 gave Routines. Export and import are here; the unit/rest preference controls (US-42)
- * arrive in their own PR, per `roadmap.md`'s M3c.
+ * ADR-0030 gave Routines.
  */
 @Composable
 fun SettingsRoute(
@@ -56,6 +59,8 @@ fun SettingsRoute(
         onImportConfirmed = viewModel::onImportConfirmed,
         onImportCancelled = viewModel::onImportCancelled,
         onImportErrorDismissed = viewModel::onImportErrorDismissed,
+        onUnitChanged = viewModel::onUnitChanged,
+        onRestDefaultStepped = viewModel::onRestDefaultStepped,
         onBack = onBack,
         modifier = modifier,
     )
@@ -70,6 +75,8 @@ internal fun SettingsScreen(
     onImportConfirmed: () -> Unit = {},
     onImportCancelled: () -> Unit = {},
     onImportErrorDismissed: () -> Unit = {},
+    onUnitChanged: (WeightUnit) -> Unit = {},
+    onRestDefaultStepped: (Int) -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -83,45 +90,31 @@ internal fun SettingsScreen(
         ) {
             Text("Settings", style = MaterialTheme.typography.titleLarge)
 
-            Text(
-                text =
-                    "Export everything you've logged to a file you choose where to keep — " +
-                        "including a cloud-synced folder, if you want it off this device too.",
-                style = MaterialTheme.typography.bodyMedium,
+            UnitToggle(unit = state.unit, onUnitChanged = onUnitChanged)
+
+            StepperField(
+                label = "Default rest (seconds)",
+                value = state.restDefaultSeconds.toString(),
+                // Step-only: a rest default is a small, bounded number, so +/- covers the whole
+                // range US-05 needs. Typing is not wired to anything, the same as a read-only
+                // field would be, rather than adding a parse-and-validate path for a two-digit
+                // number nobody needs to type.
+                onValueChange = {},
+                onStep = onRestDefaultStepped,
             )
 
-            if (state.exportError != null) {
-                ErrorBanner(message = "Export failed: ${state.exportError}", onDismiss = onExportErrorDismissed)
-            }
-
-            PrimaryActionButton(
-                text = if (state.isExporting) "Exporting…" else "Export data",
-                onClick = onExportClick,
-                enabled = !state.isExporting,
+            ExportSection(
+                isExporting = state.isExporting,
+                exportError = state.exportError,
+                onExportClick = onExportClick,
+                onExportErrorDismissed = onExportErrorDismissed,
             )
 
-            Text(
-                text = "Import replaces everything on this device with what the file holds.",
-                style = MaterialTheme.typography.bodyMedium,
+            ImportSection(
+                state = state,
+                onImportClick = onImportClick,
+                onImportErrorDismissed = onImportErrorDismissed,
             )
-
-            if (state.importError != null) {
-                ErrorBanner(message = state.importError, onDismiss = onImportErrorDismissed)
-            }
-
-            PrimaryActionButton(
-                text = if (state.isPreviewingImport) "Reading file…" else "Import data",
-                onClick = onImportClick,
-                enabled = !state.hasActiveSession && !state.isPreviewingImport,
-            )
-
-            if (state.hasActiveSession) {
-                Text(
-                    text = "Finish or discard your current workout to import.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 
@@ -131,6 +124,85 @@ internal fun SettingsScreen(
             onConfirm = onImportConfirmed,
             onDismiss = onImportCancelled,
         )
+    }
+}
+
+@Composable
+private fun ExportSection(
+    isExporting: Boolean,
+    exportError: String?,
+    onExportClick: () -> Unit,
+    onExportErrorDismissed: () -> Unit,
+) {
+    Text(
+        text =
+            "Export everything you've logged to a file you choose where to keep — " +
+                "including a cloud-synced folder, if you want it off this device too.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+
+    if (exportError != null) {
+        ErrorBanner(message = "Export failed: $exportError", onDismiss = onExportErrorDismissed)
+    }
+
+    PrimaryActionButton(
+        text = if (isExporting) "Exporting…" else "Export data",
+        onClick = onExportClick,
+        enabled = !isExporting,
+    )
+}
+
+@Composable
+private fun ImportSection(
+    state: SettingsUiState,
+    onImportClick: () -> Unit,
+    onImportErrorDismissed: () -> Unit,
+) {
+    Text(
+        text = "Import replaces everything on this device with what the file holds.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+
+    if (state.importError != null) {
+        ErrorBanner(message = state.importError, onDismiss = onImportErrorDismissed)
+    }
+
+    PrimaryActionButton(
+        text = if (state.isPreviewingImport) "Reading file…" else "Import data",
+        onClick = onImportClick,
+        enabled = !state.hasActiveSession && !state.isPreviewingImport,
+    )
+
+    if (state.hasActiveSession) {
+        Text(
+            text = "Finish or discard your current workout to import.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** ADR-0008: kg/lb, applied at the presentation edge only — nothing stored ever changes. */
+@Composable
+private fun UnitToggle(
+    unit: WeightUnit,
+    onUnitChanged: (WeightUnit) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        Text("Weight unit", style = MaterialTheme.typography.titleSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+            WeightUnit.entries.forEach { candidate ->
+                FilterChip(
+                    selected = candidate == unit,
+                    onClick = { onUnitChanged(candidate) },
+                    label = { Text(candidate.name.lowercase()) },
+                    // ADR-0019: FilterChip reads CornerFull unless told otherwise (Shape.kt's
+                    // documented trap) — the same override Browse's own chips already need.
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                )
+            }
+        }
     }
 }
 

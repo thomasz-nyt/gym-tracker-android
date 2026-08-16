@@ -14,14 +14,19 @@ import com.gymtracker.core.domain.backup.ImportBackup
 import com.gymtracker.core.domain.backup.PreviewBackupImport
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.FakeSessionRepository
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -39,7 +44,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * US-40 (export) and US-41 (import) from Settings, and what the screen shows at each step.
+ * US-40 (export), US-41 (import) and US-42 (unit and rest-default preferences) from Settings.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
@@ -88,6 +93,8 @@ class SettingsViewModelTest {
         store: FakeBackupStore = FakeBackupStore(seed = mapOf(member to emptyContents)),
         decoder: BackupDecoder = BackupDecoder { incomingContents },
         fileReader: BackupFileReader = BackupFileReader { "raw" },
+        unitPreference: FakeUnitPreference = FakeUnitPreference(),
+        restTimerStore: FakeRestTimerStore = FakeRestTimerStore(),
     ) = SettingsViewModel(
         currentMember = currentMember,
         export =
@@ -101,6 +108,8 @@ class SettingsViewModelTest {
         previewImport = PreviewBackupImport(fileReader, decoder, catalog, sessions, store),
         importBackup = ImportBackup(sessions, catalog, store),
         sessions = sessions,
+        unitPreference = unitPreference,
+        restTimerStore = restTimerStore,
     )
 
     // --- Export (US-40) ---
@@ -255,6 +264,57 @@ class SettingsViewModelTest {
             assertNull(viewModel.uiState.value.importError)
         }
 
+    // --- Preferences (US-42) ---
+
+    @Test
+    fun `starts reading the member's current unit and rest default`() =
+        runTest {
+            val viewModel =
+                viewModel(
+                    unitPreference = FakeUnitPreference(initial = WeightUnit.KG),
+                    restTimerStore = FakeRestTimerStore(initial = Duration.ofSeconds(90)),
+                )
+
+            assertEquals(WeightUnit.KG, viewModel.uiState.value.unit)
+            assertEquals(90L, viewModel.uiState.value.restDefaultSeconds)
+        }
+
+    @Test
+    fun `changing the unit is reflected immediately`() =
+        runTest {
+            val unitPreference = FakeUnitPreference(initial = WeightUnit.LB)
+            val viewModel = viewModel(unitPreference = unitPreference)
+
+            viewModel.onUnitChanged(WeightUnit.KG)
+
+            assertEquals(WeightUnit.KG, viewModel.uiState.value.unit)
+            assertEquals(WeightUnit.KG, unitPreference.current())
+        }
+
+    @Test
+    fun `stepping the rest default moves by 5 seconds and never goes below 10`() =
+        runTest {
+            val restTimerStore = FakeRestTimerStore(initial = Duration.ofSeconds(60))
+            val viewModel = viewModel(restTimerStore = restTimerStore)
+
+            viewModel.onRestDefaultStepped(1)
+            assertEquals(65L, viewModel.uiState.value.restDefaultSeconds)
+
+            viewModel.onRestDefaultStepped(-1)
+            viewModel.onRestDefaultStepped(-1)
+            assertEquals(55L, viewModel.uiState.value.restDefaultSeconds)
+        }
+
+    @Test
+    fun `the rest default floor is 10 seconds, not zero or negative`() =
+        runTest {
+            val viewModel = viewModel(restTimerStore = FakeRestTimerStore(initial = Duration.ofSeconds(10)))
+
+            viewModel.onRestDefaultStepped(-1)
+
+            assertEquals(10L, viewModel.uiState.value.restDefaultSeconds)
+        }
+
     private class FakeEncoder : BackupEncoder {
         override fun encode(
             contents: BackupContents,
@@ -294,5 +354,43 @@ class SettingsViewModelTest {
         override fun observeRanked(forMember: UserId) = error("not needed for this test")
 
         override suspend fun knownExerciseIds(): Set<ExerciseId> = ids
+    }
+
+    private class FakeUnitPreference(
+        initial: WeightUnit = WeightUnit.LB,
+    ) : UnitPreference {
+        private val state = MutableStateFlow(initial)
+
+        override fun observe(): Flow<WeightUnit> = state
+
+        override suspend fun current(): WeightUnit = state.value
+
+        override suspend fun set(unit: WeightUnit) {
+            state.value = unit
+        }
+    }
+
+    private class FakeRestTimerStore(
+        initial: Duration = Duration.ofSeconds(60),
+    ) : RestTimerStore {
+        private val default = MutableStateFlow(initial)
+        private val endsAt = MutableStateFlow<Instant?>(null)
+        private val asked = MutableStateFlow(false)
+
+        override val restEndsAt: Flow<Instant?> = endsAt
+        override val defaultRest: Flow<Duration> = default
+        override val shouldAskForNotificationPermission: Flow<Boolean> = asked.map { !it }
+
+        override suspend fun setRestEndsAt(instant: Instant?) {
+            endsAt.value = instant
+        }
+
+        override suspend fun setDefaultRest(rest: Duration) {
+            default.value = rest
+        }
+
+        override suspend fun markNotificationPermissionAsked() {
+            asked.value = true
+        }
     }
 }
