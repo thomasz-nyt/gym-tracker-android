@@ -1,7 +1,9 @@
 package com.gymtracker.core.data.backup
 
 import com.gymtracker.core.domain.backup.BackupContents
+import com.gymtracker.core.domain.backup.BackupDecoder
 import com.gymtracker.core.domain.backup.BackupEncoder
+import com.gymtracker.core.domain.backup.UnsupportedBackupFormatException
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.MovementTarget
@@ -26,10 +28,10 @@ import javax.inject.Inject
  * Translates [BackupContents] to and from the JSON a backup file holds (US-40, US-41,
  * ADR-0034). Modeled on `CatalogSeeder`'s `BundledExercise` — a `@Serializable` DTO in
  * `:core:data` mapping to and from a domain type, the pattern this repo already uses for its
- * one other bundled-JSON format. Implements [BackupEncoder] so `:feature:settings` calls this
- * through the domain port and never needs to depend on `:core:data` directly — the same split
- * `RoomExerciseCatalog` follows for [com.gymtracker.core.domain.exercise.ExerciseCatalog].
- * `decode` has no domain-side interface yet; it arrives with US-41's import (PR2).
+ * one other bundled-JSON format. Implements [BackupEncoder] and [BackupDecoder] so
+ * `:feature:settings` calls this through the domain ports and never needs to depend on
+ * `:core:data` directly — the same split `RoomExerciseCatalog` follows for
+ * [com.gymtracker.core.domain.exercise.ExerciseCatalog].
  *
  * `TooManyFunctions` is suppressed for the same reason `SetDao` suppresses it: one pair of
  * encode/decode functions per row type is exactly one responsibility — converting
@@ -41,7 +43,8 @@ class BackupCodec
     @Inject
     constructor(
         private val json: Json,
-    ) : BackupEncoder {
+    ) : BackupEncoder,
+        BackupDecoder {
         /** [exportedAt] and [appVersion] are diagnostic envelope fields, never read back. */
         override fun encode(
             contents: BackupContents,
@@ -58,11 +61,7 @@ class BackupCodec
                 ),
             )
 
-        /**
-         * @throws UnsupportedBackupFormatException if [raw]'s `formatVersion` is newer than
-         *   [CURRENT_FORMAT_VERSION] — refused by name rather than read partially (US-41).
-         */
-        fun decode(raw: String): BackupContents {
+        override fun decode(raw: String): BackupContents {
             val envelope = json.decodeFromString(BackupEnvelopeDto.serializer(), raw)
             if (envelope.formatVersion > CURRENT_FORMAT_VERSION) {
                 throw UnsupportedBackupFormatException(envelope.formatVersion, CURRENT_FORMAT_VERSION)

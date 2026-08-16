@@ -36,6 +36,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     ksp(libs.androidx.room.compiler)
 
+    testImplementation(testFixtures(project(":core:domain")))
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.junit4)

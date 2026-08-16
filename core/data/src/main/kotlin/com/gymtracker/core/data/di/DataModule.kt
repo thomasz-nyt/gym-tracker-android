@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.gymtracker.core.data.backup.AndroidAppVersion
+import com.gymtracker.core.data.backup.AndroidBackupFileReader
 import com.gymtracker.core.data.backup.AndroidBackupFileWriter
 import com.gymtracker.core.data.backup.BackupCodec
 import com.gymtracker.core.data.backup.RoomBackupStore
@@ -30,11 +31,15 @@ import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.data.warmup.DataStoreWarmUpTimerStore
 import com.gymtracker.core.domain.backup.AppVersion
+import com.gymtracker.core.domain.backup.BackupDecoder
 import com.gymtracker.core.domain.backup.BackupEncoder
+import com.gymtracker.core.domain.backup.BackupFileReader
 import com.gymtracker.core.domain.backup.BackupFileWriter
 import com.gymtracker.core.domain.backup.BackupStore
 import com.gymtracker.core.domain.backup.ExportBackup
 import com.gymtracker.core.domain.backup.ExportBackupToFile
+import com.gymtracker.core.domain.backup.ImportBackup
+import com.gymtracker.core.domain.backup.PreviewBackupImport
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.member.CurrentMember
@@ -400,6 +405,22 @@ object DataModule {
         appVersion: AppVersion,
         clock: Clock,
     ): ExportBackupToFile = ExportBackupToFile(exportBackup, encoder, fileWriter, appVersion, clock)
+
+    @Provides
+    fun importBackup(
+        sessions: SessionRepository,
+        catalog: ExerciseCatalog,
+        store: BackupStore,
+    ): ImportBackup = ImportBackup(sessions, catalog, store)
+
+    @Provides
+    fun previewBackupImport(
+        fileReader: BackupFileReader,
+        decoder: BackupDecoder,
+        catalog: ExerciseCatalog,
+        sessions: SessionRepository,
+        store: BackupStore,
+    ): PreviewBackupImport = PreviewBackupImport(fileReader, decoder, catalog, sessions, store)
 }
 
 @Module
@@ -449,6 +470,12 @@ abstract class DataBindings {
 
     @Binds
     abstract fun backupFileWriter(impl: AndroidBackupFileWriter): BackupFileWriter
+
+    @Binds
+    abstract fun backupDecoder(impl: BackupCodec): BackupDecoder
+
+    @Binds
+    abstract fun backupFileReader(impl: AndroidBackupFileReader): BackupFileReader
 }
 
 private val Context.gymTrackerPreferences: DataStore<Preferences> by preferencesDataStore(name = "gym-tracker")

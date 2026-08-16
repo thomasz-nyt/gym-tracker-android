@@ -36,6 +36,13 @@ interface RoutineDao {
     /** Every routine the member has, in order (US-40, ADR-0034) — [observeRoutines] read once. */
     @Query("SELECT * FROM routines WHERE user_id = :userId ORDER BY position ASC")
     suspend fun allForUser(userId: String): List<RoutineEntity>
+
+    /** US-41's replace-all: `routine_items` cascades from this delete, same as `delete(id)` above. */
+    @Query("DELETE FROM routines WHERE user_id = :userId")
+    suspend fun deleteAllForUser(userId: String)
+
+    @Insert
+    suspend fun insertAll(routines: List<RoutineEntity>)
 }
 
 /** Queries over `routine_items` — a separate table, so a separate DAO. */
@@ -79,6 +86,9 @@ interface RoutineItemDao {
         """,
     )
     suspend fun allForUser(userId: String): List<RoutineItemEntity>
+
+    @Insert
+    suspend fun insertAll(items: List<RoutineItemEntity>)
 
     /**
      * Applies a whole reordering in one transaction.

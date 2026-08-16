@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.data.sessionexercise.SessionExerciseEntity
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -49,4 +50,17 @@ internal fun SetEntity.toDomain(): ExerciseSet =
         reps = reps,
         rpe = rpe,
         performedAt = Instant.ofEpochMilli(performedAt),
+    )
+
+internal fun ExerciseSet.toEntity(updatedAt: Instant = Instant.now()): SetEntity =
+    SetEntity(
+        id = id,
+        sessionExerciseId = sessionExerciseId.value,
+        setIndex = setIndex,
+        weightKg = weightKg,
+        reps = reps,
+        rpe = rpe,
+        performedAt = performedAt.toEpochMilli(),
+        updatedAt = updatedAt.toEpochMilli(),
+        syncState = SYNC_STATE_PENDING,
     )

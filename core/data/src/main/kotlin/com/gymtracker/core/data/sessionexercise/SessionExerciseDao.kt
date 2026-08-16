@@ -43,4 +43,7 @@ interface SessionExerciseDao {
         """,
     )
     suspend fun allForUser(userId: String): List<SessionExerciseEntity>
+
+    @Insert
+    suspend fun insertAll(sessionExercises: List<SessionExerciseEntity>)
 }

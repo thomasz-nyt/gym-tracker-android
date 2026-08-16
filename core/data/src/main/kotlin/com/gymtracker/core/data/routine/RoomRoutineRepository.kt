@@ -1,6 +1,5 @@
 package com.gymtracker.core.data.routine
 
-import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItem
@@ -25,18 +24,7 @@ class RoomRoutineRepository
         override suspend fun find(id: RoutineId): Routine? = dao.find(id.value)?.toDomain()
 
         override suspend fun add(routine: Routine) {
-            val now = Instant.now().toEpochMilli()
-            dao.insert(
-                RoutineEntity(
-                    id = routine.id.value,
-                    userId = routine.userId.value,
-                    name = routine.name,
-                    position = routine.position,
-                    createdAt = now,
-                    updatedAt = now,
-                    syncState = SYNC_STATE_PENDING,
-                ),
-            )
+            dao.insert(routine.toEntity())
         }
 
         override suspend fun rename(

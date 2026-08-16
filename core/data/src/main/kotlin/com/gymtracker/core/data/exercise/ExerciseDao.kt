@@ -48,6 +48,10 @@ interface ExerciseDao {
     @Query("SELECT COUNT(*) FROM exercises")
     suspend fun count(): Int
 
+    /** Every id the catalog has (US-41, ADR-0034) — what a backup's exercise refs are checked against. */
+    @Query("SELECT id FROM exercises")
+    suspend fun allIds(): List<String>
+
     @Insert
     suspend fun insertAll(exercises: List<ExerciseEntity>)
 }

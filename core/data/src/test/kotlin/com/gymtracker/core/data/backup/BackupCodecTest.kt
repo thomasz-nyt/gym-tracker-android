@@ -1,6 +1,7 @@
 package com.gymtracker.core.data.backup
 
 import com.gymtracker.core.domain.backup.BackupContents
+import com.gymtracker.core.domain.backup.UnsupportedBackupFormatException
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.MovementTarget

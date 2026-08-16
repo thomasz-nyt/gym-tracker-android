@@ -1,13 +1,11 @@
 package com.gymtracker.core.data.sessionexercise
 
-import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.Instant
 import javax.inject.Inject
 
 /** [SessionExerciseRepository] over Room. */
@@ -25,19 +23,7 @@ class RoomSessionExerciseRepository
         override suspend fun find(id: SessionExerciseId): SessionExercise? = dao.find(id.value)?.toDomain()
 
         override suspend fun add(sessionExercise: SessionExercise) {
-            dao.insert(
-                SessionExerciseEntity(
-                    id = sessionExercise.id.value,
-                    sessionId = sessionExercise.sessionId.value,
-                    exerciseId = sessionExercise.exerciseId.value,
-                    position = sessionExercise.position,
-                    updatedAt = Instant.now().toEpochMilli(),
-                    syncState = SYNC_STATE_PENDING,
-                    targetSets = sessionExercise.target?.sets,
-                    targetReps = sessionExercise.target?.reps,
-                    targetWeightKg = sessionExercise.target?.weightKg,
-                ),
-            )
+            dao.insert(sessionExercise.toEntity())
         }
 
         override suspend fun remove(id: SessionExerciseId) {
