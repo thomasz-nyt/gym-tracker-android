@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +21,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
@@ -55,10 +58,12 @@ fun SettingsRoute(
         state = state,
         onExportClick = { exportLauncher.launch(suggestedBackupFileName()) },
         onExportErrorDismissed = viewModel::onExportErrorDismissed,
+        onExportSuccessDismissed = viewModel::onExportSuccessDismissed,
         onImportClick = { importLauncher.launch(arrayOf("application/json")) },
         onImportConfirmed = viewModel::onImportConfirmed,
         onImportCancelled = viewModel::onImportCancelled,
         onImportErrorDismissed = viewModel::onImportErrorDismissed,
+        onImportSuccessDismissed = viewModel::onImportSuccessDismissed,
         onUnitChanged = viewModel::onUnitChanged,
         onRestDefaultStepped = viewModel::onRestDefaultStepped,
         onBack = onBack,
@@ -71,10 +76,12 @@ internal fun SettingsScreen(
     state: SettingsUiState,
     onExportClick: () -> Unit = {},
     onExportErrorDismissed: () -> Unit = {},
+    onExportSuccessDismissed: () -> Unit = {},
     onImportClick: () -> Unit = {},
     onImportConfirmed: () -> Unit = {},
     onImportCancelled: () -> Unit = {},
     onImportErrorDismissed: () -> Unit = {},
+    onImportSuccessDismissed: () -> Unit = {},
     onUnitChanged: (WeightUnit) -> Unit = {},
     onRestDefaultStepped: (Int) -> Unit = {},
     onBack: () -> Unit = {},
@@ -85,7 +92,19 @@ internal fun SettingsScreen(
         topBar = { DrillDownTopBar(onBack = onBack) },
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).padding(GymDimens.ScreenPadding).fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(padding)
+                    .padding(GymDimens.ScreenPadding)
+                    .fillMaxSize()
+                    // The only screen in the app whose content could otherwise outgrow its
+                    // viewport with no way to reach the rest — every other long screen either
+                    // weights a LazyColumn or scrolls. At 200% font scale, or on a short
+                    // emulator profile, "Import data" sat below the fold with nothing to pull
+                    // it into view. testing-strategy.md's own trap #1 (a node in the tree is
+                    // not a node on screen) applies here exactly as it did to the session
+                    // screen's LazyColumn.
+                    .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         ) {
             Text("Settings", style = MaterialTheme.typography.titleLarge)
@@ -106,14 +125,17 @@ internal fun SettingsScreen(
             ExportSection(
                 isExporting = state.isExporting,
                 exportError = state.exportError,
+                exportSucceeded = state.exportSucceeded,
                 onExportClick = onExportClick,
                 onExportErrorDismissed = onExportErrorDismissed,
+                onExportSuccessDismissed = onExportSuccessDismissed,
             )
 
             ImportSection(
                 state = state,
                 onImportClick = onImportClick,
                 onImportErrorDismissed = onImportErrorDismissed,
+                onImportSuccessDismissed = onImportSuccessDismissed,
             )
         }
     }
@@ -131,8 +153,10 @@ internal fun SettingsScreen(
 private fun ExportSection(
     isExporting: Boolean,
     exportError: String?,
+    exportSucceeded: Boolean,
     onExportClick: () -> Unit,
     onExportErrorDismissed: () -> Unit,
+    onExportSuccessDismissed: () -> Unit,
 ) {
     Text(
         text =
@@ -143,6 +167,15 @@ private fun ExportSection(
 
     if (exportError != null) {
         ErrorBanner(message = "Export failed: $exportError", onDismiss = onExportErrorDismissed)
+    }
+
+    // A write that silently succeeds looks, on screen, identical to one that silently did
+    // nothing — this is the only signal the member gets that their file actually landed.
+    if (exportSucceeded) {
+        SuccessBanner(
+            message = "Export complete. The file is where you chose to save it.",
+            onDismiss = onExportSuccessDismissed,
+        )
     }
 
     PrimaryActionButton(
@@ -157,6 +190,7 @@ private fun ImportSection(
     state: SettingsUiState,
     onImportClick: () -> Unit,
     onImportErrorDismissed: () -> Unit,
+    onImportSuccessDismissed: () -> Unit,
 ) {
     Text(
         text = "Import replaces everything on this device with what the file holds.",
@@ -165,6 +199,17 @@ private fun ImportSection(
 
     if (state.importError != null) {
         ErrorBanner(message = state.importError, onDismiss = onImportErrorDismissed)
+    }
+
+    // The member's entire database was just replaced — a dialog closing is not enough to say
+    // so. Reports the same counts the confirm dialog already showed them.
+    state.importSucceeded?.let { success ->
+        SuccessBanner(
+            message =
+                "Imported ${success.sessionCount} ${"workout".orPlural(success.sessionCount)} and " +
+                    "${success.routineCount} ${"routine".orPlural(success.routineCount)}.",
+            onDismiss = onImportSuccessDismissed,
+        )
     }
 
     PrimaryActionButton(
@@ -211,9 +256,44 @@ private fun ErrorBanner(
     message: String,
     onDismiss: () -> Unit,
 ) {
-    Surface(
+    DismissibleBanner(
+        message = message,
+        onDismiss = onDismiss,
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    )
+}
+
+/**
+ * ADR-0019 reserves red for the accent and for errors, so a success banner does not reach for
+ * green — there is none in this palette. `surfaceVariant` matches the informational-banner
+ * convention every other screen already uses (`RoutinesScreen`'s already-running notice,
+ * `RestPanel`'s warm-up strip, `HistoryScreen`'s and `SessionUndoBars`' undo bars) rather than
+ * inventing a fourth treatment for the same kind of message.
+ */
+@Composable
+private fun SuccessBanner(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    DismissibleBanner(
+        message = message,
+        onDismiss = onDismiss,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun DismissibleBanner(
+    message: String,
+    onDismiss: () -> Unit,
+    color: Color,
+    contentColor: Color,
+) {
+    Surface(
+        color = color,
+        contentColor = contentColor,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -242,8 +322,13 @@ private fun ImportConfirmDialog(
         onDismissRequest = onDismiss,
         title = { Text("Replace your data?") },
         text = {
+            // Found on device while verifying US-42's own defects: "Replace 1 workouts" —
+            // predates this change (US-41), but it sits in the exact same file and the exact
+            // same "count a noun" shape as the two banners above, so it's fixed alongside them
+            // rather than left as a known bug in code already being touched.
             Text(
-                "Replace ${preview.currentSessionCount} workouts and ${preview.currentRoutineCount} routines " +
+                "Replace ${preview.currentSessionCount} ${"workout".orPlural(preview.currentSessionCount)} " +
+                    "and ${preview.currentRoutineCount} ${"routine".orPlural(preview.currentRoutineCount)} " +
                     "on this device with ${preview.incomingSessionCount} and ${preview.incomingRoutineCount} " +
                     "from this file?",
             )
@@ -266,3 +351,8 @@ private fun suggestedBackupFileName(clock: Clock = Clock.systemDefaultZone()): S
     val date = LocalDate.now(clock).format(DateTimeFormatter.ISO_LOCAL_DATE)
     return "gym-tracker-$date.json"
 }
+
+// Same shape as GuidedExerciseScreen's own file-private orPlural — not shared, since Kotlin
+// gives no visibility narrower than internal for a top-level function across modules, and this
+// one exists to fix "Imported 1 workouts", not to open a cross-module pluralization utility.
+private fun String.orPlural(count: Int): String = if (count == 1) this else "${this}s"
