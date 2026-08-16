@@ -3,7 +3,6 @@ package com.gymtracker.core.designsystem.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
 import org.junit.Test
-import kotlin.math.pow
 import kotlin.test.assertTrue
 
 /**
@@ -84,7 +83,7 @@ class GymColorSchemeTest {
     fun `every rendered pair meets WCAG AA in both schemes`() {
         schemes.forEach { (name, scheme) ->
             scheme.renderedPairs().forEach { (role, pair) ->
-                val ratio = contrastRatio(pair.first, pair.second)
+                val ratio = WcagContrast.ratio(pair.first, pair.second)
                 assertTrue(
                     ratio >= WCAG_AA,
                     "$name $role is $ratio:1, below the ${WCAG_AA}:1 the ADR commits to",
@@ -181,7 +180,7 @@ class GymColorSchemeTest {
         // Comfortably above the ~1.3:1 that shipped, so this test fails the moment the value
         // regresses toward invisible again.
         schemes.forEach { (name, scheme) ->
-            val ratio = contrastRatio(scheme.outlineVariant, scheme.background)
+            val ratio = WcagContrast.ratio(scheme.outlineVariant, scheme.background)
             assertTrue(
                 ratio >= MINIMUM_DIVIDER_CONTRAST,
                 "$name outlineVariant is $ratio:1 against the ground, below the " +
@@ -202,25 +201,6 @@ class GymColorSchemeTest {
                 "$name error has hue $hue°, which is not red",
             )
         }
-    }
-
-    /** WCAG 2.x contrast ratio: (lighter + 0.05) / (darker + 0.05). */
-    private fun contrastRatio(
-        a: Color,
-        b: Color,
-    ): Double {
-        val la = relativeLuminance(a)
-        val lb = relativeLuminance(b)
-        return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)
-    }
-
-    /** WCAG relative luminance from sRGB channels — the spec formula, kept in the test. */
-    private fun relativeLuminance(color: Color): Double {
-        fun linear(channel: Float): Double {
-            val c = channel.toDouble()
-            return if (c <= 0.03928) c / 12.92 else ((c + 0.055) / 1.055).pow(2.4)
-        }
-        return 0.2126 * linear(color.red) + 0.7152 * linear(color.green) + 0.0722 * linear(color.blue)
     }
 
     /** HSV saturation: 0 is a pure grey, where hue means nothing. */

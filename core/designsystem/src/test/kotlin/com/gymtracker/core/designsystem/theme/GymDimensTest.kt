@@ -85,4 +85,14 @@ class GymDimensTest {
         assertEquals(72.dp, GymDimens.MinListRowHeight)
         assertTrue(GymDimens.MinListRowHeight >= GymDimens.MinTouchTarget)
     }
+
+    @Test
+    fun `US-43's mascot has a hero size on Train home and a larger-than-Thumbnail inline size`() {
+        assertEquals(140.dp, GymDimens.MascotHome)
+        assertEquals(88.dp, GymDimens.MascotInline)
+        // Deliberately bigger than a catalog thumbnail now: Rep shares his rows with a short
+        // label or a single-line name, not a photo grid, so there is headroom to spare.
+        assertTrue(GymDimens.MascotInline > GymDimens.Thumbnail)
+        assertTrue(GymDimens.MascotHome > GymDimens.MascotInline)
+    }
 }
