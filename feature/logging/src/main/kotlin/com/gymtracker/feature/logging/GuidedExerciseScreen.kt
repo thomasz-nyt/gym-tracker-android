@@ -9,12 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -327,16 +325,23 @@ private fun ExerciseSummary(
  * The dialog that starts the flow (US-05a).
  *
  * Separate from [SetEntryDialog] on purpose: "Add set" and "Save set" keep their exact
- * behaviour, so the two-tap path of US-03 cannot be changed from here (ADR-0017). Unchanged by
- * ADR-0033 — see that ADR's "what this does not touch" for why.
+ * behaviour, so the two-tap path of US-03 cannot be changed from here (ADR-0017). ADR-0033 left
+ * this dialog on Material defaults deliberately, naming the fix in advance in its own "what this
+ * ADR does not touch" section: "three `StepperField`s in the same dialog shape." This is that —
+ * weight, sets and reps all read through the same component the screen this dialog opens into
+ * already uses, so starting a walkthrough and correcting a set no longer disagree about how a
+ * number is entered.
  */
 @Composable
 internal fun GuidedSetupDialog(
     setup: GuidedSetup,
     unit: WeightUnit,
     onWeightChanged: (String) -> Unit,
+    onWeightStepped: (Int) -> Unit,
     onRepsChanged: (String) -> Unit,
+    onRepsStepped: (Int) -> Unit,
     onSetsChanged: (String) -> Unit,
+    onSetsStepped: (Int) -> Unit,
     onBegin: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -345,38 +350,39 @@ internal fun GuidedSetupDialog(
         title = { Text("Start ${setup.exerciseName}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-                OutlinedTextField(
+                StepperField(
+                    label = "Weight (${unit.name.lowercase()})",
                     value = setup.weight,
                     onValueChange = onWeightChanged,
-                    label = { Text("Weight (${unit.name.lowercase()})") },
-                    placeholder = { Text("Bodyweight") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    onStep = onWeightStepped,
+                    placeholder = "Bodyweight",
+                    // The other unit, live — the same convention set entry and the set editor
+                    // already use, so a value typed here reads the same way there does.
+                    supporting =
+                        setup.weight
+                            .trim()
+                            .toDoubleOrNull()
+                            ?.let { typed ->
+                                WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary
+                            },
+                    keyboardType = KeyboardType.Decimal,
                 )
-                setup.weight
-                    .trim()
-                    .toDoubleOrNull()
-                    ?.let { typed -> WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary }
-                    ?.let { other -> Text(other, style = MaterialTheme.typography.bodySmall) }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-                    OutlinedTextField(
-                        value = setup.sets,
-                        onValueChange = onSetsChanged,
-                        label = { Text("Sets") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = setup.reps,
-                        onValueChange = onRepsChanged,
-                        label = { Text("Reps") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                // Weight, Reps, Sets — the same field order the set-entry sheet uses
+                // (SetSheets.kt), rather than this dialog's own prior Sets-then-Reps.
+                StepperField(
+                    label = "Reps",
+                    value = setup.reps,
+                    onValueChange = onRepsChanged,
+                    onStep = onRepsStepped,
+                )
+
+                StepperField(
+                    label = "Sets",
+                    value = setup.sets,
+                    onValueChange = onSetsChanged,
+                    onStep = onSetsStepped,
+                )
             }
         },
         confirmButton = {
@@ -391,7 +397,11 @@ internal fun GuidedSetupDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            // The touch-target floor its sibling above already carries — missed the first time
+            // this dialog was built, caught auditing the same defect that motivated this pass.
+            TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Text("Cancel")
+            }
         },
     )
 }

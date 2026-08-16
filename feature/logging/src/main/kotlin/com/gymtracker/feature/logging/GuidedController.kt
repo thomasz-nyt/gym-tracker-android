@@ -9,6 +9,7 @@ import com.gymtracker.core.domain.set.SetInput
 import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightUnit
+import com.gymtracker.core.domain.units.weightIncrement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,7 +77,15 @@ data class GuidedState(
  * The one thing it does better than the manual path: ADR-0009 writes N sets sharing a single
  * `performed_at` — "the time they were recorded, not a guess at when each was performed".
  * Here each set is logged as it finishes, so each carries a real one.
+ *
+ * `TooManyFunctions` is suppressed for the same reason `SetDao` and `BackupCodec` suppress it:
+ * this class drives one exercise through guided mode start to finish, and the setup dialog's
+ * three steppers (weight, reps, sets — ADR-0033's own named follow-up) are that same one
+ * responsibility, not a second one. Splitting the setup-dialog methods into their own class
+ * would separate a form from the flow it starts, for no reader's benefit — [start] and [begin]
+ * already have to be read together.
  */
+@Suppress("TooManyFunctions")
 class GuidedController(
     /**
      * Writes one set and then starts the rest that follows it.
@@ -97,7 +106,7 @@ class GuidedController(
 
     val state: Flow<GuidedState> =
         combine(setup, planStore.plan, exercises, typedReps) { pending, plan, rows, typed ->
-            GuidedState(setup = pending, running = plan?.let { running(it, rows, typed) })
+            GuidedState(setup = pending, running = plan?.let { runningExercise(it, rows, typed, clock) })
         }
 
     /**
@@ -145,6 +154,45 @@ class GuidedController(
 
     fun dismissSetup() {
         setup.value = null
+    }
+
+    /**
+     * Steps the setup dialog's rep target by -1 or +1 (US-43 UI follow-up: the dialog gains the
+     * app's stepper, matching the rep count on the screen it opens).
+     *
+     * Separate from [stepReps]: that steps the count for the set about to be *finished*, once
+     * the flow is running; this steps the *pending target*, before [begin] has been called.
+     * They read and write different fields of [GuidedState] and must never be confused for one
+     * another — a no-op on a null [setup] rather than falling back to the running exercise is
+     * how that stays true structurally, not just by convention.
+     */
+    fun stepSetupReps(direction: Int) {
+        setup.value = setup.value?.let { current -> current.copy(reps = current.reps.stepWholeNumber(direction)) }
+    }
+
+    /** [stepSetupReps]'s counterpart for the setup dialog's set target. */
+    fun stepSetupSets(direction: Int) {
+        setup.value = setup.value?.let { current -> current.copy(sets = current.sets.stepWholeNumber(direction)) }
+    }
+
+    /**
+     * [stepSetupReps]'s counterpart for the setup dialog's weight — ADR-0033's own "what this
+     * ADR does not touch" section named all three fields as the follow-up, not just reps and
+     * sets. Same rule [SetEntryController.stepWeight] uses: one increment of the member's unit
+     * (2.5 kg / 5 lb), snapped rather than offset so a value entered in the other unit steps
+     * cleanly, floored at blank rather than zero (a bodyweight set, not a claim the bar weighs
+     * nothing — constitution §2).
+     */
+    fun stepSetupWeight(direction: Int) {
+        scope.launch {
+            val increment = unitPreference.current().weightIncrement()
+            setup.value =
+                setup.value?.let { current ->
+                    val from = current.weight.trim().toDoubleOrNull() ?: 0.0
+                    val stepped = snap(from, increment, direction)
+                    current.copy(weight = if (stepped <= 0.0) "" else trimNumber(stepped))
+                }
+        }
     }
 
     /** Begins the exercise. Nothing is written yet — the first set is written when it is done. */
@@ -248,31 +296,6 @@ class GuidedController(
         }
     }
 
-    private fun running(
-        plan: GuidedPlan,
-        rows: List<SessionExerciseRow>,
-        typed: String?,
-    ): GuidedRunning? {
-        val row = rows.firstOrNull { it.sessionExercise.id == plan.sessionExerciseId } ?: return null
-        val done = (row.sets.size - plan.setsAtStart).coerceAtLeast(0)
-        val logged = row.sets.takeLast(done)
-        val weighted = logged.mapNotNull { set -> set.weightKg?.let { it * set.reps } }
-
-        return GuidedRunning(
-            row = row,
-            exerciseName = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
-            weightKg = plan.weightKg,
-            targetSets = plan.targetSets,
-            targetReps = plan.targetReps,
-            setsDone = done,
-            reps = typed ?: plan.targetReps.toString(),
-            isComplete = done >= plan.targetSets,
-            volumeKg = if (weighted.isEmpty()) null else weighted.sum(),
-            elapsed = Duration.between(plan.startedAt, clock.instant()),
-            nextUp = rows.firstOrNull { it.sessionExercise.id != row.sessionExercise.id && it.sets.isEmpty() },
-        )
-    }
-
     private companion object {
         /**
          * A fixed walkthrough length (3 sets of 12), not read from history or a routine target.
@@ -284,4 +307,38 @@ class GuidedController(
         const val DEFAULT_TARGET_SETS = "3"
         const val DEFAULT_TARGET_REPS = "12"
     }
+}
+
+/**
+ * What [GuidedController] renders for a running exercise, computed fresh each time [combine]
+ * ticks. Top-level rather than a class member — it depends only on its own parameters, not on
+ * any of [GuidedController]'s private state — and moving it out was the difference between 13
+ * member functions (detekt's `TooManyFunctions` threshold) and 12 once the three new
+ * setup-dialog steppers (weight, reps, sets — ADR-0033's own named follow-up) landed alongside
+ * [GuidedController.changeReps] and [GuidedController.stepReps].
+ */
+private fun runningExercise(
+    plan: GuidedPlan,
+    rows: List<SessionExerciseRow>,
+    typed: String?,
+    clock: Clock,
+): GuidedRunning? {
+    val row = rows.firstOrNull { it.sessionExercise.id == plan.sessionExerciseId } ?: return null
+    val done = (row.sets.size - plan.setsAtStart).coerceAtLeast(0)
+    val logged = row.sets.takeLast(done)
+    val weighted = logged.mapNotNull { set -> set.weightKg?.let { it * set.reps } }
+
+    return GuidedRunning(
+        row = row,
+        exerciseName = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
+        weightKg = plan.weightKg,
+        targetSets = plan.targetSets,
+        targetReps = plan.targetReps,
+        setsDone = done,
+        reps = typed ?: plan.targetReps.toString(),
+        isComplete = done >= plan.targetSets,
+        volumeKg = if (weighted.isEmpty()) null else weighted.sum(),
+        elapsed = Duration.between(plan.startedAt, clock.instant()),
+        nextUp = rows.firstOrNull { it.sessionExercise.id != row.sessionExercise.id && it.sets.isEmpty() },
+    )
 }

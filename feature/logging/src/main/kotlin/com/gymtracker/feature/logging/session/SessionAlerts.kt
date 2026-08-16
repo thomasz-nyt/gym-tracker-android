@@ -35,8 +35,11 @@ internal fun SessionDialogs(
             setup = setup,
             unit = state.unit,
             onWeightChanged = guided.onWeightChanged,
+            onWeightStepped = guided.onSetupWeightStepped,
             onRepsChanged = guided.onSetupRepsChanged,
+            onRepsStepped = guided.onSetupRepsStepped,
             onSetsChanged = guided.onSetsChanged,
+            onSetsStepped = guided.onSetupSetsStepped,
             onBegin = guided.onBegin,
             onDismiss = guided.onDismissSetup,
         )
