@@ -4,9 +4,10 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M4**, with **M3c** running beside it. M0, M1, M3, M3a and M3b are
-complete; M2 is deliberately postponed so the offline core can be finished before accounts and
-sync arrive, and M3a, M3b and M3c were all taken ahead of M4 for the same reason.
+Current milestone: **M4**, with **M3c** and **M4a** running beside it. M0, M1, M3, M3a and M3b
+are complete; M2 is deliberately postponed so the offline core can be finished before accounts
+and sync arrive, and M3a, M3b, M3c and M4a were all taken ahead of their sequential position for
+reasons argued in each one's own section below.
 
 M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
 it was routines work that touched no table M4 reads, so running it beside M4 risked nothing
@@ -421,6 +422,43 @@ future screen cannot show "Exercise 3 of 6" for a freestyle session by forgettin
       claim) and rebuilds `feature/logging/.../session/` as a ruled sheet with the segment
       bar, "n of m done", and US-35's one-tap log button added beside `Add set`.
       `TwoTapSetLoggingTest` passes unedited. Closed 2026-08-12
+
+---
+
+## M4a — Rep, animated
+
+Stories: US-43. See `adr/0035-rep-appears-inside-the-app.md`.
+
+Added 2026-08-15, the same day as M3c and for a related reason: ADR-0026 (2026-08-09) named
+the mascot, built the launcher icon, and explicitly left "does Rep appear inside the app" open
+rather than decided by drift — "reopened properly rather than eroded one screen at a time." The
+maintainer has now asked for that reopening.
+
+**Taken ahead of M7 (where a mascot would otherwise file, as polish) for the reason M3b and M3c
+both were: it touches no table, no domain type, no migration, and no data M4 reads.** It is
+additive UI in `:core:designsystem` — one new composable, one new pure-Kotlin geometry model,
+two colour tokens outside `ColorScheme` — plus four call sites that each render an optional
+extra element. Sequencing protects nothing here that running it now would risk.
+
+- [ ] ADR-0035 and US-43 written **before** any code
+- [ ] `RepMascotGeometry`: the running pose, transcribed from the source SVG (viewBox
+      `0 0 200 210`) as pure Kotlin, unit-tested — the loop closes, the two legs are exact
+      mirror-phase copies of each other, the bob and band-tail rotation match the source
+      `keyTimes`/`values`
+- [ ] `RepMascot`: a `Canvas` composable driven by `rememberInfiniteTransition`, colours read
+      from `MaterialTheme` and `LocalMascotBand` so light/dark needs no separate asset
+- [ ] `MascotBandLight` (`#9C7100`) / `MascotBandDark` (`#D19A00`), gated ≥3:1 against every
+      surface Rep is drawn on by `MascotColorsTest`, never added to `ColorScheme`
+- [ ] Rep on Train home, the warm-up panel (running), exercise detail (beside the name, not the
+      empty photo slot), and the guided screen's `RestHero`/`ExerciseSummary` states only
+- [ ] Renders a static pose, not nothing, when `Settings.Global.ANIMATOR_DURATION_SCALE == 0`
+- [ ] `GymColorSchemeTest`, `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and
+      `GuidedFlowScreenTest` pass **unedited**
+- [ ] No new dependency
+
+**Exit:** Rep plays on all four surfaces in both light and dark mode, verified on device since
+there is no screenshot-diff gate to lean on (`testing-strategy.md`); with system animations off,
+he holds a pose instead of vanishing; the four unedited suites above stay green.
 
 ---
 
