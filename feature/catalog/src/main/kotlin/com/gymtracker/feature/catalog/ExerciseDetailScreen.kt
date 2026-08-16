@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +31,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.GymPhoto
+import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.YouTubeSearch
@@ -49,6 +51,10 @@ import com.gymtracker.core.domain.model.ExerciseId
  * The dead-end "Done" is gone (finding 06, ADR-0024), replaced by a real up affordance rather
  * than by nothing: the bottom bar is hidden on drill-downs, so removing the button left an edge
  * swipe as the only exit. See [DrillDownTopBar].
+ *
+ * US-43 / ADR-0035: `RepMascot` plays beside the exercise name — a brand mark, not a stand-in
+ * for [MovementPhoto]'s empty slot. That slot stays empty on purpose for the 866 of 873
+ * exercises with no bundled image (US-13's absence rule); Rep does not fill it.
  */
 @Composable
 fun ExerciseDetailRoute(
@@ -105,11 +111,18 @@ internal fun ExerciseDetailScreen(
                     .padding(bottom = DETAIL_PADDING),
             verticalArrangement = Arrangement.spacedBy(DETAIL_GAP),
         ) {
-            Text(
-                text = exercise.name,
-                style = MaterialTheme.typography.titleLarge,
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(DETAIL_GAP),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(top = DETAIL_PADDING),
-            )
+            ) {
+                Text(
+                    text = exercise.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                RepMascot(modifier = Modifier.size(GymDimens.MascotInline))
+            }
 
             MovementPhoto(exercise.imageAsset)
 

@@ -96,4 +96,26 @@ object GymDimens {
      * row rhythm.
      */
     val MinListRowHeight = 72.dp
+
+    /**
+     * `RepMascot` on Train home (US-43, ADR-0035): a hero size, not an inline mark — this is
+     * the one screen where Rep is the only thing in the frame. `NoSession`'s weighted middle
+     * band has room for this even on CI's 320x640 emulator (`testing-strategy.md`): the top
+     * button row and bottom action stack together claim well under half that height, and this
+     * shares the remainder with a single line of "next up" text, not competing with it for a
+     * fixed budget. It must still not push the action stack up (ADR-0016's bottom-weighting) —
+     * `NoSession`'s own weighted `Column` is what guarantees that, not this value.
+     */
+    val MascotHome = 140.dp
+
+    /**
+     * `RepMascot` next to other content — the warm-up panel, exercise detail, and the guided
+     * screen's rest/complete states. Bigger than [Thumbnail] on purpose, but capped below
+     * [MascotHome]: on the warm-up panel, Rep shares a `Row` with the "Done" button beside a
+     * `displayLarge` (104sp) countdown, and 104dp measured on device with not enough width left
+     * for "Done" to stay on one line. This token is shared by every inline placement, so a
+     * future call site with less room to spare (a longer countdown, a narrower phone) should
+     * re-check on device before raising it.
+     */
+    val MascotInline = 88.dp
 }

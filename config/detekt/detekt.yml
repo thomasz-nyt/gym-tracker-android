@@ -50,6 +50,14 @@ style:
       - '**/*.Spec.kt'
       - '**/*.Spek.kt'
       - '**/designsystem/theme/Color.kt'
+      # ADR-0035: the mascot's two golds, same shape as Color.kt above — hex literals bound to
+      # named vals, gated by MascotColorsTest's WCAG floor rather than by a naming convention.
+      - '**/designsystem/theme/MascotColors.kt'
+      # ADR-0035: Rep's running pose, transcribed point-for-point from the source SVG's own
+      # coordinates. Each Offset is already bound to a named val documenting which SVG element
+      # it came from; the numbers themselves are the source of truth RepMascotGeometryTest
+      # checks against, not values a name would clarify further.
+      - '**/designsystem/component/RepMascotGeometry.kt'
   UnusedPrivateMember:
     # @Preview composables are entry points for the IDE, never called from code. GymPreviews is
     # our multipreview wrapper around it (ADR-0016) — detekt matches the annotation written on

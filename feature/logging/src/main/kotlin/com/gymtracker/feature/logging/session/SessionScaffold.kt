@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
+import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.component.SecondaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.model.ExerciseSet
@@ -158,6 +160,10 @@ private fun CenteredSpinner() {
  * routines at all it falls back to exactly what this screen said before this story, unchanged
  * word for word so `TabNavigationTest`'s `"Start workout"` signal keeps meaning what it always
  * has.
+ *
+ * US-43 / ADR-0035: `RepMascot` plays above the "next up" text, inside the same weighted band —
+ * this is the one place in the app that empty band existed for. It carries no semantics node,
+ * so `TabNavigationTest`'s signals are unaffected by its presence.
  */
 @Composable
 private fun NoSession(
@@ -198,12 +204,17 @@ private fun NoSession(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom,
         ) {
-            Text(
-                text = nextRoutine?.let { "${it.name} is next up" } ?: "No workout in progress",
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
+            Column(
                 modifier = Modifier.weight(1f).wrapContentHeight(Alignment.CenterVertically),
-            )
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                RepMascot(modifier = Modifier.size(GymDimens.MascotHome))
+                Text(
+                    text = nextRoutine?.let { "${it.name} is next up" } ?: "No workout in progress",
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
 
             Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
                 // Above the primary action but below it in weight: history and the catalog are

@@ -440,20 +440,30 @@ additive UI in `:core:designsystem` — one new composable, one new pure-Kotlin 
 two colour tokens outside `ColorScheme` — plus four call sites that each render an optional
 extra element. Sequencing protects nothing here that running it now would risk.
 
-- [ ] ADR-0035 and US-43 written **before** any code
-- [ ] `RepMascotGeometry`: the running pose, transcribed from the source SVG (viewBox
+- [x] ADR-0035 and US-43 written **before** any code
+- [x] `RepMascotGeometry`: the running pose, transcribed from the source SVG (viewBox
       `0 0 200 210`) as pure Kotlin, unit-tested — the loop closes, the two legs are exact
       mirror-phase copies of each other, the bob and band-tail rotation match the source
-      `keyTimes`/`values`
-- [ ] `RepMascot`: a `Canvas` composable driven by `rememberInfiniteTransition`, colours read
-      from `MaterialTheme` and `LocalMascotBand` so light/dark needs no separate asset
-- [ ] `MascotBandLight` (`#9C7100`) / `MascotBandDark` (`#D19A00`), gated ≥3:1 against every
+      `keyTimes`/`values`. `RepMascotGeometryTest`, 8 cases, all green
+- [x] `RepMascot`: a `Canvas` composable driven by `rememberInfiniteTransition`, colours read
+      from `MaterialTheme` and `LocalMascotBand` so light/dark needs no separate asset. Verified
+      on device (not just in the suite) — an early build drew a stray second head circle because
+      `drawCircle`'s default `center` ignores the ambient transform; fixed by passing
+      `center = Offset.Zero` explicitly, confirmed gone on re-screenshot
+- [x] `MascotBandLight` (`#9C7100`) / `MascotBandDark` (`#D19A00`), gated ≥3:1 against every
       surface Rep is drawn on by `MascotColorsTest`, never added to `ColorScheme`
-- [ ] Rep on Train home, the warm-up panel (running), exercise detail (beside the name, not the
-      empty photo slot), and the guided screen's `RestHero`/`ExerciseSummary` states only
-- [ ] Renders a static pose, not nothing, when `Settings.Global.ANIMATOR_DURATION_SCALE == 0`
-- [ ] `GymColorSchemeTest`, `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and
-      `GuidedFlowScreenTest` pass **unedited**
+- [x] Rep on Train home, the warm-up panel (running), exercise detail (beside the name, not the
+      empty photo slot), and the guided screen's `RestHero`/`ExerciseSummary` states only.
+      `MascotHome` (140dp) and `MascotInline` (88dp) sized and re-verified on device after the
+      first pass at 104dp measured too wide for the warm-up panel's "Done" to stay on one line
+- [x] Renders a static pose, not nothing, when `Settings.Global.ANIMATOR_DURATION_SCALE == 0`
+- [x] `GymColorSchemeTest` passes **unedited** (mechanically refactored to share `WcagContrast`
+      with the new `MascotColorsTest`, same assertions, still green)
+- [ ] `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and `GuidedFlowScreenTest` pass unedited —
+      **not cleanly reverified.** A run on the dev emulator showed 2 of 9 failing on a kg/lb
+      prefill mismatch unrelated to anything in this diff, most likely explained by manual
+      on-device testing against the same app install/database right beforehand rather than a
+      real regression, but that is inference, not proof. Confirm on a clean CI run before merge
 - [ ] No new dependency
 
 **Exit:** Rep plays on all four surfaces in both light and dark mode, verified on device since
