@@ -34,6 +34,7 @@ import com.gymtracker.feature.progress.ExerciseProgressRoute
 import com.gymtracker.feature.progress.WeeklyVolumeRoute
 import com.gymtracker.feature.routines.RoutineEditorRoute
 import com.gymtracker.feature.routines.RoutinesRoute
+import com.gymtracker.feature.settings.SettingsRoute
 import kotlinx.serialization.Serializable
 
 /**
@@ -73,6 +74,10 @@ internal object Routines
 internal data class RoutineEditor(
     val routineId: String,
 )
+
+/** Export, import and the preference controls (US-40, US-41, US-42, M3c). A drill-down from Train's header. */
+@Serializable
+internal object Settings
 
 /**
  * One exercise's progress over time (US-16). A drill-down from its detail screen, and (US-33)
@@ -204,6 +209,8 @@ private fun GymTrackerNavGraph(
                 // Routines is a drill-down now (ADR-0030), reached only from here — a push,
                 // like RoutineEditor and Browse's picking mode above.
                 onOpenRoutines = { navController.navigate(Routines) },
+                // Settings (M3c) is the same shape: a push from Train's header, not a tab.
+                onOpenSettings = { navController.navigate(Settings) },
                 pickedExerciseIds = picked,
                 onPicksHandled = { entry.savedStateHandle[PICKED_EXERCISES] = ArrayList<String>() },
             )
@@ -219,6 +226,10 @@ private fun GymTrackerNavGraph(
                 // rather than a push, for the reason the Logging route's shortcuts document.
                 onWorkoutStarted = { navController.navigateToTab(TopLevelDestination.TRAIN) },
             )
+        }
+
+        composable<Settings> {
+            SettingsRoute(onBack = navController::popBackStack)
         }
 
         composable<RoutineEditor> { entry ->

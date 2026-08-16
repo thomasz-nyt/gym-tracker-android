@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":feature:logging"))
     implementation(project(":feature:progress"))
     implementation(project(":feature:routines"))
+    implementation(project(":feature:settings"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)

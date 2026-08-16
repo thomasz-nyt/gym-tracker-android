@@ -82,6 +82,7 @@ internal fun SessionBody(
     nextRoutine: Routine?,
     onStartFromRoutine: (RoutineId) -> Unit,
     onOpenRoutines: () -> Unit,
+    onOpenSettings: () -> Unit,
     warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
@@ -132,6 +133,7 @@ internal fun SessionBody(
                         nextRoutine = nextRoutine,
                         onStartFromRoutine = onStartFromRoutine,
                         onOpenRoutines = onOpenRoutines,
+                        onOpenSettings = onOpenSettings,
                     )
                 }
         }
@@ -149,12 +151,13 @@ private fun CenteredSpinner() {
  * Train home with no workout running (US-36, ADR-0030).
  *
  * `Routines` is reached only from here — one outlined button, top-right, on every state this
- * composable can be in, including the routine-less one below. Below it, the screen says which
- * routine is due next when it can honestly say one (the one gone longest without being done,
- * or never done at all) and offers `Start <name>` beside the unconditional `Freestyle` action;
- * with no routines at all it falls back to exactly what this screen said before this story,
- * unchanged word for word so `TabNavigationTest`'s `"Start workout"` signal keeps meaning what
- * it always has.
+ * composable can be in, including the routine-less one below. `Settings` (US-40 … US-42, M3c)
+ * joins it the same way, reached only from this row. Below them, the screen says which routine
+ * is due next when it can honestly say one (the one gone longest without being done, or never
+ * done at all) and offers `Start <name>` beside the unconditional `Freestyle` action; with no
+ * routines at all it falls back to exactly what this screen said before this story, unchanged
+ * word for word so `TabNavigationTest`'s `"Start workout"` signal keeps meaning what it always
+ * has.
  */
 @Composable
 private fun NoSession(
@@ -164,9 +167,20 @@ private fun NoSession(
     nextRoutine: Routine?,
     onStartFromRoutine: (RoutineId) -> Unit,
     onOpenRoutines: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap, Alignment.End),
+        ) {
+            OutlinedButton(
+                onClick = onOpenSettings,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Settings")
+            }
             OutlinedButton(
                 onClick = onOpenRoutines,
                 shape = MaterialTheme.shapes.large,
