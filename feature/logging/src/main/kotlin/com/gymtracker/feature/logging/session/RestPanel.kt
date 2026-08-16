@@ -1,9 +1,13 @@
 package com.gymtracker.feature.logging.session
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -16,6 +20,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.gymtracker.core.designsystem.component.GymDivider
@@ -114,12 +119,6 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
  * an absent one — as is a label promising a sound the phone never makes. Both arrive together
  * with the use case that backs them, rather than as chrome drawn ahead of its behaviour.
  *
- * The design's countdown progress bar needs the configured rest *duration*, not just what is
- * left — [SessionUiState][com.gymtracker.feature.logging.SessionUiState] does not carry that
- * today, and faking a fraction from [remaining] alone would draw a bar that resets to full every
- * time the countdown ticks. Left out rather than built wrong; the fix is threading
- * `RestTimerStore.defaultRest` through, not a layout change.
- *
  * **[justSetRecord] (US-18) adds a banner above the countdown, rather than replacing it** the
  * way `Redesign.dc.html`'s `2a PR moment` frame does — that frame drops the countdown to an
  * unfilled block so only one accent-filled surface is on screen, matching ADR-0029's "exactly
@@ -133,6 +132,7 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
 @Composable
 internal fun RestingBody(
     remaining: Duration,
+    total: Duration?,
     upNext: UpNextSet?,
     exerciseName: String?,
     progress: SessionProgress?,
@@ -157,7 +157,7 @@ internal fun RestingBody(
             )
         }
 
-        RestCountdownBanner(remaining = remaining, onSkipRest = onSkipRest)
+        RestCountdownBanner(remaining = remaining, total = total, onSkipRest = onSkipRest)
 
         if (upNext != null) {
             UpNext(
@@ -233,10 +233,20 @@ private fun PersonalRecordBanner(
     }
 }
 
-/** The accent-filled countdown block: eyebrow, the giant number, and `SKIP REST`. */
+/**
+ * The accent-filled countdown block: eyebrow, the giant number, the progress bar, and
+ * `SKIP REST`.
+ *
+ * [total] is nullable rather than required because it is a display refinement, not a
+ * precondition: a member on this exact screen the moment the app is upgraded has a rest already
+ * running with no total on record (US-42's `RestTimerStore` migration is additive, so an
+ * in-flight rest predates the field entirely). The countdown number itself never depended on it
+ * and still renders; only the bar is skipped, rather than drawing one against a guessed total.
+ */
 @Composable
 private fun RestCountdownBanner(
     remaining: Duration,
+    total: Duration?,
     onSkipRest: () -> Unit,
 ) {
     Surface(
@@ -257,6 +267,9 @@ private fun RestCountdownBanner(
                         contentDescription = "Rest ${remaining.asCountdown()} remaining"
                     },
             )
+            if (total != null) {
+                RestProgressBar(remaining = remaining, total = total)
+            }
             OutlinedButton(
                 onClick = onSkipRest,
                 shape = MaterialTheme.shapes.large,
@@ -268,6 +281,47 @@ private fun RestCountdownBanner(
         }
     }
 }
+
+/**
+ * How much rest is left, as a shrinking bar — the same track-and-fill shape
+ * `WeeklyVolumeScreen`'s `VolumeBar` already uses, adapted to the full-bleed accent surface this
+ * one sits on: [onPrimary][androidx.compose.material3.ColorScheme.onPrimary] at partial alpha
+ * for the track, full [onPrimary] for the fill, rather than `surfaceVariant`/`primary`, which
+ * would vanish against a background that is already `primary`.
+ *
+ * Carries no semantics: the countdown number immediately above already announces "Rest N
+ * remaining," and a bar repeating that as a percentage would be noise, not a second fact.
+ */
+@Composable
+private fun RestProgressBar(
+    remaining: Duration,
+    total: Duration,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(GymDimens.VolumeBarHeight)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = REST_BAR_TRACK_ALPHA))
+                .clearAndSetSemantics {},
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth(remaining.fractionOf(total))
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.onPrimary),
+        )
+    }
+}
+
+/** Never negative, never past full — a rest just started or one mid-tick beyond `total` alike. */
+private fun Duration.fractionOf(total: Duration): Float =
+    if (total.isZero || total.isNegative) {
+        0f
+    } else {
+        (seconds.toFloat() / total.seconds.toFloat()).coerceIn(0f, 1f)
+    }
 
 /**
  * What the next set will be, and what the same movement was last time (ADR-0023, ADR-0029).
@@ -369,3 +423,6 @@ private fun Duration.asCountdown(): String =
     "%d:%02d".format(seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
 
 private const val SECONDS_PER_MINUTE = 60
+
+/** Faint enough that the giant countdown number stays the loudest thing on the surface. */
+private const val REST_BAR_TRACK_ALPHA = 0.3f

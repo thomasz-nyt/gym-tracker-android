@@ -91,6 +91,61 @@ class RestTimerTest {
             assertEquals(now.plusSeconds(70), store.restEndsAt.first(), "restarted from the second set")
         }
 
+    // US-42's own promise: changing the default does not retime a rest already running. A
+    // progress bar needs a total to draw against, and reading defaultRest live would visibly
+    // break that promise — the bar's fraction would jump even though restEndsAt never moves.
+    // total() must stay pinned to whatever the default was when *this* rest started.
+
+    @Test
+    fun `the running rest's total is what the default was when it started`() =
+        runTest {
+            store.setDefaultRest(Duration.ofSeconds(90))
+
+            timer().start()
+
+            assertEquals(Duration.ofSeconds(90), timer().total().first())
+        }
+
+    @Test
+    fun `changing the default mid-rest does not change the running rest's total`() =
+        runTest {
+            timer().start()
+            assertEquals(Duration.ofSeconds(60), timer().total().first())
+
+            store.setDefaultRest(Duration.ofSeconds(120))
+
+            assertEquals(Duration.ofSeconds(60), timer().total().first(), "pinned at start, not read live")
+        }
+
+    @Test
+    fun `total is null when no rest is running`() =
+        runTest {
+            assertNull(timer().total().first())
+        }
+
+    @Test
+    fun `skipping clears the total along with the end time`() =
+        runTest {
+            val timer = timer()
+            timer.start()
+
+            timer.skip()
+
+            assertNull(timer.total().first())
+        }
+
+    @Test
+    fun `restarting from the second set replaces the total, not just the end time`() =
+        runTest {
+            store.setDefaultRest(Duration.ofSeconds(60))
+            timer().start()
+
+            store.setDefaultRest(Duration.ofSeconds(45))
+            timer(now.plusSeconds(10)).start()
+
+            assertEquals(Duration.ofSeconds(45), timer().total().first())
+        }
+
     @Test
     fun `the notification permission is asked once and remembered`() =
         runTest {
@@ -103,15 +158,26 @@ class RestTimerTest {
 
     private class FakeRestTimerStore : RestTimerStore {
         private val endsAt = MutableStateFlow<Instant?>(null)
+        private val total = MutableStateFlow<Duration?>(null)
         private val default = MutableStateFlow(Duration.ofSeconds(60))
         private val asked = MutableStateFlow(false)
 
         override val restEndsAt = endsAt
+        override val restTotal = total
         override val defaultRest = default
         override val shouldAskForNotificationPermission = asked.map { !it }
 
         override suspend fun setRestEndsAt(instant: Instant?) {
             endsAt.value = instant
+            if (instant == null) total.value = null
+        }
+
+        override suspend fun setRest(
+            endsAt: Instant,
+            total: Duration,
+        ) {
+            this.endsAt.value = endsAt
+            this.total.value = total
         }
 
         override suspend fun setDefaultRest(rest: Duration) {

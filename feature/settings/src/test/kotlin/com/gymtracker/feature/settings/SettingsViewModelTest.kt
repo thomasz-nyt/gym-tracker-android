@@ -375,14 +375,25 @@ class SettingsViewModelTest {
     ) : RestTimerStore {
         private val default = MutableStateFlow(initial)
         private val endsAt = MutableStateFlow<Instant?>(null)
+        private val total = MutableStateFlow<Duration?>(null)
         private val asked = MutableStateFlow(false)
 
         override val restEndsAt: Flow<Instant?> = endsAt
+        override val restTotal: Flow<Duration?> = total
         override val defaultRest: Flow<Duration> = default
         override val shouldAskForNotificationPermission: Flow<Boolean> = asked.map { !it }
 
         override suspend fun setRestEndsAt(instant: Instant?) {
             endsAt.value = instant
+            if (instant == null) total.value = null
+        }
+
+        override suspend fun setRest(
+            endsAt: Instant,
+            total: Duration,
+        ) {
+            this.endsAt.value = endsAt
+            this.total.value = total
         }
 
         override suspend fun setDefaultRest(rest: Duration) {

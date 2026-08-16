@@ -107,6 +107,7 @@ internal fun SessionBody(
                     exercises = state.exercises,
                     unit = state.unit,
                     restRemaining = state.restRemaining,
+                    restTotal = state.restTotal,
                     progress = state.progress,
                     openSessionExerciseId = state.openSessionExerciseId,
                     nextLoggableSet = state.nextLoggableSet,
@@ -249,6 +250,7 @@ private fun ActiveSession(
     exercises: List<SessionExerciseRow>,
     unit: WeightUnit,
     restRemaining: Duration?,
+    restTotal: Duration?,
     progress: SessionProgress?,
     openSessionExerciseId: SessionExerciseId?,
     nextLoggableSet: UpNextSet?,
@@ -281,6 +283,7 @@ private fun ActiveSession(
         if (restRemaining != null) {
             RestingBody(
                 remaining = restRemaining,
+                total = restTotal,
                 upNext = upNext,
                 exerciseName =
                     exercises

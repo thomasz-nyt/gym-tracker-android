@@ -89,4 +89,44 @@ class DataStoreRestTimerStoreTest {
 
             assertEquals(false, DataStoreRestTimerStore(shared).shouldAskForNotificationPermission.first())
         }
+
+    @Test
+    fun `no total is stored on a fresh install`() =
+        runTest {
+            assertNull(DataStoreRestTimerStore(store()).restTotal.first())
+        }
+
+    @Test
+    fun `setRest writes the end time and the total atomically, readable by a new instance`() =
+        runTest {
+            val shared = store()
+            DataStoreRestTimerStore(shared).setRest(endsAt, Duration.ofSeconds(90))
+
+            val reopened = DataStoreRestTimerStore(shared)
+            assertEquals(endsAt, reopened.restEndsAt.first())
+            assertEquals(Duration.ofSeconds(90), reopened.restTotal.first())
+        }
+
+    @Test
+    fun `clearing the rest through setRestEndsAt(null) also clears the total`() =
+        runTest {
+            val subject = DataStoreRestTimerStore(store())
+            subject.setRest(endsAt, Duration.ofSeconds(90))
+
+            subject.setRestEndsAt(null)
+
+            assertNull(subject.restTotal.first())
+        }
+
+    @Test
+    fun `changing the default afterwards does not change a total already stored`() =
+        runTest {
+            val shared = store()
+            val subject = DataStoreRestTimerStore(shared)
+            subject.setRest(endsAt, Duration.ofSeconds(60))
+
+            subject.setDefaultRest(Duration.ofSeconds(120))
+
+            assertEquals(Duration.ofSeconds(60), DataStoreRestTimerStore(shared).restTotal.first())
+        }
 }
