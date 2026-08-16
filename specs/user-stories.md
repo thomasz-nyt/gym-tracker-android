@@ -727,6 +727,31 @@ by a member still seeing "Go", a plain rep field and a "Finish set" button on Ma
 
 ---
 
+## M4a — Rep, animated
+
+### US-43 — Rep, animated, inside the app
+Added 2026-08-15. See `adr/0035-rep-appears-inside-the-app.md`. ADR-0026 named the mascot and
+built the launcher icon, and deliberately left "does Rep appear inside the app" open rather than
+decided by drift. This closes that question for the generic running figure; the seven
+machine-specific placards from the same drawing set are explicitly out of scope.
+
+- Rep, running, plays on Train home in the empty space above the start-workout actions, on the
+  warm-up panel while it is running, beside the exercise name on exercise detail, and on the
+  guided exercise screen's rest and complete states.
+- **Not** on the guided screen while a set is being logged (`MidSetHeader`, `GuidedControls`) —
+  constitution §2.1's two-tap path is untouched, and `TwoTapSetLoggingTest` /
+  `OneTapSetLoggingTest` / `GuidedFlowScreenTest` pass **unedited**.
+- **Not** in the exercise-detail photo slot. That slot stays empty for the 866 of 873 exercises
+  with no bundled image, per US-13's absence rule — Rep sits beside the name, never as a
+  stand-in for missing media.
+- With system animations off (`Settings.Global.ANIMATOR_DURATION_SCALE == 0`), Rep renders as a
+  still pose rather than nothing and rather than hanging.
+- Rep's sweatband reads correctly in both light and dark mode — measured, not eyeballed: at
+  least 3:1 against every surface it is drawn on, per ADR-0035.
+- `GymColorSchemeTest` passes unedited: the mascot's colours are never added to `ColorScheme`.
+
+---
+
 ## M5 — Health Connect (optional)
 
 ### US-20 — Availability

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -19,12 +20,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
+import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
@@ -144,6 +147,9 @@ private fun MidSetHeader(
  * No skip-rest control is drawn here — [GuidedControls]'s `Log set {n}` is already live
  * throughout the countdown (ADR-0023's rule, held structurally on this screen exactly as on the
  * session screen), so there is no action a skip button would unblock.
+ *
+ * US-43 / ADR-0035: `RepMascot` plays beside "Rest", drawn `monochrome` — gold-on-red measures
+ * nowhere near a usable contrast, so the band is dropped here rather than recoloured again.
  */
 @Composable
 private fun RestHero(
@@ -160,7 +166,14 @@ private fun RestHero(
             modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
             verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
         ) {
-            EyebrowLabel(text = "Rest", color = MaterialTheme.colorScheme.onPrimary)
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                EyebrowLabel(text = "Rest", color = MaterialTheme.colorScheme.onPrimary)
+                RepMascot(modifier = Modifier.size(GymDimens.MascotInline), monochrome = true)
+            }
             Text(
                 text = remaining.asMinutesSeconds(),
                 style = MaterialTheme.typography.displayLarge,
@@ -240,7 +253,12 @@ private fun GuidedControls(
     }
 }
 
-/** What the exercise came to, and what is next if anything is (US-05a). */
+/**
+ * What the exercise came to, and what is next if anything is (US-05a).
+ *
+ * US-43 / ADR-0035: `RepMascot` plays beside "Done" — the exercise is finished, so nothing here
+ * is a tap this competes with.
+ */
 @Composable
 private fun ExerciseSummary(
     running: GuidedRunning,
@@ -252,7 +270,14 @@ private fun ExerciseSummary(
         modifier = Modifier.padding(GymDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
     ) {
-        EyebrowLabel(text = "Done", color = MaterialTheme.colorScheme.primary)
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            EyebrowLabel(text = "Done", color = MaterialTheme.colorScheme.primary)
+            RepMascot(modifier = Modifier.size(GymDimens.MascotInline))
+        }
         Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
         HorizontalDivider(
             thickness = GymDimens.StructuralRuleThickness,

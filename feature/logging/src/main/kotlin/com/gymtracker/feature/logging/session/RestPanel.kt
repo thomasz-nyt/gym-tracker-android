@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,7 @@ import androidx.compose.ui.semantics.semantics
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
+import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
@@ -46,6 +48,9 @@ import java.util.Locale
  * What is deliberately absent: a weight field, a rep field, an exercise name, and any "save".
  * There is nothing to save. Stopping it discards it, which is why the control says "Done"
  * rather than anything that sounds like it writes a row.
+ *
+ * US-43 / ADR-0035: running, `RepMascot` plays beside "Done" — there is nothing to tap here but
+ * "Done" itself, so nothing is competing with it for attention the way a mid-set control would.
  */
 @Composable
 internal fun WarmUpPanel(warmUp: WarmUp) {
@@ -82,11 +87,17 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
                         },
                 )
             }
-            TextButton(
-                onClick = warmUp.onStop,
-                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Done")
+                RepMascot(modifier = Modifier.size(GymDimens.MascotInline))
+                TextButton(
+                    onClick = warmUp.onStop,
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                ) {
+                    Text("Done")
+                }
             }
         }
     }
