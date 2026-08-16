@@ -4,10 +4,15 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M4**, with **M3c** and **M4a** running beside it. M0, M1, M3, M3a and M3b
-are complete; M2 is deliberately postponed so the offline core can be finished before accounts
-and sync arrive, and M3a, M3b, M3c and M4a were all taken ahead of their sequential position for
-reasons argued in each one's own section below.
+M0, M1, M3, M3a, M3b, M3c, M4 and M4a are all complete as of 2026-08-16 — the last three closed
+in name only for a while, their checkboxes left unticked across the PRs that shipped them, until
+this entry reconciled the file against the code (see each section's own "Exit" note for what was
+verified and how). M2 is deliberately postponed so the offline core can be finished before
+accounts and sync arrive; M3a, M3b, M3c and M4a were all taken ahead of their sequential position
+for reasons argued in each one's own section below. Per the sequential rule at the top of this
+file, **M5 is next** — nothing in it has started. Redesign-audit follow-up work (below) continues
+alongside, on the same terms M3b and M3c ran alongside M4: it touches no table any milestone
+reads.
 
 M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
 it was routines work that touched no table M4 reads, so running it beside M4 risked nothing
@@ -51,7 +56,9 @@ Stories: US-01 … US-06b
 - [x] Seed the exercise catalog from bundled JSON (free-exercise-db, public domain)
 - [x] Start a session (US-01). Ending it is US-06.
 - [x] Add an exercise to a session
-- [x] Log a set: weight, reps (RPE in the domain; not yet in the UI)
+- [x] Log a set: weight, reps, RPE (RPE reached the UI later — set entry and the set editor
+      both carry it, e.g. `ActiveSessionRoute.kt`'s `onRpeChanged`; corrected 2026-08-16, the
+      parenthetical here had gone stale)
 - [x] Prefill from the last time this exercise was performed
 - [x] Edit and delete a set (US-04). One row per set, so any one is reachable (ADR-0022)
 - [x] Rest timer between sets
@@ -290,31 +297,42 @@ Constitution §5 and US-11 already promised an export. US-11 **stays at M2 and i
 renumbered**: it is written around an account you can delete, which does not exist yet, and it
 has no import in it. An export you cannot restore does not survive a reinstall.
 
-- [ ] ADR-0034, US-40/41/42, and the `data-model.md` and `tech-stack.md` notes written
+- [x] ADR-0034, US-40/41/42, and the `data-model.md` and `tech-stack.md` notes written
       **before** any code
-- [ ] US-40: export the five member tables plus three DataStore keys as domain-shaped JSON
+- [x] US-40: export the five member tables plus three DataStore keys as domain-shaped JSON
       under a versioned envelope, written through the Storage Access Framework. The catalog is
       excluded — it re-seeds from the APK with identical UUIDv5 ids, the same argument
       migrations v5 and v6 already make
-- [ ] US-41: import, replacing everything, inside one transaction. `ValidateBackup` is a pure
+- [x] US-41: import, replacing everything, inside one transaction. `ValidateBackup` is a pure
       function in `:core:domain` and runs to completion before a row is written, so a file that
       cannot be fully applied leaves the database untouched and names what is missing
-- [ ] US-41: import refused while a workout is running. `observeActive` drives the session
+- [x] US-41: import refused while a workout is running. `observeActive` drives the session
       screen and the guided flow's DataStore state points into `session_exercises`; a wipe
       mid-set is the one thing constitution §2.1 will not tolerate
-- [ ] US-42: a Settings screen, reached as a drill-down from Train's header rather than a
+- [x] US-42: a Settings screen, reached as a drill-down from Train's header rather than a
       fourth tab (US-36, ADR-0030), carrying export, import, the kg/lb toggle and the rest
       default — the last two closing controls US-05 and ADR-0008 have promised since M1 and
       never had
-- [ ] No new dependency. kotlinx.serialization is already in `:core:data` (`CatalogSeeder`),
+- [x] No new dependency. kotlinx.serialization is already in `:core:data` (`CatalogSeeder`),
       and SAF is `androidx.activity`'s `ActivityResultContracts`
 
-**Exit:** log a real session, export it, uninstall, reinstall, import — and every workout,
-routine, target and personal record is back, with the charts reading the restored history and
-the unit preference intact. Verified **on device**, not only in the suite: the member id lives
-in DataStore and dies with the install, so a restore that misses it produces a database no
-screen can see, and that failure looks exactly like an empty app. `TwoTapSetLoggingTest` and
-`OneTapSetLoggingTest` pass **unedited**.
+**Exit: met 2026-08-16.** These six boxes had gone unticked across PRs #50/#51/#52 — landed, but
+never reconciled against this file, against `CLAUDE.md`'s own definition of done. Ticked here
+rather than in the commit that shipped the last of them, since that is when the gap was noticed,
+not when it was introduced.
+
+Log a real session, export it, uninstall, reinstall, import — and every workout, routine,
+target and personal record is back, with the charts reading the restored history and the unit
+preference intact. Verified **on device**, not only in the suite, on `Medium_Phone_API_36.1`:
+logged a freestyle session (Barbell Bench Press, one bodyweight set), exported to
+`gym-tracker-2026-08-16.json` via the SAF picker, confirmed the envelope holds `memberId`, unit,
+rest default and all five tables, `adb uninstall`'d the app (the member id dies with the install,
+exactly the failure mode this exit criterion exists to catch), reinstalled, confirmed Train home
+read empty, imported the same file — the confirm dialog read the real counts ("Replace 0
+workouts and 0 routines on this device with 1 and 0 from this file?") — and confirmed the
+session reappeared on Progress with its exercise and set intact. `TwoTapSetLoggingTest` and
+`OneTapSetLoggingTest` pass **unedited**: the full instrumented suite (13 tests, 0 failures) ran
+twice from a cleared app on this same device.
 
 ---
 
@@ -459,12 +477,16 @@ extra element. Sequencing protects nothing here that running it now would risk.
 - [x] Renders a static pose, not nothing, when `Settings.Global.ANIMATOR_DURATION_SCALE == 0`
 - [x] `GymColorSchemeTest` passes **unedited** (mechanically refactored to share `WcagContrast`
       with the new `MascotColorsTest`, same assertions, still green)
-- [ ] `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and `GuidedFlowScreenTest` pass unedited —
-      **not cleanly reverified.** A run on the dev emulator showed 2 of 9 failing on a kg/lb
-      prefill mismatch unrelated to anything in this diff, most likely explained by manual
-      on-device testing against the same app install/database right beforehand rather than a
-      real regression, but that is inference, not proof. Confirm on a clean CI run before merge
-- [ ] No new dependency
+- [x] `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and `GuidedFlowScreenTest` pass unedited —
+      **reverified 2026-08-16.** The earlier note's "2 of 9 failing" was itself imprecise: those
+      three files hold 5 `@Test` methods, not 9 (the full `app/src/androidTest/` suite is 13
+      across 6 files). Ran the complete suite twice from a cleared app on
+      `Medium_Phone_API_36.1(AVD)`: **13/13 passing, 0 failed, 0 skipped**, both times. The
+      earlier kg/lb prefill failure did not reproduce; the inference that it was leftover state
+      from manual testing rather than a real regression holds
+- [x] No new dependency — confirmed: the file list for the three Rep commits
+      (`a3385c3`, `b151705`, `7640648`) contains zero build files. The only config change is two
+      justified `MagicNumber` exclusions in `config/detekt/detekt.yml`
 
 **Exit:** Rep plays on all four surfaces in both light and dark mode, verified on device since
 there is no screenshot-diff gate to lean on (`testing-strategy.md`); with system animations off,
@@ -708,13 +730,9 @@ there specifically. Two new `GuidedFlowTest` cases (with history, and with none 
 all); `GuidedFlowScreenTest` simplified, since the dialog no longer needs a manual
 bump past a 1-set default to reach the resting state it tests. All four gates green.
 
-**In progress:**
-
-- **Finish as a summary rather than a confirm dialog (US-31, at M4).** "Showing the work is a
-  better check than asking *are you sure*." The confirm dialog itself is kept — the maintainer
-  chose the lower-risk reading of that sentence over removing it outright — and what comes
-  after confirming is replaced with a summary, which is also the first place a PR (US-18) is
-  shown anywhere in the app.
+**In progress:** nothing, as of 2026-08-16. The one entry this heading used to carry — "Finish
+as a summary rather than a confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is
+already ticked `[x]` in M4 above; the heading itself had gone stale rather than the work.
 
 **Designed, not built, and needing a user story first:**
 
