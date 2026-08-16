@@ -4,13 +4,18 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-Current milestone: **M4**. M0, M1, M3, M3a and M3b are complete; M2 is deliberately postponed
-so the offline core can be finished before accounts and sync arrive, and M3a and M3b were both
-taken ahead of M4 for the same reason.
+Current milestone: **M4**, with **M3c** running beside it. M0, M1, M3, M3a and M3b are
+complete; M2 is deliberately postponed so the offline core can be finished before accounts and
+sync arrive, and M3a, M3b and M3c were all taken ahead of M4 for the same reason.
 
 M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
 it was routines work that touched no table M4 reads, so running it beside M4 risked nothing
 that sequencing would protect. Said out loud rather than left for someone to notice.
+
+M3c (2026-08-15) does the same thing on the same terms, and is worth naming for a different
+reason: it is the first milestone here driven by a cost the *development process* was paying
+rather than by a gap in the product. Reinstalling to test wiped real training data every time.
+That is not a feature request, which is exactly why it went unwritten for so long.
 
 What is left from the `Redesign.dc.html` audit is **not** all in M4, and is listed at the end
 of this file so it does not get lost between milestones.
@@ -262,6 +267,53 @@ say so.
 **Exit:** a session started from a routine shows that routine's name in History and the
 finish summary, a session started without one shows `Freestyle`, and renaming or deleting a
 routine afterward changes neither. `TwoTapSetLoggingTest` passes **unedited**.
+
+---
+
+## M3c — Backup and restore
+
+Stories: US-40, US-41, US-42. See `adr/0034-backup-is-a-file-you-own.md`.
+
+Added 2026-08-15, and it is the same kind of arrival as M3a and M3b: not new scope invented by
+the agent, but a cost the maintainer was paying every week. Uninstalling deletes the Room
+database **and** DataStore; the app is reinstalled several times a week to test on device and
+is also the real log for real training. Testing has been destroying training history.
+
+**Taken ahead of M2 for the reason M3 and M3a were:** none of it needs an account, a backend or
+a network. **Runs alongside M4** for the reason M3b did: M4 reads `sets` and draws charts, this
+reads every member table once and writes a file. The one place they could collide — a restored
+row changing a chart — is the point of the feature rather than a hazard, and is covered by the
+exit criterion below.
+
+Constitution §5 and US-11 already promised an export. US-11 **stays at M2 and is not
+renumbered**: it is written around an account you can delete, which does not exist yet, and it
+has no import in it. An export you cannot restore does not survive a reinstall.
+
+- [ ] ADR-0034, US-40/41/42, and the `data-model.md` and `tech-stack.md` notes written
+      **before** any code
+- [ ] US-40: export the five member tables plus three DataStore keys as domain-shaped JSON
+      under a versioned envelope, written through the Storage Access Framework. The catalog is
+      excluded — it re-seeds from the APK with identical UUIDv5 ids, the same argument
+      migrations v5 and v6 already make
+- [ ] US-41: import, replacing everything, inside one transaction. `ValidateBackup` is a pure
+      function in `:core:domain` and runs to completion before a row is written, so a file that
+      cannot be fully applied leaves the database untouched and names what is missing
+- [ ] US-41: import refused while a workout is running. `observeActive` drives the session
+      screen and the guided flow's DataStore state points into `session_exercises`; a wipe
+      mid-set is the one thing constitution §2.1 will not tolerate
+- [ ] US-42: a Settings screen, reached as a drill-down from Train's header rather than a
+      fourth tab (US-36, ADR-0030), carrying export, import, the kg/lb toggle and the rest
+      default — the last two closing controls US-05 and ADR-0008 have promised since M1 and
+      never had
+- [ ] No new dependency. kotlinx.serialization is already in `:core:data` (`CatalogSeeder`),
+      and SAF is `androidx.activity`'s `ActivityResultContracts`
+
+**Exit:** log a real session, export it, uninstall, reinstall, import — and every workout,
+routine, target and personal record is back, with the charts reading the restored history and
+the unit preference intact. Verified **on device**, not only in the suite: the member id lives
+in DataStore and dies with the install, so a restore that misses it produces a database no
+screen can see, and that failure looks exactly like an empty app. `TwoTapSetLoggingTest` and
+`OneTapSetLoggingTest` pass **unedited**.
 
 ---
 

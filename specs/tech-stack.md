@@ -27,6 +27,7 @@ hard part and are native on both sides anyway).
 | Health | `androidx.health.connect:connect-client` | Optional module — see below |
 | Nav | Navigation Compose, type-safe routes | |
 | Serialization | kotlinx.serialization | |
+| Backup file I/O | Storage Access Framework, via `androidx.activity`'s `ActivityResultContracts` | ADR-0034. **Not a new dependency** — already present. The user picks the destination in the system picker, so a cloud-synced folder is their choice and the app gains no cloud dependency, no permission, and no `WRITE_EXTERNAL_STORAGE` |
 | Build | Gradle KTS, version catalog (`libs.versions.toml`) | Convention plugins in `build-logic/` |
 | Lint | ktlint + detekt | Failing lint fails CI |
 | Debug signing | `debug.keystore`, checked in | So CI and local builds install over each other. Not a secret: it cannot sign a release |
@@ -53,9 +54,15 @@ hard part and are native on both sides anyway).
 :feature:logging         Session + set logging (the core loop)
 :feature:catalog         Exercise catalog + media
 :feature:progress        Charts and PRs
+:feature:routines        Routines and their targets (US-29, US-30)
+:feature:settings        Settings, backup and restore (US-40 … US-42)
 :feature:health          Health Connect. OPTIONAL — see below
 :feature:coach           AI coaching
 ```
+
+**Corrected 2026-08-15:** `:feature:routines` had been missing from this list since M3a
+shipped it. Added here rather than silently, alongside `:feature:settings`, so the list is
+worth trusting — `settings.gradle.kts` is the source of truth and the two had drifted.
 
 `:core:domain` must compile without the Android plugin. This is enforced by a CI
 check and is the single most important structural rule in the project: it is what

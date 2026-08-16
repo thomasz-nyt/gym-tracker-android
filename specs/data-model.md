@@ -271,6 +271,45 @@ seeds identical ids, and the same script seeds the Supabase global catalog at
 M2, so `sets.exercise_id` needs no remapping at first sync. Household-created
 exercises (M3) still use `gen_random_uuid()`.
 
+### What travels in a backup
+
+US-40 and US-41 (schema-neutral, M3c, ADR-0034). A backup file carries **five tables and
+three DataStore keys**, and the exclusions are as deliberate as the inclusions.
+
+```
+sessions              session_exercises      sets
+routines              routine_items
+
+local_member_id       weight_unit            default_rest_seconds
+```
+
+**`exercises` is not in it.** The catalog is derived data with deterministic ids — the section
+directly above is the whole reason — so it re-seeds from the bundled asset on a fresh install
+and `session_exercises.exercise_id` resolves without anything being restored. This is the same
+argument migrations v4→v5 and v5→v6 already make when they wipe and re-seed the table outright.
+The cost is stated rather than hidden: if a future catalog revision ever removes an id, an
+older backup referencing it cannot be restored, and `routine_items.exercise_id` is a real
+foreign key that will say so. Import validates every referenced id up front and refuses the
+whole file rather than dropping the affected workouts.
+
+**`local_member_id` is in it because a restore is worthless without it.** Uninstalling clears
+DataStore, so a reinstall generates a new member UUID — and `sessions`, `routines` and both
+`SetDao` prefill queries all filter on `user_id`. Rows restored under a dead id are invisible
+to every screen, and the app looks exactly as empty as it did before the import. Import writes
+the id back rather than rewriting the rows, which keeps export → import an identity function.
+This is consistent with *§ Identity before M2* above: the id names the member, not the install,
+which is why one UPDATE can re-assign it to a Supabase user at sign-in.
+
+**`updated_at` and `sync_state` are not in it.** Both are M2 bookkeeping — `sync_state` is
+written `PENDING` at every call site and read by nothing — so a backup records neither, and
+import re-derives them exactly as every other write path does. Restored rows are `PENDING`,
+which is also the correct state for them once sync exists.
+
+**The in-flight DataStore keys are not in it:** `rest_ends_at`, `warm_up_started_at`, the six
+`guided_*` keys, and `notification_permission_asked`. Per ADR-0005 those exist precisely
+because they describe *this device or this install*; a rest countdown restored into a different
+install would be describing a rest that nobody is taking.
+
 ## Postgres (Supabase)
 
 ```sql
