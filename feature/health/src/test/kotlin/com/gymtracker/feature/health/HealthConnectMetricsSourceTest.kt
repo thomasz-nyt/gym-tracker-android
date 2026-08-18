@@ -6,16 +6,22 @@ import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.model.SessionMetrics
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * The `specs/health-connect.md` test matrix that does not need a device or Robolectric: every
- * branch of [HealthConnectMetricsSource] is a pure function of [FakeHealthConnectGateway],
- * which touches neither the real SDK nor `HealthIntegration` — see [HealthStatus]'s class doc for
- * why the toggle is deliberately not one of this class's inputs.
+ * The `specs/health-connect.md` test matrix that does not need a device: every branch of
+ * [HealthConnectMetricsSource] is a pure function of [FakeHealthConnectGateway], which touches
+ * neither the real SDK nor `HealthIntegration` — see [HealthStatus]'s class doc for why the
+ * toggle is deliberately not one of this class's inputs.
+ *
+ * Runs under Robolectric only because the fault-injection case exercises a real
+ * `android.util.Log.w()` call — every other case here is plain JVM logic.
  */
+@RunWith(RobolectricTestRunner::class)
 class HealthConnectMetricsSourceTest {
     private val window = Instant.parse("2026-08-19T18:00:00Z")..Instant.parse("2026-08-19T19:00:00Z")
 
@@ -146,6 +152,22 @@ class HealthConnectMetricsSourceTest {
             assertEquals(window, gateway.lastHeartRateWindow)
         }
 
+    @Test
+    fun `a real SDK failure degrades to null rather than propagating`() =
+        runTest {
+            // Caught live on device (API 36): a real HealthConnectException can come out of
+            // readRecords for reasons this class has no control over — this is an enhancement
+            // layer (constitution §3), so a read that fails must never surface as a crash or a
+            // written-but-wrong result.
+            val gateway =
+                FaultyHealthConnectGateway(
+                    granted = setOf(HealthPermission.HEART_RATE.id),
+                    failure = IllegalStateException("Incorrect health permission state"),
+                )
+
+            assertNull(source(gateway).metricsFor(window))
+        }
+
     private fun ready(
         granted: Set<String>,
         heartRateBpm: List<Long> = emptyList(),
@@ -159,7 +181,7 @@ class HealthConnectMetricsSourceTest {
         exerciseWindow = exerciseWindow,
     )
 
-    private fun source(gateway: FakeHealthConnectGateway) = HealthConnectMetricsSource(gateway)
+    private fun source(gateway: HealthConnectGateway) = HealthConnectMetricsSource(gateway)
 }
 
 private class FakeHealthConnectGateway(
@@ -187,4 +209,20 @@ private class FakeHealthConnectGateway(
     override suspend fun activeCaloriesKcal(window: ClosedRange<Instant>): List<Double> = activeCaloriesKcal
 
     override suspend fun exerciseSessionWindow(window: ClosedRange<Instant>): ClosedRange<Instant>? = exerciseWindow
+}
+
+/** SDK available and Ready, but every read throws — the real failure mode found on device. */
+private class FaultyHealthConnectGateway(
+    private val granted: Set<String>,
+    private val failure: Throwable,
+) : HealthConnectGateway {
+    override fun sdkStatus(): Int = HealthConnectClient.SDK_AVAILABLE
+
+    override suspend fun grantedPermissions(): Set<String> = granted
+
+    override suspend fun heartRateBpm(window: ClosedRange<Instant>): List<Long> = throw failure
+
+    override suspend fun activeCaloriesKcal(window: ClosedRange<Instant>): List<Double> = throw failure
+
+    override suspend fun exerciseSessionWindow(window: ClosedRange<Instant>): ClosedRange<Instant>? = throw failure
 }

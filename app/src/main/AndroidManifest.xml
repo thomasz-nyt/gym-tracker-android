@@ -45,6 +45,29 @@
             </intent-filter>
         </activity>
 
+        <!--
+          US-22: without this, Health Connect refuses every read outright — found live on
+          device (API 36) as `IllegalStateException: Incorrect health permission state,
+          likely because the calling application's manifest does not specify handling
+          android.intent.action.VIEW_PERMISSION_USAGE with
+          android.intent.category.HEALTH_PERMISSIONS`. Both intent filters point at the same
+          activity: VIEW_PERMISSION_USAGE is what the Android 14+ platform module launches
+          from its own permissions screen; SHOW_PERMISSIONS_RATIONALE is the pre-14
+          Health Connect app's equivalent.
+        -->
+        <activity
+            android:name="com.gymtracker.app.HealthPermissionsRationaleActivity"
+            android:exported="true"
+            android:theme="@style/Theme.GymTracker">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
     </application>
 
 </manifest>

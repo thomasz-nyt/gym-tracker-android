@@ -1,10 +1,12 @@
 package com.gymtracker.feature.health
 
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.model.SessionMetrics
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -47,10 +49,36 @@ class HealthConnectMetricsSource
          * permission, if granted, narrows the window the other two run over to the actual
          * recorded session rather than the app's own start/end, which can run a little wide of
          * what a wearable considered "the workout."
+         *
+         * The whole read is wrapped: a real `HealthConnectException` reached this on-device
+         * (API 36, `IllegalStateException: Incorrect health permission state...` — the platform
+         * requires a `VIEW_PERMISSION_USAGE`/`HEALTH_PERMISSIONS` manifest declaration before it
+         * will serve reads at all) and, uncaught, crashed the app from inside a `viewModelScope`
+         * coroutine. This is an enhancement layer (constitution §3) — a failed read must degrade
+         * to "nothing recorded," the same as never having read at all, never a crash and never a
+         * half-written result.
          */
+        @Suppress("TooGenericExceptionCaught")
+        // Deliberately broad: the real SDK's failure modes are not fully known to this class
+        // (a HealthConnectException, wrapped as an IllegalStateException, was the one caught on
+        // device — see the class doc), and every one of them must degrade the same way. Logged,
+        // not swallowed silently, so a real failure is still visible to whoever reads logs.
         override suspend fun metricsFor(window: ClosedRange<Instant>): SessionMetrics? {
             if (status() != HealthStatus.Ready) return null
 
+            return try {
+                read(window)
+            } catch (cancelled: CancellationException) {
+                // Structured concurrency's own signal, not a health-read failure — must
+                // propagate, not degrade to null the way a real SDK error does below.
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.w(TAG, "Health Connect read failed; recording nothing for this session", failure)
+                null
+            }
+        }
+
+        private suspend fun read(window: ClosedRange<Instant>): SessionMetrics {
             val granted = gateway.grantedPermissions()
             val refined =
                 if (HealthPermission.EXERCISE.id in granted) {
@@ -74,5 +102,6 @@ class HealthConnectMetricsSource
 
         private companion object {
             const val SOURCE = "health_connect"
+            const val TAG = "HealthConnectMetrics"
         }
     }
