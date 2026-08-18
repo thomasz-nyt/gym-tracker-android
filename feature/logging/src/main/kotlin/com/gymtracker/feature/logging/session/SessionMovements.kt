@@ -29,10 +29,13 @@ import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.rest.UpNextSet
+import com.gymtracker.core.domain.session.SetIntervals
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.feature.logging.SessionExerciseRow
+import com.gymtracker.feature.logging.asMinutesSeconds
+import java.time.Duration
 
 /**
  * The plan, live (ADR-0029): the open movement with its set rows, and everything still to come
@@ -48,9 +51,16 @@ import com.gymtracker.feature.logging.SessionExerciseRow
  * for the header's "n of m done" and wrong for this: the moment the open movement's first set
  * is logged, `current` would jump to the *next* movement (or null), and the movement someone is
  * mid-set on — two of three sets done — would have nowhere to render. See
- * `ActiveSessionViewModel`'s computation of [openSessionExerciseId] for the actual rule.
- * "Still to come" reads plan order back out of [exercises] itself (`sessionExercise.position`)
- * rather than needing a second, separately-ordered list passed in.
+ * `ActiveSessionViewModel`'s computation of [openSessionExerciseId] for the actual rule,
+ * including US-45/ADR-0037's explicit, sticky override for when the machine was taken and a
+ * member switches back to an earlier exercise.
+ *
+ * **"Other exercises" (US-45) is every exercise but the open one, in plan order — earlier or
+ * later, touched or not.** It used to be `position > currentRow.position` only, which is
+ * exactly the bug ADR-0037 fixes: log a set on exercise 3 and exercises 1–2 had no row, no
+ * button, nothing to tap for the rest of the session. Reads plan order back out of [exercises]
+ * itself (`sessionExercise.position`) rather than needing a second, separately-ordered list
+ * passed in.
  *
  * "Start exercise" (US-05a) and "Remove" (US-02c) are not in the design's frames — the mockup
  * does not show every control the app already has to keep. They stay, as a quiet text row under
@@ -79,10 +89,15 @@ internal fun SessionPlan(
     onStartExercise: (SessionExerciseRow) -> Unit,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
+    onSelectExercise: (SessionExerciseId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val planOrder = exercises.sortedBy { it.sessionExercise.position }
     val currentRow = planOrder.firstOrNull { it.sessionExercise.id == openSessionExerciseId }
+    // US-44: every set in the session, not just the open movement's own — intervals
+    // deliberately span movements, so the first set of a freshly-opened exercise still reads
+    // the walk from whatever was logged last.
+    val intervals = SetIntervals.of(exercises.flatMap { it.sets })
 
     LazyColumn(modifier = modifier) {
         if (currentRow != null) {
@@ -92,6 +107,7 @@ internal fun SessionPlan(
                     exerciseNumber = currentRow.sessionExercise.position,
                     movementsTotal = planOrder.size,
                     unit = unit,
+                    intervals = intervals,
                     onRemoveExercise = onRemoveExercise,
                     onStartExercise = onStartExercise,
                     onEditSet = onEditSet,
@@ -99,16 +115,16 @@ internal fun SessionPlan(
             }
         }
 
-        val stillToCome =
+        val otherExercises =
             if (currentRow == null) {
                 emptyList()
             } else {
-                planOrder.filter { it.sessionExercise.position > currentRow.sessionExercise.position }
+                planOrder.filter { it.sessionExercise.id != currentRow.sessionExercise.id }
             }
-        if (stillToCome.isNotEmpty()) {
-            item(key = "still-to-come-label") {
+        if (otherExercises.isNotEmpty()) {
+            item(key = "other-exercises-label") {
                 EyebrowLabel(
-                    text = "Still to come",
+                    text = "Other exercises",
                     // Deliberately muted, not accent — the redesign audit's finding 07 flagged
                     // exactly this shape (a label the same colour as a link) reading as tappable
                     // when it is not.
@@ -116,15 +132,18 @@ internal fun SessionPlan(
                     modifier = Modifier.padding(top = GymDimens.Gap, bottom = GymDimens.TightGap),
                 )
             }
-            items(stillToCome, key = { "queue-${it.sessionExercise.id.value}" }) { row ->
+            items(otherExercises, key = { "queue-${it.sessionExercise.id.value}" }) { row ->
                 StillToComeRow(
                     index = row.sessionExercise.position,
                     name = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
                     target = row.sessionExercise.target,
+                    setsLogged = row.sets.size,
                     unit = unit,
-                    // Out-of-order logging already exists (US-02): tapping ahead opens the same
-                    // sheet "Add set" would, for the movement tapped rather than the current one.
-                    onClick = { onAddSet(row) },
+                    // US-45 (ADR-0037): tapping opens the row fully — its own set list, target,
+                    // and one-tap log button — rather than firing "Add set" blind the way this
+                    // used to for a future exercise. The sheet is still one tap away from the
+                    // now-open row's own log bar, unchanged.
+                    onClick = { onSelectExercise(row.sessionExercise.id) },
                 )
             }
         }
@@ -213,6 +232,7 @@ private fun CurrentMovement(
     exerciseNumber: Int,
     movementsTotal: Int,
     unit: WeightUnit,
+    intervals: Map<String, Duration>,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
@@ -260,7 +280,26 @@ private fun CurrentMovement(
             }
         }
 
-        LoggedSets(row.sets, unit) { set -> onEditSet(row, set) }
+        // US-44 (`Redesign.dc.html` 3g): absent, not zero, until there are at least two sets to
+        // pace between — SetIntervals.average already returns null for exactly that case.
+        SetIntervals.average(row.sets, intervals)?.let { average ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = GymDimens.HairGap),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "${row.sets.size} ${if (row.sets.size == 1) "set" else "sets"} logged",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                NumeralText(
+                    text = "avg ${average.asMinutesSeconds()} between",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
+        LoggedSets(row.sets, unit, intervals) { set -> onEditSet(row, set) }
     }
 }
 
@@ -269,11 +308,18 @@ private fun CurrentMovement(
  * own tap target (ADR-0022) — ruled rows, not a collapsed line (ADR-0009 already explained why:
  * one line for three sets was unreadable to correct). Every row runs through [NumeralText] so
  * its numbers carry the weight ADR-0019 asks for.
+ *
+ * **The trailing slot carries the set-to-set interval, not a checkmark (US-44, ADR-0036).** A
+ * row already showing a real weight × reps number does not need a second symbol to confirm it
+ * happened; the interval is new information the checkmark never was. "—" for the first set of
+ * the session (nothing to measure from) and for a bulk-logged gap [SetIntervals] suppresses as
+ * noise, matching the muted colour and dash the design's own first row uses.
  */
 @Composable
 private fun LoggedSets(
     sets: List<ExerciseSet>,
     unit: WeightUnit,
+    intervals: Map<String, Duration>,
     onEditSet: (ExerciseSet) -> Unit,
 ) {
     Column {
@@ -305,10 +351,10 @@ private fun LoggedSets(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "✓",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                NumeralText(
+                    text = intervals[set.id]?.let { "+${it.asMinutesSeconds()}" } ?: "—",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             GymDivider()
@@ -323,12 +369,17 @@ private fun LoggedSets(
     }
 }
 
-/** One remaining movement in the plan: index, name, target — no per-row actions of its own. */
+/**
+ * One other movement in the session: index, name, and either its target (not yet started) or
+ * how many sets it already carries (US-45 — switched away from, not lost). Tapping opens it
+ * fully; there are no per-row actions beyond that.
+ */
 @Composable
 private fun StillToComeRow(
     index: Int,
     name: String,
     target: MovementTarget?,
+    setsLogged: Int,
     unit: WeightUnit,
     onClick: () -> Unit,
 ) {
@@ -353,7 +404,17 @@ private fun StillToComeRow(
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
-            queueTargetLine(target, unit)?.let { line ->
+            // A row already carrying sets (switched away from, not untouched) says so instead
+            // of its target — distinguishing "not started" from "in progress elsewhere" at a
+            // glance, without a new visual language: the exact phrase CurrentMovement's own
+            // "N sets logged" line already established (US-44).
+            val meta =
+                if (setsLogged > 0) {
+                    "$setsLogged ${if (setsLogged == 1) "set" else "sets"} logged"
+                } else {
+                    queueTargetLine(target, unit)
+                }
+            meta?.let { line ->
                 NumeralText(
                     text = line,
                     style = MaterialTheme.typography.bodySmall,

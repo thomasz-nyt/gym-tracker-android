@@ -278,6 +278,9 @@ class ActiveSessionViewModel
                 scope = viewModelScope,
             )
 
+        /** Choosing which exercise is open lives in its own state holder; see [ExerciseSelectionController]. */
+        val selection = ExerciseSelectionController()
+
         /** Set entry lives in its own state holder; see [SetEntryController]. */
         val setEntry =
             SetEntryController(
@@ -425,7 +428,8 @@ class ActiveSessionViewModel
                 member,
                 unitPreference.observe(),
                 exercisesInOrder,
-            ) { session, memberId, unit, rows ->
+                selection.current,
+            ) { session, memberId, unit, rows, selected ->
                 val progress =
                     session?.let {
                         SessionProgress.of(
@@ -444,8 +448,14 @@ class ActiveSessionViewModel
                 // render at all. "The last movement with any set logged, or the first movement
                 // if none do yet" is what the design's `1a Session mid-set` frame actually
                 // shows: a movement with SET 1 and SET 2 already checked off and SET 3 dimmed
-                // as NEXT, all on the *same* open row.
-                val currentRow = rows.lastOrNull { it.sets.isNotEmpty() } ?: rows.firstOrNull()
+                // as NEXT, all on the *same* open row. [selected] (ADR-0037) wins over that
+                // derived default when present — tapping any other exercise opens it explicitly,
+                // and it stays open until a different explicit tap changes it. A stale selection
+                // (its exercise was removed) falls through to the derived default automatically.
+                val currentRow =
+                    selected?.let { id -> rows.firstOrNull { it.sessionExercise.id == id } }
+                        ?: rows.lastOrNull { it.sets.isNotEmpty() }
+                        ?: rows.firstOrNull()
                 val history =
                     currentRow?.let { row -> prefillFromLastSet(row.sessionExercise.exerciseId, memberId, unit) }
                 val target = currentRow?.sessionExercise?.target
