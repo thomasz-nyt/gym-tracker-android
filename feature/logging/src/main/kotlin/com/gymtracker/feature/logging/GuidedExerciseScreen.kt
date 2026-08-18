@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
@@ -170,7 +170,7 @@ private fun RestHero(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 EyebrowLabel(text = "Rest", color = MaterialTheme.colorScheme.onPrimary)
-                RepMascot(modifier = Modifier.size(GymDimens.MascotInline), monochrome = true)
+                RepMascot(modifier = Modifier.height(GymDimens.MascotInline), monochrome = true)
             }
             Text(
                 text = remaining.asMinutesSeconds(),
@@ -274,7 +274,7 @@ private fun ExerciseSummary(
             modifier = Modifier.fillMaxWidth(),
         ) {
             EyebrowLabel(text = "Done", color = MaterialTheme.colorScheme.primary)
-            RepMascot(modifier = Modifier.size(GymDimens.MascotInline))
+            RepMascot(modifier = Modifier.height(GymDimens.MascotInline))
         }
         Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
         HorizontalDivider(
@@ -406,16 +406,7 @@ internal fun GuidedSetupDialog(
     )
 }
 
-/**
- * mm:ss. Arithmetic on [Duration.getSeconds] rather than `toMinutesPart`, which is API 31 and
- * would crash on the API 26 devices `tech-stack.md` supports.
- */
-private fun Duration.asMinutesSeconds(): String =
-    "%d:%02d".format(seconds / SECONDS_IN_MINUTE, seconds % SECONDS_IN_MINUTE)
-
 private fun String.orPlural(count: Int): String = if (count == 1) this else "${this}s"
-
-private const val SECONDS_IN_MINUTE = 60
 
 @GymPreviews
 @Composable

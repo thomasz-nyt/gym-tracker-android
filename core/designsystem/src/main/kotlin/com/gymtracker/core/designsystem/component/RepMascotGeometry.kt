@@ -13,9 +13,22 @@ import androidx.compose.ui.geometry.Offset
  * [RepMascot] is the only consumer; it turns [poseAt] into drawn geometry every frame.
  */
 internal object RepMascotGeometry {
-    /** The source SVG's `viewBox`, in its own units — everything below is in this space. */
-    const val VIEW_BOX_WIDTH = 200f
-    const val VIEW_BOX_HEIGHT = 210f
+    /**
+     * The fit box `RepMascot`'s `Canvas` scales and centres the drawing into (ADR-0035's Turn 3
+     * amendment). The source SVG's own `viewBox` is `0 0 200 210`, but the figure's ink only
+     * spans a fraction of it: [VIEW_BOX_LEFT]/[VIEW_BOX_TOP] and this width/height crop that
+     * unused margin away, so a caller sizing `RepMascot` by height gets a box that matches what
+     * is actually drawn rather than one padded by empty space on every side. The values below
+     * are the design bundle's own crop (`viewBox="46 20 84 148"`), verified by
+     * `RepMascotGeometryTest` to contain every animated pose's ink with margin.
+     */
+    const val VIEW_BOX_LEFT = 46f
+    const val VIEW_BOX_TOP = 20f
+    const val VIEW_BOX_WIDTH = 84f
+    const val VIEW_BOX_HEIGHT = 148f
+
+    /** `RepMascot` sizes its `Canvas` to this ratio so a height-only modifier still fits. */
+    const val ASPECT_RATIO = VIEW_BOX_WIDTH / VIEW_BOX_HEIGHT
 
     /** The source's `calcMode="spline" keySplines="0.4 0 0.5 1"`, on every animated segment. */
     private val Spline = CubicBezierEasing(0.4f, 0f, 0.5f, 1f)

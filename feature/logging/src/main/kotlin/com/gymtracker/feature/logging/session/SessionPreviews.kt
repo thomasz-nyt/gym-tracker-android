@@ -51,11 +51,28 @@ private fun ActiveSessionPreview() {
     }
 }
 
-/** The screen as it actually looks mid-workout: sets logged, and a rest counting down. */
+private val previewAppearance = SessionExercise(SessionExerciseId("se"), previewSession.id, ExerciseId("bench"), 1)
+
+// MagicNumber's ignoreAnnotated exemption (detekt.yml) covers literals inside a @Composable or
+// @Preview function; this fixture moved out to a top-level val so RestingPreview and
+// RestingFinalTenPreview can share it, which loses that exemption even though the literals are
+// exactly as illustrative here as they were inline.
+@Suppress("MagicNumber")
+private val previewLoggedSets =
+    listOf(
+        ExerciseSet("1", previewAppearance.id, 1, 61.23, 8, null, previewSession.startedAt),
+        ExerciseSet("2", previewAppearance.id, 2, 61.23, 8, null, previewSession.startedAt),
+    )
+
+/**
+ * The screen as it actually looks mid-workout: sets logged, and a rest counting down — the
+ * calm state (ADR-0036), ink rather than accent-filled. `restTotal` (90s) is deliberately
+ * longer than `restRemaining` (75s): a preview where the countdown exceeds its own total would
+ * draw a nonsensical, clamped-to-empty progress bar.
+ */
 @GymPreviews
 @Composable
 private fun RestingPreview() {
-    val appearance = SessionExercise(SessionExerciseId("se"), previewSession.id, ExerciseId("bench"), 1)
     GymTrackerTheme {
         LoggingScreen(
             state =
@@ -67,15 +84,35 @@ private fun RestingPreview() {
                     restTotal = Duration.ofSeconds(90),
                     exercises =
                         listOf(
-                            SessionExerciseRow(
-                                sessionExercise = appearance,
-                                exercise = null,
-                                sets =
-                                    listOf(
-                                        ExerciseSet("1", appearance.id, 1, 61.23, 8, null, previewSession.startedAt),
-                                        ExerciseSet("2", appearance.id, 2, 61.23, 8, null, previewSession.startedAt),
-                                    ),
-                            ),
+                            SessionExerciseRow(previewAppearance, exercise = null, sets = previewLoggedSets),
+                        ),
+                ),
+            onStartWorkout = {},
+            onResolveStale = {},
+        )
+    }
+}
+
+/**
+ * The final ten seconds of a rest (ADR-0036): the countdown block takes the accent fill, and
+ * the log button beneath it steps back to outlined — this is the frame where a future edit
+ * that lets both go filled at once would look wrong first.
+ */
+@GymPreviews
+@Composable
+private fun RestingFinalTenPreview() {
+    GymTrackerTheme {
+        LoggingScreen(
+            state =
+                SessionUiState(
+                    isLoading = false,
+                    activeSession = previewSession,
+                    unit = WeightUnit.LB,
+                    restRemaining = Duration.ofSeconds(7),
+                    restTotal = Duration.ofSeconds(90),
+                    exercises =
+                        listOf(
+                            SessionExerciseRow(previewAppearance, exercise = null, sets = previewLoggedSets),
                         ),
                 ),
             onStartWorkout = {},

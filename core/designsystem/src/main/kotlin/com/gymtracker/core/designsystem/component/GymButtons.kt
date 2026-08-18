@@ -2,6 +2,7 @@ package com.gymtracker.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.sizeIn
@@ -9,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -59,6 +61,13 @@ fun PrimaryActionButton(
  * lower-opacity span; this button keeps the whole line at one size and colour instead — matching
  * every micro-span in a design is a much larger, easily-regressed surface than the digit-weight
  * contrast the design actually calls out as the priority.
+ *
+ * **[outlined] (ADR-0036).** The rest countdown's final-ten-seconds swap needs this exact button
+ * built two ways: filled while the countdown is calm, stepped back to outlined the moment the
+ * countdown itself takes the accent fill — "exactly one filled accent element" holding true
+ * through the swap, not just around it. Outlined reuses the same unstyled `OutlinedButton` idiom
+ * every other outlined control in this codebase already uses (`Done`, `Add set`, `SKIP REST`)
+ * rather than hand-matching the design's literal ink-coloured border.
  */
 @Composable
 fun PrimaryActionButton(
@@ -67,17 +76,14 @@ fun PrimaryActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    outlined: Boolean = false,
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        shape = MaterialTheme.shapes.large,
-        // sizeIn, not a fixed height: the detail line carries both units ("135 lb × 8 · 61.2 kg")
-        // and wraps to two lines on a narrow screen or at a large font scale. A fixed height
-        // clipped the second line mid-glyph — the button grows instead, since 72dp is the floor
-        // the sweaty-hands constraint asks for, not a ceiling.
-        modifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.PrimaryAction),
-    ) {
+    // sizeIn, not a fixed height, on both branches: the detail line carries both units
+    // ("135 lb × 8 · 61.2 kg") and wraps to two lines on a narrow screen or at a large font
+    // scale. A fixed height clipped the second line mid-glyph — the button grows instead, since
+    // 72dp is the floor the sweaty-hands constraint asks for, not a ceiling.
+    val buttonModifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.PrimaryAction)
+    val label: @Composable RowScope.() -> Unit = {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.Start,
@@ -98,6 +104,24 @@ fun PrimaryActionButton(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+
+    if (outlined) {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            shape = MaterialTheme.shapes.large,
+            modifier = buttonModifier,
+            content = label,
+        )
+    } else {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            shape = MaterialTheme.shapes.large,
+            modifier = buttonModifier,
+            content = label,
+        )
     }
 }
 

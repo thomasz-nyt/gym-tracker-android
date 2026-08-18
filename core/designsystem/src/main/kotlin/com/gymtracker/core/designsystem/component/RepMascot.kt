@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +47,14 @@ import kotlin.math.min
  * (`ANIMATOR_DURATION_SCALE == 0`), this renders the phase-0 pose statically instead — both the
  * accessibility answer and a CI necessity, since the instrumented job runs with
  * `disable-animations: true`.
+ *
+ * **Sizing (ADR-0035's Turn 3 amendment).** The `Canvas` carries its own
+ * [aspectRatio][androidx.compose.foundation.layout.aspectRatio], matching
+ * [RepMascotGeometry]'s cropped fit box — a call site sizes this composable with
+ * `Modifier.height(...)` alone; a bare `Modifier.size(...)` still works but reserves square
+ * space the drawing no longer fills. `Canvas` measures as a `Spacer`, so a height-only modifier
+ * with no width constraint from the caller would otherwise measure zero width and draw nothing;
+ * the internal `aspectRatio` is what keeps every call site down to one modifier regardless.
  */
 @Composable
 fun RepMascot(
@@ -82,7 +91,7 @@ fun RepMascot(
     val skinColor = if (monochrome) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val bandColor = if (monochrome) MaterialTheme.colorScheme.onPrimary else LocalMascotBand.current
 
-    Canvas(modifier = modifier) {
+    Canvas(modifier = modifier.aspectRatio(RepMascotGeometry.ASPECT_RATIO)) {
         val scaleFactor =
             min(size.width / RepMascotGeometry.VIEW_BOX_WIDTH, size.height / RepMascotGeometry.VIEW_BOX_HEIGHT)
         val contentWidth = RepMascotGeometry.VIEW_BOX_WIDTH * scaleFactor
@@ -93,7 +102,14 @@ fun RepMascot(
             top = (size.height - contentHeight) / 2f,
         ) {
             scale(scaleFactor, pivot = Offset.Zero) {
-                translate(top = pose.bobOffsetY) {
+                // Shifts the drawing so the cropped fit box's top-left corner (VIEW_BOX_LEFT,
+                // VIEW_BOX_TOP in the source SVG's own coordinate space) lands at this scope's
+                // origin, with the bob riding along on the same translate rather than a nested
+                // one — the two compose into a single offset either way.
+                translate(
+                    left = -RepMascotGeometry.VIEW_BOX_LEFT,
+                    top = -RepMascotGeometry.VIEW_BOX_TOP + pose.bobOffsetY,
+                ) {
                     drawFigure(pose, inkColor, skinColor, bandColor)
                 }
             }
@@ -247,12 +263,14 @@ private const val LOOP_DURATION_MS = 860
 
 // Stroke widths, transcribed from the source stylesheet's `.bd`/`.bdt`/`.far`/`.skin`/`.nose`/
 // `.band` classes and the explicit `stroke-width` overrides on the body path and both band paths.
-private const val BODY_WIDTH = 14f
-private const val NEAR_LEG_WIDTH = 7f
-private const val NEAR_ARM_WIDTH = 6f
-private const val FAR_LIMB_WIDTH = 6f
+// `internal`, not `private`: RepMascotGeometryTest's ink-bounding-box case (ADR-0035's Turn 3
+// amendment) reads these directly rather than duplicating the numbers a second time.
+internal const val BODY_WIDTH = 14f
+internal const val NEAR_LEG_WIDTH = 7f
+internal const val NEAR_ARM_WIDTH = 6f
+internal const val FAR_LIMB_WIDTH = 6f
 private const val FAR_LIMB_ALPHA = 0.24f
-private const val SKIN_OUTLINE_WIDTH = 4.5f
-private const val NOSE_WIDTH = 4.5f
-private const val BAND_ARC_WIDTH = 7f
-private const val BAND_TAIL_WIDTH = 6f
+internal const val SKIN_OUTLINE_WIDTH = 4.5f
+internal const val NOSE_WIDTH = 4.5f
+internal const val BAND_ARC_WIDTH = 7f
+internal const val BAND_TAIL_WIDTH = 6f
