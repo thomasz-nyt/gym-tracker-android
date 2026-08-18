@@ -22,6 +22,7 @@ import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.progress.PersonalRecord
@@ -74,6 +75,18 @@ internal fun FinishSummaryScreen(
             style = MaterialTheme.typography.titleMedium,
         )
         Text(text = detail.summary.describe(unit), style = MaterialTheme.typography.bodyMedium)
+
+        // US-22: absent entirely unless a health read actually ran (US-20's absence pattern) —
+        // `metrics` is null both when the integration is off and when the device can't use it,
+        // which is exactly the point (ADR-0038). Present, it may still carry a null field for
+        // one it read and found nothing for; that renders as "not recorded", never zero.
+        detail.summary.session.metrics?.let { metrics ->
+            Text(
+                text = metrics.describe(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         if (records.isNotEmpty()) {
             RecordsSection(records, names, unit, modifier = Modifier.weight(1f))
@@ -144,6 +157,20 @@ private fun SessionSummary.describe(unit: WeightUnit): String =
         }
     }
 
+/**
+ * "Avg HR 128 bpm · Peak 171 bpm · 340 kcal active", or "not recorded" per field that was read
+ * for but came back empty (US-22) — never a zero, per constitution §2.4. Shared with
+ * `WorkoutDetailScreen`'s own header, which renders the exact same session the same way once
+ * it becomes history.
+ */
+internal fun SessionMetrics.describe(): String =
+    buildString {
+        append(avgHeartRate?.let { "Avg HR $it bpm" } ?: "Heart rate not recorded")
+        maxHeartRate?.let { append("  ·  Peak $it bpm") }
+        append("  ·  ")
+        append(activeKilocalories?.let { "$it kcal active" } ?: "Calories not recorded")
+    }
+
 private fun String.orPlural(count: Int): String = if (count == 1) this else "${this}s"
 
 /** "1h 12m", or "48m" under the hour — nobody reads "0h 48m". */
@@ -160,7 +187,7 @@ private const val PREVIEW_WEIGHT_KG = 102.5
 private const val PREVIEW_REPS = 5
 private const val PREVIEW_VOLUME_KG = 512.5
 
-private fun previewDetail(): SessionDetail {
+private fun previewDetail(metrics: SessionMetrics? = null): SessionDetail {
     val started = Instant.parse("2026-08-09T17:10:00Z")
     val session =
         WorkoutSession(
@@ -169,7 +196,7 @@ private fun previewDetail(): SessionDetail {
             gymName = null,
             startedAt = started,
             endedAt = started.plus(Duration.ofMinutes(PREVIEW_DURATION_MINUTES)),
-            metrics = null,
+            metrics = metrics,
             routine = RoutineOrigin(id = "r1", name = "Upper A"),
         )
     val appearance = SessionExercise(SessionExerciseId("se-1"), session.id, ExerciseId("bench"), 1)
@@ -237,6 +264,19 @@ private fun FinishSummaryNoRecordsPreview() {
     GymTrackerTheme {
         FinishSummaryScreen(
             detail = previewDetail(),
+            records = emptyList(),
+            unit = WeightUnit.LB,
+            onDone = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun FinishSummaryWithHealthMetricsPreview() {
+    GymTrackerTheme {
+        FinishSummaryScreen(
+            detail = previewDetail(metrics = SessionMetrics(128, 171, 340, "health_connect")),
             records = emptyList(),
             unit = WeightUnit.LB,
             onDone = {},
