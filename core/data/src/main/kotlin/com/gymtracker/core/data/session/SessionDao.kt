@@ -1,12 +1,18 @@
 package com.gymtracker.core.data.session
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Queries over the `sessions` table. */
 @Dao
+// One query past detekt's interface threshold. Suppressed rather than split for the same
+// reason `SetDao` is: a DAO is a query surface, not a class with behaviour, and this one has
+// exactly one responsibility — reading and writing `sessions`.
+@Suppress("TooManyFunctions")
 interface SessionDao {
     @Query(ACTIVE_SESSION)
     fun observeActive(userId: String): Flow<SessionEntity?>
@@ -56,6 +62,15 @@ interface SessionDao {
         updatedAt: Long,
     )
 
+    /**
+     * US-22, a Room partial-entity update: only the columns [SessionMetricsPatch] names are
+     * touched, keyed on its `id` — everything else about the row, `sync_state` included, is
+     * untouched. Chosen over a scalar-parameter `@Query` to stay under detekt's
+     * `LongParameterList` without inventing an unrelated grouping of the same six values.
+     */
+    @Update(entity = SessionEntity::class)
+    suspend fun saveMetrics(patch: SessionMetricsPatch)
+
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun delete(id: String)
 
@@ -71,3 +86,17 @@ interface SessionDao {
                 "ORDER BY started_at DESC LIMIT 1"
     }
 }
+
+/**
+ * The six columns [SessionDao.saveMetrics] writes. Not `@Entity`-annotated — Room's partial
+ * update matches by `@ColumnInfo` name against [SessionEntity], not by declaring a second table.
+ */
+data class SessionMetricsPatch(
+    @ColumnInfo(name = "id") val id: String,
+    @ColumnInfo(name = "avg_hr") val avgHr: Int?,
+    @ColumnInfo(name = "max_hr") val maxHr: Int?,
+    @ColumnInfo(name = "active_kcal") val activeKcal: Int?,
+    @ColumnInfo(name = "metrics_source") val metricsSource: String?,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    @ColumnInfo(name = "sync_state") val syncState: String = SYNC_STATE_PENDING,
+)

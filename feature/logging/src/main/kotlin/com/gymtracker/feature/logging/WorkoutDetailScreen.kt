@@ -185,12 +185,16 @@ private fun WorkoutHeader(
                 },
             style = MaterialTheme.typography.bodyMedium,
         )
-        // Until M5 there is nothing to read, and an unrecorded metric is shown as unrecorded
-        // rather than as zero (constitution §2.4, and the rule US-22 will inherit).
-        Text(
-            text = "Heart rate and calories: not recorded",
-            style = MaterialTheme.typography.bodySmall,
-        )
+        // US-22: absent entirely unless a health read actually ran — the same absence pattern
+        // `FinishSummaryScreen`'s own health line uses, since this renders the same session
+        // once it becomes history. A field that was read for and found nothing shows as "not
+        // recorded", never zero (constitution §2.4) — SessionMetrics.describe() carries that.
+        summary.session.metrics?.let { metrics ->
+            Text(
+                text = metrics.describe(),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 

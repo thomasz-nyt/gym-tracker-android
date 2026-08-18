@@ -21,11 +21,18 @@ interface HealthMetricsSource {
 
     /**
      * Heart rate and active-calorie samples for [window], aggregated in memory to a session
-     * summary. Raw samples never leave this function (constitution §5). Returns `null` if
-     * [status] is not [HealthStatus.Ready], or if the window contains no samples at all — the
-     * two cases the UI shows identically, as "not recorded" (constitution §2.4: never zero,
-     * never estimated). Callers must additionally check [HealthIntegration] before calling this
-     * — see the class doc.
+     * summary. Raw samples never leave this function (constitution §5).
+     *
+     * Returns `null` only if [status] is not [HealthStatus.Ready] — nothing was read, and
+     * nothing should be written. If it **is** [HealthStatus.Ready] but the window contains no
+     * samples, returns a [SessionMetrics] with every metric field `null` and
+     * [SessionMetrics.source] set: "attempted, found nothing" is a different fact from "never
+     * attempted," and only the former should overwrite a session's metrics with an honest
+     * "not recorded" (constitution §2.4 — never zero, never estimated, but absence that was
+     * actually checked for is still worth recording as such).
+     *
+     * Callers must additionally check [HealthIntegration] before calling this — see the class
+     * doc.
      */
     suspend fun metricsFor(window: ClosedRange<Instant>): SessionMetrics?
 }

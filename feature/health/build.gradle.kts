@@ -17,4 +17,8 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    // Only HealthConnectMetricsSourceTest's fault-injection case needs this: it exercises the
+    // real android.util.Log.w() call in the failure path, which plain JUnit's android.jar stub
+    // throws on rather than no-ops.
+    testImplementation(libs.robolectric)
 }
