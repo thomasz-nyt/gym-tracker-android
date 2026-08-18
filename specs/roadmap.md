@@ -531,9 +531,20 @@ revoke (US-23) — since none of the three needs the others' code to land first.
 **Exit:** installing on a device with no Health Connect at all produces zero
 crashes, zero empty holes, and no prompts.
 
-PR A: all four gates plus `verifyDomainHasNoAndroidDeps` green. The instrumented suite (both
-bindings) and on-device verification of the permission walk are this PR's own remaining steps
-before merge — not yet run as this entry is written.
+PR A: all four gates plus `verifyDomainHasNoAndroidDeps` green. The full instrumented suite ran
+twice on `Medium_Phone_API_36.1(AVD)` — default bindings (22 tests, 0 failed, `HealthSettingsTest`
+skipped as designed) and `-Pgymtracker.optionalFeatures=off` (20 tests, 0 failed, 0 skipped,
+`HealthSettingsTest` running and passing this time). `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`
+and `GuidedFlowScreenTest` pass unedited in both. Verified live on device, not only in the
+suite: with Health Connect present and the toggle off, Settings shows the "Health Connect" row
+with no permission card; turning it on walks all three permissions in order, each with its own
+reason shown first, confirmed by logcat that the real
+`com.google.android.healthconnect.controller` permission activity actually launches for each;
+denying every permission leaves "No permissions were granted, so nothing is read." and the rest
+of the app (Train home, a workout) untouched; toggling off mid-walk clears the pending card and
+the message immediately. The no-Health-Connect case is covered by `HealthSettingsTest` rather
+than by hand — this emulator image has Health Connect built in, so there was no device on hand
+without it.
 
 ---
 
