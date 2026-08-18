@@ -44,6 +44,8 @@ import com.gymtracker.core.domain.backup.PreviewBackupImport
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.health.HealthIntegration
+import com.gymtracker.core.domain.health.HealthMetricsSource
+import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.RoutineId
@@ -338,6 +340,13 @@ object DataModule {
         sets: SetRepository,
         clock: Clock,
     ): EndSession = EndSession(sessions, sets, clock)
+
+    @Provides
+    fun recordSessionMetrics(
+        healthIntegration: HealthIntegration,
+        healthMetricsSource: HealthMetricsSource,
+        sessions: SessionRepository,
+    ): RecordSessionMetrics = RecordSessionMetrics(healthIntegration, healthMetricsSource, sessions)
 
     @Provides
     fun sessionHistory(

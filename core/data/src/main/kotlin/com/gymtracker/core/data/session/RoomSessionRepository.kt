@@ -1,6 +1,7 @@
 package com.gymtracker.core.data.session
 
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.SessionRepository
@@ -49,5 +50,21 @@ class RoomSessionRepository
         /** The `ON DELETE CASCADE` on the child tables takes the exercises and sets with it. */
         override suspend fun deleteSession(id: SessionId) {
             dao.delete(id.value)
+        }
+
+        override suspend fun saveMetrics(
+            id: SessionId,
+            metrics: SessionMetrics,
+        ) {
+            dao.saveMetrics(
+                SessionMetricsPatch(
+                    id = id.value,
+                    avgHr = metrics.avgHeartRate,
+                    maxHr = metrics.maxHeartRate,
+                    activeKcal = metrics.activeKilocalories,
+                    metricsSource = metrics.source,
+                    updatedAt = Instant.now().toEpochMilli(),
+                ),
+            )
         }
     }

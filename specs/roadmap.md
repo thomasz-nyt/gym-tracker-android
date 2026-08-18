@@ -512,11 +512,16 @@ revoke (US-23) — since none of the three needs the others' code to land first.
       2026-08-18
 - [x] Granular permission request, one at a time with its own on-screen reason first; app
       fully functional if denied or unavailable. PR A, 2026-08-18
-- [ ] Read heart rate, active calories, and exercise sessions for the session window (PR B,
-      US-22 — not started)
-- [ ] Aggregate on-device; persist only avg HR, max HR, active kcal on the session (PR B,
-      US-22 — the four columns already exist on `sessions` since v1; this box is the read,
-      not a migration)
+- [x] Read heart rate, active calories, and exercise sessions for the session window. PR B,
+      2026-08-18. Each of the three permissions gates its own read independently — a partial
+      grant reads what it can and leaves the rest null, never a refused read overall
+      (`health-connect.md`'s "partial permissions" case). Exercise, when granted, narrows the
+      window the other two run over to the actually recorded session
+- [x] Aggregate on-device; persist only avg HR, max HR, active kcal on the session. PR B,
+      2026-08-18 — the four columns already existed on `sessions` since v1 (`SessionRepository.
+      saveMetrics`, a Room partial-entity update). Rendered on `FinishSummaryScreen` and
+      `WorkoutDetailScreen`, absent entirely unless a read actually ran, "not recorded" per
+      field that was read for and found nothing (never zero, constitution §2.4)
 - [x] Per-member toggle, default **off**, and — caught while building the Settings screen,
       recorded in ADR-0038 rather than silently — **independent of the availability check
       above**, not folded into it: a status that meant either "device incapable" or "toggle
@@ -545,6 +550,31 @@ of the app (Train home, a workout) untouched; toggling off mid-walk clears the p
 the message immediately. The no-Health-Connect case is covered by `HealthSettingsTest` rather
 than by hand — this emulator image has Health Connect built in, so there was no device on hand
 without it.
+
+PR B: all four gates plus `verifyDomainHasNoAndroidDeps` green; the full instrumented suite ran
+twice on `Medium_Phone_API_36.1(AVD)` (22 tests default / 20 tests optional-features-off, 0
+failed either way); `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and `GuidedFlowScreenTest`
+pass unedited in both.
+
+**A real crash, found only on device, not by the unit suite.** With the toggle on and all three
+permissions granted, finishing a workout crashed the app outright — `FATAL EXCEPTION: main`,
+`HealthConnectException` wrapped as `IllegalStateException`, uncaught inside a `viewModelScope`
+coroutine. Two causes, both fixed before this box was ticked: `HealthConnectMetricsSource.
+metricsFor()` had no error handling at all, so any real SDK failure propagated and crashed the
+process rather than degrading to "nothing recorded" the way an enhancement layer must
+(constitution §3) — fixed with a fault-injection test driving the fix first. And the platform
+itself names the actual cause: Android 14+ refuses every Health Connect read unless the app
+declares a manifest handler for `VIEW_PERMISSION_USAGE`/`HEALTH_PERMISSIONS` — a requirement
+`health-connect.md` never named — fixed by adding `HealthPermissionsRationaleActivity`.
+Re-verified live end to end after both fixes: toggle on, permissions granted, finish a workout —
+no crash (confirmed against logcat, not just the UI staying up), and both the finish summary and
+the workout detail read "Heart rate not recorded · Calories not recorded" — a real Health
+Connect read that found no samples, which is the reason it renders at all rather than being
+absent: `SessionEntity`'s own read path only produces a non-null `SessionMetrics` when
+`metrics_source` is set, and a genuinely never-attempted read (the pre-fix crash's actual
+behavior, confirmed by pulling the on-device SQLite file and finding every metrics column null
+including `metrics_source`) renders nothing, exactly as it did before this session's read ever
+ran.
 
 ---
 

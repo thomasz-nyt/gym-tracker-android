@@ -87,6 +87,7 @@ class NextLoggableSetTargetPrefillTest {
                 addExerciseToSession = AddExerciseToSession(sessionExercises) { SessionExerciseId("unused") },
                 endSession = EndSession(repository, sets, clock),
                 workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+                recordSessionMetrics = fakeRecordSessionMetrics(repository),
                 personalRecordsAchievedIn =
                     PersonalRecordsAchievedIn(
                         DetectPersonalRecord(

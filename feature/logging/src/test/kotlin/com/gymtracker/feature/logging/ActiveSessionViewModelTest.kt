@@ -1,11 +1,13 @@
 package com.gymtracker.feature.logging
 
 import app.cash.turbine.test
+import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.progress.DetectPersonalRecord
@@ -98,45 +100,48 @@ class ActiveSessionViewModelTest {
         return id
     }
 
-    private fun viewModel(repository: FakeSessions) =
-        ActiveSessionViewModel(
-            sessions = repository,
-            sessionExercises = sessionExercises,
-            catalog = catalog,
-            currentMember = FakeCurrentMember(member),
-            sets = sets,
-            logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
-            restTimer = RestTimer(restStore, clock),
-            restTimerStore = restStore,
-            prefillFromLastSet = PrefillFromLastSet(sets),
-            unitPreference = units,
-            startSession = StartSession(repository, restStore, clock) { SessionId("new") },
-            startSessionFromRoutine = fakeStartSessionFromRoutine(),
-            addExerciseToSession =
-                AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
-            endSession = EndSession(repository, sets, clock),
-            workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
-            personalRecordsAchievedIn =
-                PersonalRecordsAchievedIn(
-                    DetectPersonalRecord(
-                        PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
-                        ZoneOffset.UTC,
-                    ),
-                ),
-            detectPersonalRecord =
+    private fun viewModel(
+        repository: FakeSessions,
+        recordSessionMetrics: RecordSessionMetrics = fakeRecordSessionMetrics(repository),
+    ) = ActiveSessionViewModel(
+        sessions = repository,
+        sessionExercises = sessionExercises,
+        catalog = catalog,
+        currentMember = FakeCurrentMember(member),
+        sets = sets,
+        logSets = LogSets(LogSet(sets, clock) { "set-${nextSet++}" }),
+        restTimer = RestTimer(restStore, clock),
+        restTimerStore = restStore,
+        prefillFromLastSet = PrefillFromLastSet(sets),
+        unitPreference = units,
+        startSession = StartSession(repository, restStore, clock) { SessionId("new") },
+        startSessionFromRoutine = fakeStartSessionFromRoutine(),
+        addExerciseToSession =
+            AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
+        endSession = EndSession(repository, sets, clock),
+        workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+        recordSessionMetrics = recordSessionMetrics,
+        personalRecordsAchievedIn =
+            PersonalRecordsAchievedIn(
                 DetectPersonalRecord(
                     PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
                     ZoneOffset.UTC,
                 ),
-            removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
-            restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
-            determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
-            updateSet = UpdateSet(sets),
-            deleteSet = DeleteSet(sets),
-            restoreSet = RestoreSet(sets),
-            guidedPlanStore = guidedStore,
-            clock = clock,
-        )
+            ),
+        detectPersonalRecord =
+            DetectPersonalRecord(
+                PersonalRecordsOf(repository, sessionExercises, sets, ZoneOffset.UTC),
+                ZoneOffset.UTC,
+            ),
+        removeExerciseFromSession = RemoveExerciseFromSession(sessionExercises, sets),
+        restoreExerciseToSession = RestoreExerciseToSession(sessionExercises, sets),
+        determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
+        updateSet = UpdateSet(sets),
+        deleteSet = DeleteSet(sets),
+        restoreSet = RestoreSet(sets),
+        guidedPlanStore = guidedStore,
+        clock = clock,
+    )
 
     @Test
     fun `with no session the screen offers to start one`() =
@@ -688,6 +693,45 @@ class ActiveSessionViewModelTest {
                 assertEquals(512.5, finish.detail.summary.volumeKg)
                 assertEquals(102.5, finish.records.single().weightKg)
                 assertEquals(5, finish.records.single().reps)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `finishing with the health toggle off never touches the session's metrics`() =
+        runTest {
+            // The default `viewModel()` fake reproduces this — asserted explicitly here so a
+            // future change to the wiring that starts writing regardless of the toggle fails a
+            // test, not just a code review.
+            val repository = FakeSessions(listOf(session("s1")))
+            val viewModel = viewModel(repository)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val today = sessionExercises.all.single { it.sessionId == SessionId("s1") }
+            sets.seed(ExerciseSet("today-set", today.id, 1, 60.0, 8, null, now))
+
+            viewModel.finish.confirm()
+
+            assertNull(repository.all.single { it.id == SessionId("s1") }.metrics)
+        }
+
+    @Test
+    fun `finishing with the health toggle on reads and stores metrics, reflected in the summary`() =
+        runTest {
+            val repository = FakeSessions(listOf(session("s1")))
+            val metrics = SessionMetrics(128, 171, 340, "health_connect")
+            val recordMetrics = fakeRecordSessionMetrics(repository, enabled = true, metrics = metrics)
+            val viewModel = viewModel(repository, recordSessionMetrics = recordMetrics)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val today = sessionExercises.all.single { it.sessionId == SessionId("s1") }
+            sets.seed(ExerciseSet("today-set", today.id, 1, 60.0, 8, null, now))
+
+            viewModel.finish.confirm()
+
+            assertEquals(metrics, repository.all.single { it.id == SessionId("s1") }.metrics)
+            viewModel.uiState.test {
+                val finish = expectMostRecentItem().finish
+                check(finish is FinishFlow.Ready) { "expected Ready, got $finish" }
+                assertEquals(metrics, finish.detail.summary.session.metrics)
                 cancelAndIgnoreRemainingEvents()
             }
         }
