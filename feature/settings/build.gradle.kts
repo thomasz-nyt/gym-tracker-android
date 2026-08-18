@@ -13,6 +13,11 @@ dependencies {
     implementation(project(":core:domain"))
 
     implementation(libs.androidx.activity.compose)
+    // Only for PermissionController.createRequestPermissionResultContract() — the launcher
+    // this screen needs to request Health Connect permissions one at a time (US-21). Reading
+    // and aggregating health data itself stays in :feature:health; this module never touches
+    // HealthConnectClient.
+    implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

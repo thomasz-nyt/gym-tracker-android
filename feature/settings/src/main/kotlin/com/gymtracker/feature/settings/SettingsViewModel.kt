@@ -9,6 +9,10 @@ import com.gymtracker.core.domain.backup.ImportBackupResult
 import com.gymtracker.core.domain.backup.ImportPreviewResult
 import com.gymtracker.core.domain.backup.ImportRefusalReason
 import com.gymtracker.core.domain.backup.PreviewBackupImport
+import com.gymtracker.core.domain.health.HealthIntegration
+import com.gymtracker.core.domain.health.HealthMetricsSource
+import com.gymtracker.core.domain.health.HealthPermission
+import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.rest.RestTimerStore
@@ -63,6 +67,20 @@ data class SettingsUiState(
     val importSucceeded: ImportSuccessUi? = null,
     val unit: WeightUnit = WeightUnit.LB,
     val restDefaultSeconds: Long = DEFAULT_REST_SECONDS,
+    /**
+     * US-20: the device/account gate, independent of [healthIntegrationEnabled] (ADR-0038).
+     * `SettingsScreen` renders no health UI at all while this is [HealthStatus.Unavailable] —
+     * the same absence pattern US-13 established.
+     */
+    val healthStatus: HealthStatus = HealthStatus.Unavailable,
+    /** The member's own opt-in (US-21), independent of [healthStatus]. Defaults off. */
+    val healthIntegrationEnabled: Boolean = false,
+    /**
+     * The permission currently awaiting its on-screen reason and a system request, or `null`
+     * when no walk is in progress. Non-null only between [SettingsViewModel.onHealthIntegrationToggled]
+     * turning the toggle on and the last permission's result landing.
+     */
+    val pendingHealthPermission: HealthPermission? = null,
 )
 
 /**
@@ -81,7 +99,17 @@ data class SettingsUiState(
  * The unit and rest-default controls wire a UI to setters nothing has ever called —
  * [UnitPreference.set] and [RestTimerStore.setDefaultRest] both already existed and were already
  * bound; ADR-0008 and US-05 promised both and neither had a home until this screen.
+ *
+ * US-20/US-21 add a fourth concern, health, at 12 member functions against detekt's threshold
+ * of 11 — one past where `ImportRefusalReason.message()` was pulled out to a top-level function
+ * to buy the same headroom previously. That trick is spent: [onHealthIntegrationToggled] and
+ * [onHealthPermissionResult] both need `_uiState` and can't move out the same way, and folding
+ * either into an existing dismiss-style method would blur two genuinely different UI events for
+ * a lint count. Suppressed rather than forced smaller by a change this PR's scope doesn't call
+ * for; the honest fix is splitting this class by concern (export/import, preferences, health),
+ * which is a bigger change than a health opt-in warrants.
  */
+@Suppress("TooManyFunctions")
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SettingsViewModel
@@ -94,6 +122,8 @@ class SettingsViewModel
         sessions: SessionRepository,
         private val unitPreference: UnitPreference,
         private val restTimerStore: RestTimerStore,
+        private val healthMetricsSource: HealthMetricsSource,
+        private val healthIntegration: HealthIntegration,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(SettingsUiState())
         val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -117,6 +147,16 @@ class SettingsViewModel
             viewModelScope.launch {
                 restTimerStore.defaultRest.collect { rest ->
                     _uiState.update { it.copy(restDefaultSeconds = rest.seconds) }
+                }
+            }
+            viewModelScope.launch {
+                // status() is independent of the toggle (ADR-0038) — re-read here so the section
+                // can decide whether to render at all, and again whenever the toggle itself
+                // changes, since a member flipping it is the other moment the picture can change.
+                healthIntegration.observe().collect { enabled ->
+                    _uiState.update {
+                        it.copy(healthIntegrationEnabled = enabled, healthStatus = healthMetricsSource.status())
+                    }
                 }
             }
         }
@@ -235,6 +275,39 @@ class SettingsViewModel
             val current = _uiState.value.restDefaultSeconds
             val next = (current + delta * REST_STEP_SECONDS).coerceAtLeast(MIN_REST_SECONDS)
             viewModelScope.launch { restTimerStore.setDefaultRest(Duration.ofSeconds(next)) }
+        }
+
+        /**
+         * US-21. Stores the choice, then either starts the permission walk at the first
+         * permission (turning on) or clears any walk in progress (turning off) — the section
+         * itself decides what to show from [SettingsUiState.pendingHealthPermission] and
+         * [SettingsUiState.healthIntegrationEnabled].
+         */
+        fun onHealthIntegrationToggled(enabled: Boolean) {
+            viewModelScope.launch {
+                healthIntegration.set(enabled)
+                _uiState.update {
+                    it.copy(
+                        healthIntegrationEnabled = enabled,
+                        pendingHealthPermission = if (enabled) HealthPermission.entries.first() else null,
+                    )
+                }
+            }
+        }
+
+        /**
+         * Called once the system permission request for [permission] has returned, granted or
+         * denied — the walk advances either way (US-21's "any denial is final for that run" is
+         * enforced by never asking for the same permission twice, not by retrying it here).
+         * [HealthMetricsSource.status] is re-read after every step, not only the last, since a
+         * grant can change it and status is never assumed stable (ADR-0038).
+         */
+        fun onHealthPermissionResult(permission: HealthPermission) {
+            val next = HealthPermission.entries.getOrNull(permission.ordinal + 1)
+            viewModelScope.launch {
+                val status = healthMetricsSource.status()
+                _uiState.update { it.copy(pendingHealthPermission = next, healthStatus = status) }
+            }
         }
 
         private companion object {

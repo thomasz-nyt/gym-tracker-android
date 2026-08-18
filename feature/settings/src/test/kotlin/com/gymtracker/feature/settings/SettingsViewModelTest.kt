@@ -13,6 +13,10 @@ import com.gymtracker.core.domain.backup.FakeBackupStore
 import com.gymtracker.core.domain.backup.ImportBackup
 import com.gymtracker.core.domain.backup.PreviewBackupImport
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.health.HealthIntegration
+import com.gymtracker.core.domain.health.HealthMetricsSource
+import com.gymtracker.core.domain.health.HealthPermission
+import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
@@ -95,6 +99,8 @@ class SettingsViewModelTest {
         fileReader: BackupFileReader = BackupFileReader { "raw" },
         unitPreference: FakeUnitPreference = FakeUnitPreference(),
         restTimerStore: FakeRestTimerStore = FakeRestTimerStore(),
+        healthMetricsSource: FakeHealthMetricsSource = FakeHealthMetricsSource(),
+        healthIntegration: FakeHealthIntegration = FakeHealthIntegration(),
     ) = SettingsViewModel(
         currentMember = currentMember,
         export =
@@ -110,6 +116,8 @@ class SettingsViewModelTest {
         sessions = sessions,
         unitPreference = unitPreference,
         restTimerStore = restTimerStore,
+        healthMetricsSource = healthMetricsSource,
+        healthIntegration = healthIntegration,
     )
 
     // --- Export (US-40) ---
@@ -410,6 +418,100 @@ class SettingsViewModelTest {
             assertEquals(10L, viewModel.uiState.value.restDefaultSeconds)
         }
 
+    // --- Health Connect (US-20, US-21) ---
+
+    @Test
+    fun `status is read on start, independent of the toggle`() =
+        runTest {
+            // ADR-0038's correction: status() must never depend on the toggle, or Settings could
+            // never legitimately show the control that turns it on in the first place.
+            val viewModel =
+                viewModel(
+                    healthMetricsSource = FakeHealthMetricsSource(initial = HealthStatus.PermissionRequired),
+                    healthIntegration = FakeHealthIntegration(initial = false),
+                )
+
+            assertEquals(HealthStatus.PermissionRequired, viewModel.uiState.value.healthStatus)
+            assertEquals(false, viewModel.uiState.value.healthIntegrationEnabled)
+        }
+
+    @Test
+    fun `the section stays absent (Unavailable) when the device or account cannot use it`() =
+        runTest {
+            val viewModel = viewModel(healthMetricsSource = FakeHealthMetricsSource(initial = HealthStatus.Unavailable))
+
+            assertEquals(HealthStatus.Unavailable, viewModel.uiState.value.healthStatus)
+        }
+
+    @Test
+    fun `turning the toggle on stores it and starts the permission walk at the first permission`() =
+        runTest {
+            val healthIntegration = FakeHealthIntegration(initial = false)
+            val viewModel = viewModel(healthIntegration = healthIntegration)
+
+            viewModel.onHealthIntegrationToggled(true)
+
+            assertEquals(true, healthIntegration.current())
+            assertEquals(true, viewModel.uiState.value.healthIntegrationEnabled)
+            assertEquals(HealthPermission.HEART_RATE, viewModel.uiState.value.pendingHealthPermission)
+        }
+
+    @Test
+    fun `each permission result advances to the next permission, in order`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.onHealthIntegrationToggled(true)
+            assertEquals(HealthPermission.HEART_RATE, viewModel.uiState.value.pendingHealthPermission)
+
+            viewModel.onHealthPermissionResult(HealthPermission.HEART_RATE)
+            assertEquals(HealthPermission.ACTIVE_CALORIES, viewModel.uiState.value.pendingHealthPermission)
+
+            viewModel.onHealthPermissionResult(HealthPermission.ACTIVE_CALORIES)
+            assertEquals(HealthPermission.EXERCISE, viewModel.uiState.value.pendingHealthPermission)
+        }
+
+    @Test
+    fun `the walk ends after the last permission, regardless of whether it was granted or denied`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.onHealthIntegrationToggled(true)
+            viewModel.onHealthPermissionResult(HealthPermission.HEART_RATE)
+            viewModel.onHealthPermissionResult(HealthPermission.ACTIVE_CALORIES)
+
+            viewModel.onHealthPermissionResult(HealthPermission.EXERCISE)
+
+            assertNull(viewModel.uiState.value.pendingHealthPermission)
+        }
+
+    @Test
+    fun `finishing the walk re-reads status, reflecting permissions granted during it`() =
+        runTest {
+            val healthMetricsSource = FakeHealthMetricsSource(initial = HealthStatus.PermissionRequired)
+            val viewModel = viewModel(healthMetricsSource = healthMetricsSource)
+            viewModel.onHealthIntegrationToggled(true)
+
+            // The real gateway would report this once the OS records a grant; the fake stands
+            // in for that here rather than asserting anything about the OS itself.
+            healthMetricsSource.current = HealthStatus.Ready
+            viewModel.onHealthPermissionResult(HealthPermission.HEART_RATE)
+
+            assertEquals(HealthStatus.Ready, viewModel.uiState.value.healthStatus)
+        }
+
+    @Test
+    fun `turning the toggle off stops the walk and clears any pending permission`() =
+        runTest {
+            val healthIntegration = FakeHealthIntegration(initial = false)
+            val viewModel = viewModel(healthIntegration = healthIntegration)
+            viewModel.onHealthIntegrationToggled(true)
+            assertEquals(HealthPermission.HEART_RATE, viewModel.uiState.value.pendingHealthPermission)
+
+            viewModel.onHealthIntegrationToggled(false)
+
+            assertEquals(false, healthIntegration.current())
+            assertNull(viewModel.uiState.value.pendingHealthPermission)
+        }
+
     private class FakeEncoder : BackupEncoder {
         override fun encode(
             contents: BackupContents,
@@ -497,6 +599,31 @@ class SettingsViewModelTest {
 
         override suspend fun markNotificationPermissionAsked() {
             asked.value = true
+        }
+    }
+
+    private class FakeHealthMetricsSource(
+        initial: HealthStatus = HealthStatus.Unavailable,
+    ) : HealthMetricsSource {
+        /** Mutable so a test can simulate a permission grant landing mid-walk. */
+        var current: HealthStatus = initial
+
+        override suspend fun status(): HealthStatus = current
+
+        override suspend fun metricsFor(window: ClosedRange<Instant>) = null
+    }
+
+    private class FakeHealthIntegration(
+        initial: Boolean = false,
+    ) : HealthIntegration {
+        private val state = MutableStateFlow(initial)
+
+        override fun observe(): Flow<Boolean> = state
+
+        override suspend fun current(): Boolean = state.value
+
+        override suspend fun set(enabled: Boolean) {
+            state.value = enabled
         }
     }
 }
