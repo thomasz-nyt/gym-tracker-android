@@ -1,6 +1,7 @@
 package com.gymtracker.core.domain.session
 
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import kotlinx.coroutines.flow.Flow
@@ -57,4 +58,14 @@ interface SessionRepository {
      * [DeleteSession], which is the only path that should be deleting a workout with sets in it.
      */
     suspend fun deleteSession(id: SessionId)
+
+    /**
+     * Writes [metrics] onto session [id] (US-22). Touches only the four metrics columns —
+     * `ended_at` and everything else about the session is untouched, so this can run at any
+     * point after the session exists without racing anything else that writes to it.
+     */
+    suspend fun saveMetrics(
+        id: SessionId,
+        metrics: SessionMetrics,
+    )
 }

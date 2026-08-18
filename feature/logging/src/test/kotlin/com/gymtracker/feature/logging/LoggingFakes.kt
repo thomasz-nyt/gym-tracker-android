@@ -16,6 +16,7 @@ import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimerStore
@@ -296,6 +297,13 @@ internal class FakeSessions(
     override suspend fun deleteSession(id: SessionId) {
         state.value = state.value.filterNot { it.id == id }
         cascade(id)
+    }
+
+    override suspend fun saveMetrics(
+        id: SessionId,
+        metrics: SessionMetrics,
+    ) {
+        state.value = state.value.map { if (it.id == id) it.copy(metrics = metrics) else it }
     }
 }
 

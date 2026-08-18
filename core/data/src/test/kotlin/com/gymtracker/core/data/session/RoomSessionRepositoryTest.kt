@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import kotlinx.coroutines.test.runTest
@@ -140,6 +141,44 @@ class RoomSessionRepositoryTest {
                 repository.deleteSession(SessionId("s1"))
                 assertNull(awaitItem())
             }
+        }
+
+    // --- Health metrics (US-22) ---
+
+    @Test
+    fun `saved metrics round-trip through the database`() =
+        runTest {
+            repository.startSession(session("s1"))
+            val metrics = SessionMetrics(128, 171, 340, "health_connect")
+
+            repository.saveMetrics(SessionId("s1"), metrics)
+
+            assertEquals(metrics, repository.findSession(SessionId("s1"))?.metrics)
+        }
+
+    @Test
+    fun `metrics with every field null but a source still round-trip as non-null`() =
+        runTest {
+            // The "attempted, found nothing" case (health-connect.md): distinguishable from
+            // never having read at all, which is why source alone must survive the round trip.
+            repository.startSession(session("s1"))
+            val metrics = SessionMetrics(null, null, null, "health_connect")
+
+            repository.saveMetrics(SessionId("s1"), metrics)
+
+            assertEquals(metrics, repository.findSession(SessionId("s1"))?.metrics)
+        }
+
+    @Test
+    fun `saving metrics does not touch the session's other columns`() =
+        runTest {
+            val endedAt = now.plus(Duration.ofMinutes(45))
+            repository.startSession(session("s1"))
+            repository.endSession(SessionId("s1"), endedAt)
+
+            repository.saveMetrics(SessionId("s1"), SessionMetrics(128, 171, 340, "health_connect"))
+
+            assertEquals(endedAt, repository.findSession(SessionId("s1"))?.endedAt)
         }
 
     @Test
