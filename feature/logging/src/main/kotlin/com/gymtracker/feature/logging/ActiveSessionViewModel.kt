@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
+import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Exercise
@@ -257,6 +258,7 @@ class ActiveSessionViewModel
         endSession: EndSession,
         workoutDetail: WorkoutDetail,
         personalRecordsAchievedIn: PersonalRecordsAchievedIn,
+        recordSessionMetrics: RecordSessionMetrics,
         private val detectPersonalRecord: DetectPersonalRecord,
         removeExerciseFromSession: RemoveExerciseFromSession,
         restoreExerciseToSession: RestoreExerciseToSession,
@@ -320,6 +322,7 @@ class ActiveSessionViewModel
                 endSession = endSession,
                 workoutDetail = workoutDetail,
                 personalRecordsAchievedIn = personalRecordsAchievedIn,
+                recordSessionMetrics = recordSessionMetrics,
                 scope = viewModelScope,
             )
 

@@ -3,6 +3,10 @@ package com.gymtracker.feature.logging
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlan
 import com.gymtracker.core.domain.guided.GuidedPlanStore
+import com.gymtracker.core.domain.health.HealthIntegration
+import com.gymtracker.core.domain.health.HealthMetricsSource
+import com.gymtracker.core.domain.health.HealthStatus
+import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.Equipment
@@ -357,3 +361,34 @@ internal fun fakeStartSessionFromRoutine(): StartSessionFromRoutine {
         addExerciseToSession = AddExerciseToSession(sessionExercises) { SessionExerciseId("unused") },
     )
 }
+
+/** Toggle off, no health source — the same shape every existing `finish.confirm()` test ran against. */
+internal class FakeHealthIntegration(
+    private val enabled: Boolean = false,
+) : HealthIntegration {
+    override fun observe(): Flow<Boolean> = MutableStateFlow(enabled)
+
+    override suspend fun current(): Boolean = enabled
+
+    override suspend fun set(enabled: Boolean) = Unit
+}
+
+internal class FakeHealthMetricsSource(
+    private val result: SessionMetrics? = null,
+) : HealthMetricsSource {
+    override suspend fun status(): HealthStatus = if (result != null) HealthStatus.Ready else HealthStatus.Unavailable
+
+    override suspend fun metricsFor(window: ClosedRange<Instant>): SessionMetrics? = result
+}
+
+/**
+ * A [RecordSessionMetrics] over fakes (US-22). Defaults reproduce every pre-existing
+ * `finish.confirm()` test's behaviour exactly — toggle off, so [sessions] is never touched —
+ * and a test opts into the read by passing [enabled] and [metrics].
+ */
+internal fun fakeRecordSessionMetrics(
+    sessions: SessionRepository,
+    enabled: Boolean = false,
+    metrics: SessionMetrics? = null,
+): RecordSessionMetrics =
+    RecordSessionMetrics(FakeHealthIntegration(enabled), FakeHealthMetricsSource(metrics), sessions)

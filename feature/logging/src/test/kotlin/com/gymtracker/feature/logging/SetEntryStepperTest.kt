@@ -96,6 +96,7 @@ class SetEntryStepperTest {
                     AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
                 endSession = EndSession(repository, sets, clock),
                 workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
+                recordSessionMetrics = fakeRecordSessionMetrics(repository),
                 personalRecordsAchievedIn =
                     PersonalRecordsAchievedIn(
                         DetectPersonalRecord(
