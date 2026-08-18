@@ -2,10 +2,12 @@ package com.gymtracker.feature.health
 
 import androidx.health.connect.client.HealthConnectClient
 import com.gymtracker.core.domain.health.HealthMetricsSource
+import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.model.SessionMetrics
 import java.time.Instant
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /**
  * The real [HealthMetricsSource] (M5). Bound only when `:app`'s optional-feature flag enables
@@ -39,8 +41,38 @@ class HealthConnectMetricsSource
         }
 
         /**
-         * Stubbed for this PR — always `null`. US-20/US-21 (this PR) build the availability
-         * check and the opt-in; the read itself is US-22's PR, per ADR-0038.
+         * US-22. Each of the three permissions gates its own read independently — a member who
+         * granted only active calories gets that one metric and nulls for the rest, never a
+         * refused read overall (`health-connect.md`'s "partial permissions" case). The exercise
+         * permission, if granted, narrows the window the other two run over to the actual
+         * recorded session rather than the app's own start/end, which can run a little wide of
+         * what a wearable considered "the workout."
          */
-        override suspend fun metricsFor(window: ClosedRange<Instant>): SessionMetrics? = null
+        override suspend fun metricsFor(window: ClosedRange<Instant>): SessionMetrics? {
+            if (status() != HealthStatus.Ready) return null
+
+            val granted = gateway.grantedPermissions()
+            val refined =
+                if (HealthPermission.EXERCISE.id in granted) {
+                    gateway.exerciseSessionWindow(window) ?: window
+                } else {
+                    window
+                }
+
+            val heartRate =
+                if (HealthPermission.HEART_RATE.id in granted) gateway.heartRateBpm(refined) else emptyList()
+            val activeCalories =
+                if (HealthPermission.ACTIVE_CALORIES.id in granted) gateway.activeCaloriesKcal(refined) else emptyList()
+
+            return SessionMetrics(
+                avgHeartRate = heartRate.takeIf { it.isNotEmpty() }?.average()?.roundToInt(),
+                maxHeartRate = heartRate.maxOrNull()?.toInt(),
+                activeKilocalories = activeCalories.takeIf { it.isNotEmpty() }?.sum()?.roundToInt(),
+                source = SOURCE,
+            )
+        }
+
+        private companion object {
+            const val SOURCE = "health_connect"
+        }
     }
