@@ -85,6 +85,14 @@ data class SessionUiState(
     val canUndoSetDelete: Boolean = false,
     /** Time left in the current rest, or null when none is running (US-05). */
     val restRemaining: Duration? = null,
+    /**
+     * What the current rest was configured for when it started — a progress bar's denominator.
+     * Null exactly when [restRemaining] is null. Deliberately not the live
+     * [com.gymtracker.core.domain.rest.RestTimerStore.defaultRest]: see that property's own doc
+     * for why a rest already running must not visibly retime when the member changes the
+     * default in Settings (US-42).
+     */
+    val restTotal: Duration? = null,
     /** What the rest panel says is coming, or null before anything is logged (ADR-0023). */
     val upNext: UpNextSet? = null,
     /**
@@ -186,6 +194,8 @@ private data class SessionData(
 private data class SessionComputed(
     val data: SessionData,
     val remaining: Duration?,
+    /** What [remaining] started counting down from — a progress bar's denominator (ADR-0029). */
+    val total: Duration?,
 ) {
     // Pass-through accessors so call sites read `computed.progress` etc. rather than
     // `computed.data.progress` — SessionData's split from this class is an internal
@@ -484,14 +494,18 @@ class ActiveSessionViewModel
 
         /**
          * [sessionData] plus the rest countdown (ADR-0023). See [SessionComputed]'s doc for why
-         * this is a second, outer `combine` rather than adding `rest.remaining()` as a fifth
+         * this is a second, outer `combine` rather than adding `rest.reading()` as a fifth
          * argument above: that ticks once a second for as long as the session is active, and
          * [sessionData]'s own computation is two suspend Room queries deep — this is what keeps
-         * a countdown tick from re-running either of them.
+         * a countdown tick from re-running either of them. [RestController.reading] itself reads
+         * its remaining-time and total in one tick for the same reason this whole class combines
+         * atomically rather than per-field: two independently pushed flows can each emit for one
+         * underlying change, and a member-facing `combine` over both would show a transient state
+         * in between.
          */
         private val sessionComputed: Flow<SessionComputed> =
-            combine(rest.remaining(), sessionData) { remaining, data ->
-                SessionComputed(data = data, remaining = remaining)
+            combine(rest.reading(), sessionData) { reading, data ->
+                SessionComputed(data = data, remaining = reading.remaining, total = reading.total)
             }
 
         /**
@@ -529,6 +543,7 @@ class ActiveSessionViewModel
                     setEdit = extras.edit,
                     canUndoSetDelete = extras.canUndoSetDelete,
                     restRemaining = computed.remaining,
+                    restTotal = computed.total,
                     upNext = computed.upNext,
                     canUndoRemoval = sideTrips.canUndoRemoval,
                     guided = sideTrips.guided,

@@ -60,17 +60,28 @@ internal class FakeGuidedPlanStore : GuidedPlanStore {
 
 internal class FakeRestTimerStore : RestTimerStore {
     private val endsAt = MutableStateFlow<java.time.Instant?>(null)
+    private val total = MutableStateFlow<Duration?>(null)
 
     // Matches DataStoreRestTimerStore.DEFAULT_REST_SECONDS_VALUE (US-05, amended 90s -> 60s).
     private val default = MutableStateFlow(Duration.ofSeconds(60))
     private val asked = MutableStateFlow(false)
 
     override val restEndsAt = endsAt
+    override val restTotal = total
     override val defaultRest = default
     override val shouldAskForNotificationPermission = asked.map { !it }
 
     override suspend fun setRestEndsAt(instant: java.time.Instant?) {
         endsAt.value = instant
+        if (instant == null) total.value = null
+    }
+
+    override suspend fun setRest(
+        endsAt: java.time.Instant,
+        total: Duration,
+    ) {
+        this.endsAt.value = endsAt
+        this.total.value = total
     }
 
     override suspend fun setDefaultRest(rest: Duration) {

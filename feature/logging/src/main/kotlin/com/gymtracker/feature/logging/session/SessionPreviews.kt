@@ -64,6 +64,7 @@ private fun RestingPreview() {
                     activeSession = previewSession,
                     unit = WeightUnit.LB,
                     restRemaining = Duration.ofSeconds(75),
+                    restTotal = Duration.ofSeconds(90),
                     exercises =
                         listOf(
                             SessionExerciseRow(

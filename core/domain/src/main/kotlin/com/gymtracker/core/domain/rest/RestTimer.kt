@@ -24,7 +24,7 @@ class RestTimer(
     /** Starts a rest of the member's configured length, replacing any already running. */
     suspend fun start() {
         val rest = store.defaultRest.first()
-        store.setRestEndsAt(clock.instant().plus(rest))
+        store.setRest(clock.instant().plus(rest), rest)
     }
 
     /** Ends the rest now. US-05: "I can dismiss or skip it." */
@@ -39,6 +39,14 @@ class RestTimer(
      * no time.
      */
     fun remaining(): Flow<Duration?> = store.restEndsAt.map { endsAt -> endsAt?.remaining() }
+
+    /**
+     * What the running rest was configured for, or null when none is running — a progress bar's
+     * denominator. Deliberately not [RestTimerStore.defaultRest] read live: see that property's
+     * own doc for why a rest already running must not visibly retime when the member changes
+     * the default in Settings.
+     */
+    fun total(): Flow<Duration?> = store.restTotal
 
     private fun Instant.remaining(): Duration? =
         Duration.between(clock.instant(), this).takeIf { !it.isNegative && !it.isZero }

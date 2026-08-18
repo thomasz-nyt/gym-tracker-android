@@ -8,10 +8,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -60,15 +58,24 @@ class RestController(
     }
 
     /**
-     * Remaining rest, re-read every second so the countdown moves.
+     * The rest countdown, re-read every second so it moves: how much is left, and what it was
+     * configured for when it started (a progress bar's denominator — [RestTimer.total]'s own
+     * doc explains why that is a different question from [RestTimerStore.defaultRest]).
      *
-     * The tick is only a redraw signal. The value always comes from the stored end time
-     * against the clock, so a missed tick cannot make the timer drift.
+     * Both values come from the same tick, read together rather than as two independently
+     * combined flows. `ActiveSessionViewModel`'s own class docs name exactly this trap for
+     * `SessionData`: two flows updated by separate writes can each push their own emission for
+     * one underlying change, and a `combine` over both would observe a genuinely transient
+     * state in between — [remaining] already moved, [total] not yet, or the reverse. Reading
+     * both inside the one tick is what makes them arrive as a single atomic value instead.
+     *
+     * The tick is only a redraw signal. Both values always come from the stored end time and
+     * total against the clock, so a missed tick cannot make either drift.
      */
-    fun remaining(): Flow<Duration?> =
+    fun reading(): Flow<RestReading> =
         flow {
             while (true) {
-                emitAll(restTimer.remaining().take(1))
+                emit(RestReading(remaining = restTimer.remaining().first(), total = restTimer.total().first()))
                 delay(TICK_MILLIS)
             }
         }.distinctUntilChanged()
@@ -77,3 +84,9 @@ class RestController(
         const val TICK_MILLIS = 1_000L
     }
 }
+
+/** One tick of [RestController.reading] — the countdown and what it started from, together. */
+data class RestReading(
+    val remaining: Duration?,
+    val total: Duration?,
+)
