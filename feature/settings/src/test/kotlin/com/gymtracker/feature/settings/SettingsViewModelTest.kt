@@ -114,16 +114,56 @@ class SettingsViewModelTest {
 
     // --- Export (US-40) ---
 
+    // Replaces the old `starts idle, and returns to idle once the export completes`, which
+    // pinned an actual defect: a successful export left no trace in the UI beyond the button
+    // relabelling itself for a moment mid-write. The member replaces nothing here, but they
+    // still deserve to know the file landed — reusing the `ErrorBanner` treatment, recoloured,
+    // rather than inventing a second confirmation pattern.
     @Test
-    fun `starts idle, and returns to idle once the export completes`() =
+    fun `starts idle, and reports success once the export completes`() =
         runTest {
             val viewModel = viewModel()
             assertEquals(false, viewModel.uiState.value.isExporting)
+            assertEquals(false, viewModel.uiState.value.exportSucceeded)
 
             viewModel.onExport(destination)
 
             assertEquals(false, viewModel.uiState.value.isExporting)
+            assertEquals(true, viewModel.uiState.value.exportSucceeded)
             assertNull(viewModel.uiState.value.exportError)
+        }
+
+    @Test
+    fun `a second export clears the previous success flag while it runs`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.onExport(destination)
+            assertEquals(true, viewModel.uiState.value.exportSucceeded)
+
+            viewModel.onExport(destination)
+
+            assertEquals(true, viewModel.uiState.value.exportSucceeded, "the second export also succeeded")
+        }
+
+    @Test
+    fun `dismissing the export success clears it without touching anything else`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.onExport(destination)
+
+            viewModel.onExportSuccessDismissed()
+
+            assertEquals(false, viewModel.uiState.value.exportSucceeded)
+        }
+
+    @Test
+    fun `a failed export never reports success`() =
+        runTest {
+            val viewModel = viewModel(writer = FakeFileWriter(failWith = IllegalStateException("no space")))
+
+            viewModel.onExport(destination)
+
+            assertEquals(false, viewModel.uiState.value.exportSucceeded)
         }
 
     @Test
@@ -200,6 +240,61 @@ class SettingsViewModelTest {
 
             assertEquals(incomingContents, store.lastReplaced)
             assertNull(viewModel.uiState.value.importPreview)
+        }
+
+    // The counterpart defect to the export one above: a successful import replaces the
+    // member's entire database and the only feedback was the confirm dialog closing. Reuses the
+    // counts the preview already validated — `ImportBackupResult.Imported` is a bare data
+    // object, so no domain change was needed to surface real numbers here.
+    @Test
+    fun `confirming reports what was imported, in real counts`() =
+        runTest {
+            val store = FakeBackupStore(seed = mapOf(member to emptyContents))
+            val viewModel = viewModel(store = store)
+            viewModel.onImportFileSelected(destination)
+
+            viewModel.onImportConfirmed()
+
+            val success = assertNotNull(viewModel.uiState.value.importSucceeded)
+            assertEquals(1, success.sessionCount)
+            assertEquals(1, success.routineCount)
+        }
+
+    @Test
+    fun `dismissing the import success clears it without touching anything else`() =
+        runTest {
+            val store = FakeBackupStore(seed = mapOf(member to emptyContents))
+            val viewModel = viewModel(store = store)
+            viewModel.onImportFileSelected(destination)
+            viewModel.onImportConfirmed()
+
+            viewModel.onImportSuccessDismissed()
+
+            assertNull(viewModel.uiState.value.importSucceeded)
+        }
+
+    @Test
+    fun `selecting a new file clears a previous import's success banner`() =
+        runTest {
+            val store = FakeBackupStore(seed = mapOf(member to emptyContents))
+            val viewModel = viewModel(store = store)
+            viewModel.onImportFileSelected(destination)
+            viewModel.onImportConfirmed()
+            assertNotNull(viewModel.uiState.value.importSucceeded)
+
+            viewModel.onImportFileSelected(destination)
+
+            assertNull(viewModel.uiState.value.importSucceeded)
+        }
+
+    @Test
+    fun `a refused import never reports success`() =
+        runTest {
+            val viewModel = viewModel(catalog = FakeCatalog(setOf(TestData.SQUAT))) // BENCH missing
+
+            viewModel.onImportFileSelected(destination)
+
+            assertNull(viewModel.uiState.value.importSucceeded)
         }
 
     @Test

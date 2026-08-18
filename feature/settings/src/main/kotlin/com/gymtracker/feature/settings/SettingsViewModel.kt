@@ -35,14 +35,32 @@ data class ImportPreviewUi(
     val incomingRoutineCount: Int,
 )
 
+/**
+ * What just landed, once an import actually ran. Carries the same counts [ImportPreviewUi]
+ * already validated — reused, not recomputed, since [ImportBackupResult.Imported] is a bare
+ * `data object` and the numbers were already known to be correct by the time the member
+ * confirmed.
+ */
+data class ImportSuccessUi(
+    val sessionCount: Int,
+    val routineCount: Int,
+)
+
 /** Everything the Settings screen renders (US-40, US-41, US-42). */
 data class SettingsUiState(
     val isExporting: Boolean = false,
     val exportError: String? = null,
+    /** True once an export has actually landed on disk. The member replaces nothing here, but a
+     * write that silently succeeds is indistinguishable on screen from one that silently did
+     * nothing — this is the difference. */
+    val exportSucceeded: Boolean = false,
     val hasActiveSession: Boolean = false,
     val isPreviewingImport: Boolean = false,
     val importPreview: ImportPreviewUi? = null,
     val importError: String? = null,
+    /** Non-null immediately after a confirmed import replaces the member's data. The whole
+     * database just changed under them; a dialog closing is not enough to say so. */
+    val importSucceeded: ImportSuccessUi? = null,
     val unit: WeightUnit = WeightUnit.LB,
     val restDefaultSeconds: Long = DEFAULT_REST_SECONDS,
 )
@@ -105,9 +123,9 @@ class SettingsViewModel
 
         fun onExport(destination: String) {
             viewModelScope.launch {
-                _uiState.update { it.copy(isExporting = true, exportError = null) }
+                _uiState.update { it.copy(isExporting = true, exportError = null, exportSucceeded = false) }
                 runCatching { export(currentMember.id(), destination) }
-                    .onSuccess { _uiState.update { it.copy(isExporting = false) } }
+                    .onSuccess { _uiState.update { it.copy(isExporting = false, exportSucceeded = true) } }
                     .onFailure { error ->
                         _uiState.update {
                             it.copy(isExporting = false, exportError = error.message ?: "Export failed")
@@ -120,9 +138,20 @@ class SettingsViewModel
             _uiState.update { it.copy(exportError = null) }
         }
 
+        fun onExportSuccessDismissed() {
+            _uiState.update { it.copy(exportSucceeded = false) }
+        }
+
         fun onImportFileSelected(source: String) {
             viewModelScope.launch {
-                _uiState.update { it.copy(isPreviewingImport = true, importError = null, importPreview = null) }
+                _uiState.update {
+                    it.copy(
+                        isPreviewingImport = true,
+                        importError = null,
+                        importPreview = null,
+                        importSucceeded = null,
+                    )
+                }
                 when (val result = previewImport(currentMember.id(), source)) {
                     is ImportPreviewResult.Ready -> {
                         pendingImport = result.incoming
@@ -151,11 +180,27 @@ class SettingsViewModel
 
         fun onImportConfirmed() {
             val contents = pendingImport ?: return
+            // Read before the import runs: onImportFileSelected is the one place that clears
+            // importPreview, and this call is about to trigger that same update — capturing the
+            // preview now is what lets the success banner report the same counts the member
+            // already confirmed, rather than re-deriving them from contents after the fact.
+            val preview = _uiState.value.importPreview
             viewModelScope.launch {
                 when (val result = importBackup(currentMember.id(), contents)) {
                     is ImportBackupResult.Imported -> {
                         pendingImport = null
-                        _uiState.update { it.copy(importPreview = null) }
+                        _uiState.update {
+                            it.copy(
+                                importPreview = null,
+                                importSucceeded =
+                                    preview?.let { p ->
+                                        ImportSuccessUi(
+                                            sessionCount = p.incomingSessionCount,
+                                            routineCount = p.incomingRoutineCount,
+                                        )
+                                    },
+                            )
+                        }
                     }
                     is ImportBackupResult.Refused -> {
                         pendingImport = null
@@ -174,6 +219,10 @@ class SettingsViewModel
             _uiState.update { it.copy(importError = null) }
         }
 
+        fun onImportSuccessDismissed() {
+            _uiState.update { it.copy(importSucceeded = null) }
+        }
+
         fun onUnitChanged(unit: WeightUnit) {
             viewModelScope.launch { unitPreference.set(unit) }
         }
@@ -188,19 +237,25 @@ class SettingsViewModel
             viewModelScope.launch { restTimerStore.setDefaultRest(Duration.ofSeconds(next)) }
         }
 
-        private fun ImportRefusalReason.message(): String =
-            when (this) {
-                is ImportRefusalReason.SessionActive ->
-                    "A workout is running. Finish or discard it before importing."
-                is ImportRefusalReason.UnknownExercises ->
-                    "This file references exercises not in this catalog: " +
-                        missingExerciseIds.joinToString { it.value }
-            }
-
         private companion object {
             const val REST_STEP_SECONDS = 5L
             const val MIN_REST_SECONDS = 10L
         }
+    }
+
+/**
+ * Top-level rather than a class member: a pure function of [ImportRefusalReason] with no
+ * dependency on [SettingsViewModel]'s own state, and keeping it there was the difference between
+ * 11 member functions (detekt's `TooManyFunctions` threshold) and 10 once the two new success-
+ * dismissal callbacks landed alongside it.
+ */
+private fun ImportRefusalReason.message(): String =
+    when (this) {
+        is ImportRefusalReason.SessionActive ->
+            "A workout is running. Finish or discard it before importing."
+        is ImportRefusalReason.UnknownExercises ->
+            "This file references exercises not in this catalog: " +
+                missingExerciseIds.joinToString { it.value }
     }
 
 /** ADR-0008 default while the real preference is still loading. */
