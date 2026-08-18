@@ -25,6 +25,7 @@ hard part and are native on both sides anyway).
 | Images | Coil 3 | Loads the bundled exercise photos. **Corrected 2026-08-01:** this row read "Coil 3 with `coil-gif`, GIF is the primary exercise-demo format". The seed data contains no GIFs — free-exercise-db ships static JPGs (ADR-0014). `coil-gif` is not a dependency and is not needed until there is media that is actually animated |
 | Video | Media3 / ExoPlayer | Deferred to M2 with the media it would play (ADR-0014); do not add earlier |
 | Health | `androidx.health.connect:connect-client` 1.1.0 | Optional module — see below. Pinned to the latest stable release (not an alpha/beta/rc) as of M5, ADR-0038 |
+| Live heart rate | `android.bluetooth` (platform BLE GATT) | Optional module, API 31+ — no new artifact. ADR-0039. Not Health Connect: reads a paired band's own Bluetooth Heart Rate Profile broadcast directly, for a transient display-only value only |
 | Nav | Navigation Compose, type-safe routes | |
 | Serialization | kotlinx.serialization | |
 | Backup file I/O | Storage Access Framework, via `androidx.activity`'s `ActivityResultContracts` | ADR-0034. **Not a new dependency** — already present. The user picks the destination in the system picker, so a cloud-synced folder is their choice and the app gains no cloud dependency, no permission, and no `WRITE_EXTERNAL_STORAGE` |
@@ -70,10 +71,12 @@ makes the iOS port a matter of re-writing UI rather than re-deriving logic.
 
 ## The optional-feature contract
 
-`:feature:health` and `:feature:coach` are optional per constitution §3. The rule:
+`:feature:health` and `:feature:coach` are optional per constitution §3. The rule
+now governs three ports, not two — `HealthMetricsSource`, `LiveHeartRateSource`
+(ADR-0039), and `CoachingSource` — all on the same terms:
 
 - `:app` depends on an **interface** declared in `:core:domain`
-  (`HealthMetricsSource`, `CoachingSource`).
+  (`HealthMetricsSource`, `LiveHeartRateSource`, `CoachingSource`).
 - The default binding is a no-op implementation that reports `Unavailable`.
 - The real implementation is bound only when the feature is enabled at runtime.
 - **Every screen must render correctly with the no-op binding.** There is a test

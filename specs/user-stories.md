@@ -821,6 +821,45 @@ machine-specific placards from the same drawing set are explicitly out of scope.
 
 ---
 
+## M5a — Live heart rate from a paired band
+
+Stories: US-46 … US-49. Read `specs/adr/0039-a-live-band-is-not-health-connect.md`
+first — this is not Health Connect, and not the same read as US-22.
+
+### US-46 — Pair a band
+- Given the device is below API 31, has no Bluetooth adapter, or the toggle is off,
+  Settings shows no live-heart-rate UI at all. **No prompt, no nag, no banner** —
+  the same absence rule US-20 established for Health Connect.
+- Live heart rate is **off by default** for every member.
+- Turning it on requests `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT`, one at a time,
+  each with a plain-language reason shown first, then scans for nearby devices
+  advertising the Bluetooth Heart Rate service and lets the member choose one.
+- Denying either permission leaves the rest of the app fully working.
+- The chosen device is remembered device-locally (not synced, not backed up).
+
+### US-47 — Live heart rate, everywhere
+- While a reading exists, the current BPM is visible from every screen in the app,
+  not just the session screen.
+- When no reading exists — unpaired, disconnected, unavailable, or the toggle off —
+  the element is absent entirely: zero height, never a dash, never a zero.
+- The reading never blocks or delays anything in the core logging loop
+  (constitution §2.1): appearing or disappearing must not shift "Add set" off
+  screen or add a tap to logging a set.
+
+### US-48 — Connection honesty
+- "Searching" (connecting, no reading yet) and "Lost" (was connected, signal
+  dropped) are two distinct, visibly different states — neither is shown as if it
+  were a live reading.
+- A reading older than a defined staleness threshold is never displayed as current
+  (constitution §2.4); once stale, the display moves to "Lost".
+
+### US-49 — Unpair
+- Turning the toggle off stops scanning and drops any open connection immediately.
+- Nothing from this feature is ever persisted (ADR-0039), so unlike US-23 there is
+  nothing to offer to delete — turning it off is instant and complete.
+
+---
+
 ## M6 — AI coaching
 
 ### US-24 — Session suggestion

@@ -10,8 +10,13 @@ this entry reconciled the file against the code (see each section's own "Exit" n
 verified and how). M2 is deliberately postponed so the offline core can be finished before
 accounts and sync arrive; M3a, M3b, M3c and M4a were all taken ahead of their sequential position
 for reasons argued in each one's own section below. Per the sequential rule at the top of this
-file, **M5 is next** — nothing in it has started. Redesign-audit follow-up work (below) continues
-alongside, on the same terms M3b and M3c ran alongside M4: it touches no table any milestone
+file, **M5 is next** — US-20, US-21 and US-22 are merged (#59, then #60/#62 — #60 initially
+merged into #59's now-dead head branch rather than `main` and had to be re-landed via #62,
+2026-08-18); only US-23 (revoke) remains open. **M5a is specced (ADR-0039, 2026-08-18) and now
+unblocked** — it runs alongside M5 on the same terms M3b and M3c ran alongside M4, and reuses
+M5's optional-feature scaffolding (`:feature:health`, the no-op default binding, the per-member
+toggle shape) now that it exists in `main`, rather than rebuilding it. Redesign-audit follow-up
+work (below) continues alongside as well, on the same terms: it touches no table any milestone
 reads.
 
 M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
@@ -575,6 +580,41 @@ absent: `SessionEntity`'s own read path only produces a non-null `SessionMetrics
 behavior, confirmed by pulling the on-device SQLite file and finding every metrics column null
 including `metrics_source`) renders nothing, exactly as it did before this session's read ever
 ran.
+
+---
+
+## M5a — Live heart rate from a paired band
+
+Stories: US-46 … US-49. Read `specs/adr/0039-a-live-band-is-not-health-connect.md`
+and `specs/health-connect.md`'s amended device-access rule first. This is not
+Health Connect and not US-22's read: it is a live, transient value from a direct
+Bluetooth connection to the band, never persisted.
+
+Runs alongside M5 on the terms `roadmap.md` already set for M3b and M3c alongside
+M4: it touches no table M5 reads. Its code was blocked on #59 and #60 merging so it
+could reuse M5's optional-feature scaffolding (`:feature:health`, the no-op default
+binding pattern, the per-member toggle shape) instead of building it twice — both
+are now in `main` (see the section header above), so M5a's implementation can
+start.
+
+- [ ] `LiveHeartRateSource` port in `:core:domain`, independent of
+      `HealthMetricsSource`
+- [ ] Availability check: no Bluetooth adapter / below API 31 / **not available**
+- [ ] Granular permission request (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`); app fully
+      functional if denied or unavailable
+- [ ] Scan, pair, and hold a Bluetooth Heart Rate Profile (0x180D/0x2A37) connection
+      to the chosen device
+- [ ] Live BPM visible from every screen while a reading exists; absent entirely
+      otherwise
+- [ ] Searching / Beating / Lost are distinct, honestly-labelled states; a stale
+      reading is never shown as current
+- [ ] Per-member toggle, default **off**; nothing is ever persisted
+- [ ] Full UI suite passes with the no-op binding; `TwoTapSetLoggingTest` unedited
+
+**Exit:** installing on a device below API 31, or with no Bluetooth adapter,
+produces zero crashes, zero empty holes, and no prompts; pairing a Fitbit Charge 6
+shows live BPM tracking the band's own display within the app's session screen and
+every other screen, and turning the toggle off drops the connection immediately.
 
 ---
 

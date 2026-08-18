@@ -53,7 +53,17 @@ Use `androidx.health.connect:connect-client` — the on-device API. Do **not** u
 
 Fitbit band data reaches us the same way Apple Watch data will on iOS: the vendor's
 own app writes to the platform health store, and we read from the store. We never
-talk to a device or a vendor cloud.
+talk to a device or a vendor cloud — **for anything that ends up in this document's
+"What we read and what we store" table, or in Room.**
+
+**This rule does not extend to a live, on-screen-only reading.** ADR-0039 narrows it:
+the app may hold a direct Bluetooth Heart Rate Profile connection to a paired band
+for a transient, display-only value, because Health Connect has no streaming API and
+Fitbit's sync into it is deliberately battery-delayed — a poll would be honest about
+neither being live nor being current (constitution §2.4). That path is a separate
+domain port (`LiveHeartRateSource`, not `HealthMetricsSource`), documented in
+ADR-0039, not in this file: nothing below this point changes as a result, and
+nothing a live band reading returns is ever written to Room or the backup envelope.
 
 ## Permissions
 
