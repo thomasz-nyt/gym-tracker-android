@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -121,7 +120,7 @@ internal fun ExerciseDetailScreen(
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
                 )
-                RepMascot(modifier = Modifier.size(GymDimens.MascotInline))
+                RepMascot(modifier = Modifier.height(GymDimens.MascotInline))
             }
 
             MovementPhoto(exercise.imageAsset)

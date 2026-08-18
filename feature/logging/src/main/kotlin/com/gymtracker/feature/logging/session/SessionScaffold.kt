@@ -85,6 +85,7 @@ internal fun SessionBody(
     onStartFromRoutine: (RoutineId) -> Unit,
     onOpenRoutines: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSelectExercise: (SessionExerciseId) -> Unit,
     warmUp: WarmUp,
     modifier: Modifier = Modifier,
 ) {
@@ -125,6 +126,7 @@ internal fun SessionBody(
                     onLogNextSet = onLogNextSet,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
+                    onSelectExercise = onSelectExercise,
                     warmUp = warmUp,
                 )
             else ->
@@ -268,6 +270,7 @@ private fun ActiveSession(
     onLogNextSet: (UpNextSet) -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
+    onSelectExercise: (SessionExerciseId) -> Unit,
     warmUp: WarmUp,
 ) {
     var confirmingFinish by remember { mutableStateOf(false) }
@@ -312,6 +315,7 @@ private fun ActiveSession(
                 onStartExercise = onStartExercise,
                 onEditSet = onEditSet,
                 onLogNextSet = onLogNextSet,
+                onSelectExercise = onSelectExercise,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -372,6 +376,7 @@ private fun MidSetBody(
     onStartExercise: (SessionExerciseRow) -> Unit,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
+    onSelectExercise: (SessionExerciseId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -398,6 +403,7 @@ private fun MidSetBody(
                 onStartExercise = onStartExercise,
                 onEditSet = onEditSet,
                 onLogNextSet = onLogNextSet,
+                onSelectExercise = onSelectExercise,
                 modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = GymDimens.ScreenPadding),
             )
         }

@@ -725,6 +725,49 @@ by a member still seeing "Go", a plain rep field and a "Finish set" button on Ma
   `OneTapSetLoggingTest` must pass **unedited** — nothing here touches the session screen or the
   two-tap path.
 
+### US-44 — How long I spent between sets
+Added 2026-08-17, out of `Redesign.dc.html` Turn 3 (frame `3g`). Two different numbers both read
+as "per-set time": time-under-load needs a start event only guided mode has and a column `sets`
+does not have; the set-to-set interval is the difference between two `performed_at` values
+already in the table, needs no schema change, and is correct retroactively on every session ever
+logged. This story builds only the second number. See `adr/0036-rest-is-ink-and-red-is-the-thing-
+you-tap.md` for why it replaces the set row's checkmark rather than sitting beside it.
+
+- Each logged set shows the time since the previous set **in the same session** — intervals span
+  movements on purpose, since the walk to the next machine is what explains a long session, not
+  just the reps themselves.
+- The first set of a session shows no interval; there is nothing before it to measure from.
+- An exercise's header shows the average interval across its own logged sets.
+- A session logged before this shipped shows correct intervals the first time it is opened —
+  the figure is a read over `performed_at`, not something written at log time.
+- Sets logged within the same few seconds of each other (ADR-0009 bulk entry) show no interval
+  rather than `+0:00` — a near-zero gap from typing several sets at once is not information
+  about the workout, and rendering it invites the same "reads as a bug" complaint the redesign
+  audit already made once about the history summary line.
+- Constitution §2.4: an interval is never estimated or interpolated — absent, not guessed, when
+  there is no earlier set to measure from.
+
+### US-45 — Switch back to an exercise the machine took away
+Added 2026-08-17, reported live during testing. See `adr/0037-choosing-which-exercise-is-open.md`.
+Once a set is logged against a later exercise, an earlier untouched one had no row, no button,
+and nothing to tap anywhere on the session screen — the only ways back were destructive (delete
+every set on the later exercise, or remove it, US-02c). Not the same story as the roadmap's
+undesigned "swap a movement for a substitute exercise" — this is navigation between exercises the
+session already includes, in either direction.
+
+- Every exercise already in the session is reachable and tappable from the session screen at all
+  times, regardless of its position in the plan and regardless of whether it already has sets
+  logged.
+- Tapping an exercise other than the currently open one makes it the open exercise: its own set
+  list, target, `Start exercise`/`Remove`, and the one-tap `LOG SET` button — the same full
+  experience today's current exercise gets, not a shortcut into a sheet.
+- The exercise switched away from loses nothing — its logged sets stay exactly as they were, and
+  it is reachable again the same way, by tapping it.
+- The choice is sticky: it stays open until the member taps a different exercise, not until the
+  next set logged anywhere snaps the screen back to a derived default.
+- US-03's two-tap ceiling and US-35's one-tap log button are unchanged for a member who never
+  switches exercises — `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
+
 ---
 
 ## M4a — Rep, animated

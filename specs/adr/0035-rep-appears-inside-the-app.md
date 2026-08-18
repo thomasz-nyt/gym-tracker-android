@@ -132,3 +132,19 @@ absence rule.
   extension of this one, given the name-matching and coverage questions ADR-0026 already raised
   and this one did not answer. **Revisit** also if a future screen wants the mascot band on an
   accent surface — the monochrome-on-`primary` rule above would need to change first.
+
+## Amendment, 2026-08-17 (Turn 3, ADR-0036)
+
+`RepMascotGeometry`'s viewBox (`0 0 200 210`) was transcribed unchanged from the source SVG, but
+the figure's ink only ever occupied roughly the middle 39% of its width and 67% of its height —
+`RepMascot`'s `Canvas` fits the whole viewBox, so `Modifier.size(GymDimens.MascotInline)` (88dp)
+reserved a box for a figure drawn at 32dp wide. `Redesign.dc.html`'s Turn 3 measured this against
+the warm-up panel specifically (finding 01) and prescribed the fix: crop the viewBox to the ink's
+bounding box (`46 20 84 148` in source units, covering every animated pose's extent including the
+bob) and size call sites by height, not by a fixed box. This is a correction inside this ADR's
+own scope, not a new decision — same drawing, same placements, same colour rule — and it is
+recorded here rather than in a new ADR for that reason. One consequence worth naming: Rep now
+draws larger at every call site for the same token value, which Turn 3's own text calls out as
+wanted ("it makes Rep bigger everywhere else it appears") rather than a side effect to correct
+for. `GymDimens.MascotHome`/`MascotInline` are retuned once, on device, after the crop; see
+`specs/roadmap.md`'s Turn 3 entry for what that retuning settled on.

@@ -473,7 +473,10 @@ extra element. Sequencing protects nothing here that running it now would risk.
 - [x] Rep on Train home, the warm-up panel (running), exercise detail (beside the name, not the
       empty photo slot), and the guided screen's `RestHero`/`ExerciseSummary` states only.
       `MascotHome` (140dp) and `MascotInline` (88dp) sized and re-verified on device after the
-      first pass at 104dp measured too wide for the warm-up panel's "Done" to stay on one line
+      first pass at 104dp measured too wide for the warm-up panel's "Done" to stay on one line.
+      **Superseded 2026-08-17 by the Turn 3 entry below:** the viewBox crop that fixes the
+      overflow properly also changes what these two tokens measure, from width to height — this
+      bullet's own "too wide" framing goes stale the moment that lands, on purpose.
 - [x] Renders a static pose, not nothing, when `Settings.Global.ANIMATOR_DURATION_SCALE == 0`
 - [x] `GymColorSchemeTest` passes **unedited** (mechanically refactored to share `WcagContrast`
       with the new `MascotColorsTest`, same assertions, still green)
@@ -730,7 +733,45 @@ there specifically. Two new `GuidedFlowTest` cases (with history, and with none 
 all); `GuidedFlowScreenTest` simplified, since the dialog no longer needs a manual
 bump past a 1-set default to reach the resting state it tests. All four gates green.
 
-**In progress:** nothing, as of 2026-08-16. The one entry this heading used to carry — "Finish
+**Turn 3 — three clocks, one accent, closed 2026-08-17 (US-44, ADR-0036).**
+`Redesign.dc.html` synced a third turn on 2026-08-16, the first unlanded material since M3b's
+follow-up audit closed. It diagnosed three separate clocks, each wrong for a different reason:
+the warm-up row asking `Done` to fit in −14dp beside a 104sp countdown and an 88dp `RepMascot`
+box that draws a 32dp-wide figure; the rest countdown wearing the accent fill ADR-0029 meant for
+the log button; and "per-set time" conflating a derived, retroactive number (the set-to-set
+interval) with one that needs a schema change and doesn't exist yet (time-under-load). Shipped
+exactly the doc's own recommended scope — frames `3a` + `3c` + `3g`, plus the
+`RepMascotGeometry` viewBox crop `3a`'s finding depends on. `+30s` and an audio cue, both drawn
+in `3c`'s frames, stayed out a second time, confirmed with the maintainer before writing
+ADR-0036 — see that ADR and the entries below under "needs the maintainer's call," both
+unchanged. `3f` (a display-only stopwatch on the guided screen) and time-under-load itself stay
+out of scope, undesigned. A real bug surfaced only on device, not by any test: the warm-up
+panel's new `Done` button was missing `shape = MaterialTheme.shapes.large`, so it rendered as
+`OutlinedButton`'s default `CornerFull` pill instead of `GymShapes`'s square corner — exactly the
+trap `Shape.kt`'s own class doc warns about. Verified live on device, light and dark: the ink/red
+swap at the final ten seconds, the progress bar, and a past workout (including one predating
+this change) showing correct retroactive intervals matching the active session's own numbers
+exactly. All four gates green plus `verifyDomainHasNoAndroidDeps`. **Rebased 2026-08-17 onto
+US-29's own countdown progress bar (PR #57), landed in parallel** — `RestTimerStore.restTotal`
+is now pinned at `RestTimer.start()` rather than a live `defaultRest` read, closing the
+mid-rest-desync limitation this entry originally accepted; see ADR-0036's amendment section.
+
+**Switching between exercises, 2026-08-17 (US-45, ADR-0037).** Reported live, mid-workout, right
+after Turn 3 landed: log a set on a later exercise because an earlier one's machine is taken, and
+the earlier exercise vanishes from the session screen for good — no row, no button, nothing to
+tap, only destructive ways back (delete every set on the later exercise, or remove it, US-02c).
+Traced to `ActiveSessionViewModel`'s `currentRow`, a pure function of "the highest-position
+exercise with a logged set" since ADR-0029 first wrote it — a gap in the original design, not a
+regression from Turn 3. `ActiveSessionViewModel` gains a sticky, explicit `selectedExerciseId`
+that wins over the derived default when set; `SessionPlan`'s list drops its `position >
+currentRow.position` filter so every other exercise is reachable, in either direction, and
+tapping one now selects it as the fully open exercise (own set list, target, one-tap log button)
+rather than firing the `Add set` sheet blind. The two-tap and one-tap paths for a member who
+never switches exercises are unchanged, and `TwoTapSetLoggingTest`/`OneTapSetLoggingTest` pass
+unedited. Explicitly not this story: swapping a movement for a *substitute* exercise, which stays
+where it already was, below, needing its own design.
+
+**In progress:** nothing, as of 2026-08-17. The one entry this heading used to carry — "Finish
 as a summary rather than a confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is
 already ticked `[x]` in M4 above; the heading itself had gone stale rather than the work.
 

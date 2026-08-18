@@ -88,8 +88,13 @@ class GymDimensTest {
 
     @Test
     fun `US-43's mascot has a hero size on Train home and a larger-than-Thumbnail inline size`() {
-        assertEquals(140.dp, GymDimens.MascotHome)
-        assertEquals(88.dp, GymDimens.MascotInline)
+        // Retuned 2026-08-17 (ADR-0035's Turn 3 amendment): both tokens now size RepMascot by
+        // height, not by a square box with empty margin baked in, so a value carried over
+        // unchanged from before the viewBox crop would draw Rep noticeably bigger on screen than
+        // it used to for the same number. 140dp/88dp were the pre-crop box sizes; 128dp/80dp are
+        // what those settled to on device — see the roadmap's Turn 3 entry.
+        assertEquals(128.dp, GymDimens.MascotHome)
+        assertEquals(80.dp, GymDimens.MascotInline)
         // Deliberately bigger than a catalog thumbnail now: Rep shares his rows with a short
         // label or a single-line name, not a photo grid, so there is headroom to spare.
         assertTrue(GymDimens.MascotInline > GymDimens.Thumbnail)
