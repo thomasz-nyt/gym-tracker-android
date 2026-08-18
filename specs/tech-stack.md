@@ -24,7 +24,7 @@ hard part and are native on both sides anyway).
 | Charts | Vico | Compose-native, no `AndroidView` wrapper |
 | Images | Coil 3 | Loads the bundled exercise photos. **Corrected 2026-08-01:** this row read "Coil 3 with `coil-gif`, GIF is the primary exercise-demo format". The seed data contains no GIFs — free-exercise-db ships static JPGs (ADR-0014). `coil-gif` is not a dependency and is not needed until there is media that is actually animated |
 | Video | Media3 / ExoPlayer | Deferred to M2 with the media it would play (ADR-0014); do not add earlier |
-| Health | `androidx.health.connect:connect-client` | Optional module — see below |
+| Health | `androidx.health.connect:connect-client` 1.1.0 | Optional module — see below. Pinned to the latest stable release (not an alpha/beta/rc) as of M5, ADR-0038 |
 | Nav | Navigation Compose, type-safe routes | |
 | Serialization | kotlinx.serialization | |
 | Backup file I/O | Storage Access Framework, via `androidx.activity`'s `ActivityResultContracts` | ADR-0034. **Not a new dependency** — already present. The user picks the destination in the system picker, so a cloud-synced folder is their choice and the app gains no cloud dependency, no permission, and no `WRITE_EXTERNAL_STORAGE` |

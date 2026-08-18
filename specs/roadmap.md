@@ -499,18 +499,52 @@ he holds a pose instead of vanishing; the four unedited suites above stay green.
 
 ## M5 — Health Connect (optional)
 
-Stories: US-20 … US-23. Read `specs/health-connect.md` first.
+Stories: US-20 … US-23. Read `specs/health-connect.md` first. Split into three PRs per
+CLAUDE.md's ~400-line rule — the seam and the opt-in (US-20, US-21), the read (US-22), and
+revoke (US-23) — since none of the three needs the others' code to land first.
 
-- [ ] `:feature:health` behind the `HealthMetricsSource` interface
-- [ ] Availability check: SDK available / update required / **not available**
-- [ ] Granular permission request; app fully functional if denied or unavailable
-- [ ] Read heart rate, active calories, and exercise sessions for the session window
-- [ ] Aggregate on-device; persist only avg HR, max HR, active kcal on the session
-- [ ] Per-member toggle, default **off**
-- [ ] Full UI suite passes with the no-op binding
+- [x] `:feature:health` behind the `HealthMetricsSource` interface. PR A, 2026-08-18
+- [x] Availability check, **collapsed to two live branches, not three** (ADR-0038,
+      corrected from this line's own first draft): `HealthConnectClient.getSdkStatus()`'s
+      "not available" and "update required" both map to one `Unavailable` —
+      `health-connect.md`'s own text calls for exactly one silent branch, and a fourth status
+      surfaced as an "update now" prompt would be the nag that document forbids. PR A,
+      2026-08-18
+- [x] Granular permission request, one at a time with its own on-screen reason first; app
+      fully functional if denied or unavailable. PR A, 2026-08-18
+- [ ] Read heart rate, active calories, and exercise sessions for the session window (PR B,
+      US-22 — not started)
+- [ ] Aggregate on-device; persist only avg HR, max HR, active kcal on the session (PR B,
+      US-22 — the four columns already exist on `sessions` since v1; this box is the read,
+      not a migration)
+- [x] Per-member toggle, default **off**, and — caught while building the Settings screen,
+      recorded in ADR-0038 rather than silently — **independent of the availability check
+      above**, not folded into it: a status that meant either "device incapable" or "toggle
+      off" would leave Settings with no signal to decide whether to show the very control
+      that turns the toggle on. PR A, 2026-08-18
+- [x] Full UI suite passes with the no-op binding, `-Pgymtracker.optionalFeatures=off`
+      (`specs/testing-strategy.md` §1), enforced by `HealthSettingsTest`. PR A, 2026-08-18
+- [ ] Turning the toggle off stops reads and offers to delete previously imported metrics
+      (US-23, PR C — not started). Missing from this list until now; added rather than left
+      implicit the way M3c's and M4a's boxes went unticked across their own PRs
 
 **Exit:** installing on a device with no Health Connect at all produces zero
 crashes, zero empty holes, and no prompts.
+
+PR A: all four gates plus `verifyDomainHasNoAndroidDeps` green. The full instrumented suite ran
+twice on `Medium_Phone_API_36.1(AVD)` — default bindings (22 tests, 0 failed, `HealthSettingsTest`
+skipped as designed) and `-Pgymtracker.optionalFeatures=off` (20 tests, 0 failed, 0 skipped,
+`HealthSettingsTest` running and passing this time). `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`
+and `GuidedFlowScreenTest` pass unedited in both. Verified live on device, not only in the
+suite: with Health Connect present and the toggle off, Settings shows the "Health Connect" row
+with no permission card; turning it on walks all three permissions in order, each with its own
+reason shown first, confirmed by logcat that the real
+`com.google.android.healthconnect.controller` permission activity actually launches for each;
+denying every permission leaves "No permissions were granted, so nothing is read." and the rest
+of the app (Train home, a workout) untouched; toggling off mid-walk clears the pending card and
+the message immediately. The no-Health-Connect case is covered by `HealthSettingsTest` rather
+than by hand — this emulator image has Health Connect built in, so there was no device on hand
+without it.
 
 ---
 

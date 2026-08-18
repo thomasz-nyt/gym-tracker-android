@@ -43,6 +43,16 @@ The full UI test suite runs a second time with `HealthMetricsSource` and
 `CoachingSource` bound to their no-op implementations. Both runs must pass. This
 enforces constitution §3 mechanically rather than by good intentions.
 
+Implemented (M5, ADR-0038) as a Gradle property, `-Pgymtracker.optionalFeatures=off`, which
+`app/build.gradle.kts` reads into a debug-only `BuildConfig.OPTIONAL_FEATURES_ENABLED` field;
+`:app`'s `HealthModule` binds `HealthMetricsSource` to the no-op implementation when it is
+false. `.github/workflows/ci.yml`'s instrumented job runs `:app:connectedDebugAndroidTest`
+twice against the one emulator boot — once with the default (real bindings), once with the
+flag. A product flavor was rejected as overkill for one boolean, and `@TestInstallIn` was
+rejected because it is global to the androidTest compilation and so cannot give two different
+bindings from one source set. `CoachingSource` joins the same switch at M6; nothing about the
+mechanism needs to change for it to.
+
 ### 2. The two-tap assertion (US-03)
 An instrumented test that opens the app with an active session and a prior set for
 the exercise, then asserts the set is persisted after at most two interactions.

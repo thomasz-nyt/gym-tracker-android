@@ -128,7 +128,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run instrumented tests
+      # Runs the full suite twice against one emulator boot: once with the real bindings
+      # (default), once with HealthMetricsSource forced to its no-op implementation
+      # (testing-strategy.md §1, "the optional-feature suite" — CoachingSource joins this
+      # the same way at M6). Both must pass; a screen that only renders correctly when a
+      # health source happens to be present is the failure this run exists to catch.
+      - name: Run instrumented tests (real bindings, then the optional-feature suite)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           # API 35: Robolectric's constraint does not apply here, but the emulator images for
@@ -137,7 +142,9 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest
+          script: |
+            ./gradlew :app:connectedDebugAndroidTest
+            ./gradlew :app:connectedDebugAndroidTest -Pgymtracker.optionalFeatures=off
 
       - name: Upload instrumented reports
         if: failure()

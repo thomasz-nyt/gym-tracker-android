@@ -16,18 +16,25 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.domain.health.HealthPermission
+import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Clock
 import java.time.LocalDate
@@ -54,6 +61,16 @@ fun SettingsRoute(
             uri?.let { viewModel.onImportFileSelected(it.toString()) }
         }
 
+    // Which permission this launch was for — read back when the result lands, rather than
+    // read from `state.pendingHealthPermission` at that point, so this never depends on the
+    // callback closing over a value that might have moved on by the time it fires.
+    var requestedHealthPermission by remember { mutableStateOf<HealthPermission?>(null) }
+    val healthPermissionLauncher =
+        rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
+            requestedHealthPermission?.let(viewModel::onHealthPermissionResult)
+            requestedHealthPermission = null
+        }
+
     SettingsScreen(
         state = state,
         onExportClick = { exportLauncher.launch(suggestedBackupFileName()) },
@@ -66,6 +83,11 @@ fun SettingsRoute(
         onImportSuccessDismissed = viewModel::onImportSuccessDismissed,
         onUnitChanged = viewModel::onUnitChanged,
         onRestDefaultStepped = viewModel::onRestDefaultStepped,
+        onHealthIntegrationToggled = viewModel::onHealthIntegrationToggled,
+        onHealthPermissionRationaleContinue = { permission ->
+            requestedHealthPermission = permission
+            healthPermissionLauncher.launch(setOf(permission.id))
+        },
         onBack = onBack,
         modifier = modifier,
     )
@@ -84,6 +106,8 @@ internal fun SettingsScreen(
     onImportSuccessDismissed: () -> Unit = {},
     onUnitChanged: (WeightUnit) -> Unit = {},
     onRestDefaultStepped: (Int) -> Unit = {},
+    onHealthIntegrationToggled: (Boolean) -> Unit = {},
+    onHealthPermissionRationaleContinue: (HealthPermission) -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -136,6 +160,14 @@ internal fun SettingsScreen(
                 onImportClick = onImportClick,
                 onImportErrorDismissed = onImportErrorDismissed,
                 onImportSuccessDismissed = onImportSuccessDismissed,
+            )
+
+            HealthSection(
+                status = state.healthStatus,
+                enabled = state.healthIntegrationEnabled,
+                pendingPermission = state.pendingHealthPermission,
+                onToggled = onHealthIntegrationToggled,
+                onPermissionRationaleContinue = onHealthPermissionRationaleContinue,
             )
         }
     }
@@ -224,6 +256,83 @@ private fun ImportSection(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * US-20/US-21. Renders nothing at all — no title, no row, no explanation — while [status] is
+ * [HealthStatus.Unavailable]: the device or account cannot use Health Connect, or the SDK
+ * needs an update, and `health-connect.md` is explicit that this must be silent, "no settings
+ * row that leads nowhere." Once it renders, the toggle itself is a second, independent choice
+ * (ADR-0038) — off by default, and showing regardless of whether it is currently on.
+ */
+@Composable
+private fun HealthSection(
+    status: HealthStatus,
+    enabled: Boolean,
+    pendingPermission: HealthPermission?,
+    onToggled: (Boolean) -> Unit,
+    onPermissionRationaleContinue: (HealthPermission) -> Unit,
+) {
+    if (status == HealthStatus.Unavailable) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Health Connect", style = MaterialTheme.typography.titleSmall)
+            Switch(checked = enabled, onCheckedChange = onToggled)
+        }
+        Text(
+            text =
+                "Reads heart rate and active calories for a workout from Health Connect, " +
+                    "aggregated on this device. Off by default.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        if (enabled && status == HealthStatus.PermissionRequired && pendingPermission == null) {
+            // The toggle is on, but nothing was ever granted — the member turned it off and
+            // back on, or every permission in the walk was denied. There is no retry control
+            // in this PR; re-opening the walk needs its own affordance, left for when it is
+            // actually requested.
+            Text(
+                text = "No permissions were granted, so nothing is read.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
+    pendingPermission?.let { permission ->
+        PermissionRationaleCard(
+            permission = permission,
+            onContinue = { onPermissionRationaleContinue(permission) },
+        )
+    }
+}
+
+/**
+ * One permission's plain-language reason, shown before the system request for it
+ * (`health-connect.md` §Permissions: "each with a plain-language reason on screen first").
+ */
+@Composable
+private fun PermissionRationaleCard(
+    permission: HealthPermission,
+    onContinue: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.Gap),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        ) {
+            Text(permission.reason, style = MaterialTheme.typography.bodyMedium)
+            PrimaryActionButton(text = "Continue", onClick = onContinue)
+        }
     }
 }
 
