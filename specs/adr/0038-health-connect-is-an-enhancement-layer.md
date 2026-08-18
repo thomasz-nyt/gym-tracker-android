@@ -78,9 +78,8 @@ Three things still needed a decision to turn that document into code:
 `specs/health-connect.md` §Architecture specifies it: `status(): HealthStatus` and
 `metricsFor(window): SessionMetrics?`, where `HealthStatus` is `Unavailable` /
 `PermissionRequired` / `Ready` — **three cases, not four.** `getSdkStatus()`'s two negative
-results and the per-member toggle being off all map to the same `Unavailable`, checked in
-that order so a caller can never distinguish "not installed" from "installed but the member
-opted out" — which is the entire point: neither produces UI.
+results map to the same `Unavailable`, so a caller can never distinguish "not installed" from
+"needs a provider update" — which is the entire point: neither produces UI.
 
 The default Hilt binding is `NoOpHealthMetricsSource`, living in `:core:domain` itself (not
 `:feature:health`) so `:app` can wire the no-op path without depending on the optional
@@ -92,8 +91,29 @@ PR's DI wiring, not repeated here).
 The opt-in toggle is `HealthIntegration` (`:core:domain` port, `DataStoreHealthIntegration`
 implementation), stored in the same `gymTrackerPreferences` DataStore file `UnitPreference`
 and `RestTimerStore` already use, key `health_integration_enabled`, **default `false`** for
-every member. It is read by `status()` before any permission check and is not part of the
-US-40 backup envelope.
+every member, and not part of the US-40 backup envelope.
+
+### Correction made while building the Settings screen: the toggle does not gate `status()`
+
+The first draft of this ADR (and the first implementation of `HealthConnectMetricsSource`)
+folded the toggle into `status()` — `Unavailable` meant "not installed, needs an update, *or*
+toggle off," on the theory that this was the same collapsing `health-connect.md` already asks
+for. Building the Settings screen surfaced the bug: if `Unavailable` means "toggle off" as
+well as "not installed," the screen has no signal left to decide whether to *show* its own
+toggle at all, since the value it would read to make that decision is the value the control
+is about to change. Nothing could ever turn it on.
+
+**`status()` now reflects only the SDK and the OS-level permission grant.** The toggle is a
+second, orthogonal gate, read directly from `HealthIntegration` by whoever needs it:
+Settings shows its control once `status()` is not `Unavailable` (the device and account can
+use Health Connect at all, regardless of whether this member has opted in yet —
+`health-connect.md`'s own "no settings row that leads nowhere"), and a read (US-22) only
+happens when `status()` is `Ready` **and** `HealthIntegration.current()` is true. This is
+not a deviation from `health-connect.md`'s collapsing rule — re-reading its own two
+paragraphs, both reasons it names for the single `Unavailable` branch ("a member may be a
+minor whose account cannot use it," "availability varies by device") are about SDK/account
+capability, never about this member's own in-app choice. The first draft over-applied the
+rule; this is the narrower, correct reading of the same sentence.
 
 ## Consequences
 

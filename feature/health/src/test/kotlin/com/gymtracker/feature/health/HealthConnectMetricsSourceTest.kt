@@ -2,7 +2,6 @@ package com.gymtracker.feature.health
 
 import androidx.health.connect.client.HealthConnectClient
 import com.gymtracker.core.domain.health.HealthStatus
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.time.Instant
@@ -11,17 +10,17 @@ import kotlin.test.assertNull
 
 /**
  * The `specs/health-connect.md` test matrix that does not need a device or Robolectric: every
- * branch of [HealthConnectMetricsSource.status] is a pure function of [FakeHealthConnectGateway]
- * and [FakeHealthIntegration], neither of which touches the real SDK.
+ * branch of [HealthConnectMetricsSource.status] is a pure function of [FakeHealthConnectGateway],
+ * which touches neither the real SDK nor `HealthIntegration` — see [HealthStatus]'s class doc for
+ * why the toggle is deliberately not one of this class's inputs.
  */
 class HealthConnectMetricsSourceTest {
     @Test
-    fun `not installed is Unavailable, regardless of the toggle`() =
+    fun `not installed is Unavailable`() =
         runTest {
             val gateway = FakeHealthConnectGateway(sdkStatus = HealthConnectClient.SDK_UNAVAILABLE)
-            val toggle = FakeHealthIntegration(enabled = true)
 
-            assertEquals(HealthStatus.Unavailable, source(gateway, toggle).status())
+            assertEquals(HealthStatus.Unavailable, source(gateway).status())
         }
 
     @Test
@@ -31,41 +30,28 @@ class HealthConnectMetricsSourceTest {
                 FakeHealthConnectGateway(
                     sdkStatus = HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED,
                 )
-            val toggle = FakeHealthIntegration(enabled = true)
 
-            assertEquals(HealthStatus.Unavailable, source(gateway, toggle).status())
+            assertEquals(HealthStatus.Unavailable, source(gateway).status())
         }
 
     @Test
-    fun `installed but the toggle is off is Unavailable, indistinguishable from not installed`() =
+    fun `installed, no permissions granted yet is PermissionRequired`() =
         runTest {
-            val gateway = FakeHealthConnectGateway(sdkStatus = HealthConnectClient.SDK_AVAILABLE)
-            val toggle = FakeHealthIntegration(enabled = false)
+            val gateway = FakeHealthConnectGateway(sdkStatus = HealthConnectClient.SDK_AVAILABLE, granted = emptySet())
 
-            assertEquals(HealthStatus.Unavailable, source(gateway, toggle).status())
+            assertEquals(HealthStatus.PermissionRequired, source(gateway).status())
         }
 
     @Test
-    fun `toggle on, no permissions granted is PermissionRequired`() =
-        runTest {
-            val gateway =
-                FakeHealthConnectGateway(sdkStatus = HealthConnectClient.SDK_AVAILABLE, granted = emptySet())
-            val toggle = FakeHealthIntegration(enabled = true)
-
-            assertEquals(HealthStatus.PermissionRequired, source(gateway, toggle).status())
-        }
-
-    @Test
-    fun `toggle on, at least one permission granted is Ready`() =
+    fun `at least one permission granted is Ready`() =
         runTest {
             val gateway =
                 FakeHealthConnectGateway(
                     sdkStatus = HealthConnectClient.SDK_AVAILABLE,
                     granted = setOf("android.permission.health.READ_HEART_RATE"),
                 )
-            val toggle = FakeHealthIntegration(enabled = true)
 
-            assertEquals(HealthStatus.Ready, source(gateway, toggle).status())
+            assertEquals(HealthStatus.Ready, source(gateway).status())
         }
 
     @Test
@@ -76,8 +62,7 @@ class HealthConnectMetricsSourceTest {
                     sdkStatus = HealthConnectClient.SDK_AVAILABLE,
                     granted = setOf("android.permission.health.READ_HEART_RATE"),
                 )
-            val toggle = FakeHealthIntegration(enabled = true)
-            val underTest = source(gateway, toggle)
+            val underTest = source(gateway)
 
             assertEquals(HealthStatus.Ready, underTest.status())
 
@@ -94,16 +79,12 @@ class HealthConnectMetricsSourceTest {
                     sdkStatus = HealthConnectClient.SDK_AVAILABLE,
                     granted = setOf("android.permission.health.READ_HEART_RATE"),
                 )
-            val toggle = FakeHealthIntegration(enabled = true)
             val window = Instant.parse("2026-08-18T09:00:00Z")..Instant.parse("2026-08-18T10:00:00Z")
 
-            assertNull(source(gateway, toggle).metricsFor(window))
+            assertNull(source(gateway).metricsFor(window))
         }
 
-    private fun source(
-        gateway: FakeHealthConnectGateway,
-        toggle: FakeHealthIntegration,
-    ) = HealthConnectMetricsSource(gateway, toggle)
+    private fun source(gateway: FakeHealthConnectGateway) = HealthConnectMetricsSource(gateway)
 }
 
 private class FakeHealthConnectGateway(
@@ -113,19 +94,4 @@ private class FakeHealthConnectGateway(
     override fun sdkStatus(): Int = sdkStatus
 
     override suspend fun grantedPermissions(): Set<String> = granted
-}
-
-/** A minimal [com.gymtracker.core.domain.health.HealthIntegration] fake — no DataStore, no Android. */
-private class FakeHealthIntegration(
-    enabled: Boolean,
-) : com.gymtracker.core.domain.health.HealthIntegration {
-    private val state = MutableStateFlow(enabled)
-
-    override fun observe() = state
-
-    override suspend fun current(): Boolean = state.value
-
-    override suspend fun set(enabled: Boolean) {
-        state.value = enabled
-    }
 }

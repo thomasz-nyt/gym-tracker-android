@@ -1,7 +1,6 @@
 package com.gymtracker.feature.health
 
 import androidx.health.connect.client.HealthConnectClient
-import com.gymtracker.core.domain.health.HealthIntegration
 import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.model.SessionMetrics
@@ -13,28 +12,29 @@ import javax.inject.Inject
  * the health module (ADR-0038) — the default binding stays
  * [com.gymtracker.core.domain.health.NoOpHealthMetricsSource].
  *
+ * Carries no dependency on [com.gymtracker.core.domain.health.HealthIntegration] — the member's
+ * toggle is a second, orthogonal gate a caller combines with [status] itself, not something this
+ * class folds in (see [HealthStatus]'s class doc for why that was tried and reverted).
+ *
  * [status] re-derives every gate on every call, never caching a result: the SDK status can
- * change (installed mid-session), the toggle can change (US-21/US-23), and a permission can be
- * revoked in system settings between two launches — `specs/health-connect.md` requires all three
- * to be re-checked, not assumed stable.
+ * change (installed mid-session) and a permission can be revoked in system settings between two
+ * launches — `specs/health-connect.md` requires both to be re-checked, not assumed stable.
  */
 class HealthConnectMetricsSource
     @Inject
     internal constructor(
         private val gateway: HealthConnectGateway,
-        private val healthIntegration: HealthIntegration,
     ) : HealthMetricsSource {
         override suspend fun status(): HealthStatus {
-            // The SDK's two negative statuses (not installed, needs a provider update) and the
-            // member's own toggle being off all collapse to the same Unavailable, in this order
-            // (ADR-0038) — a caller can never tell which of the three produced it.
-            val sdkAvailable = gateway.sdkStatus() == HealthConnectClient.SDK_AVAILABLE
-            val toggledOn = healthIntegration.current()
+            // The SDK's two negative statuses — not installed, needs a provider update — both
+            // collapse to the same Unavailable (ADR-0038); a caller can never tell which
+            // produced it.
+            if (gateway.sdkStatus() != HealthConnectClient.SDK_AVAILABLE) return HealthStatus.Unavailable
 
-            return when {
-                !sdkAvailable || !toggledOn -> HealthStatus.Unavailable
-                gateway.grantedPermissions().isEmpty() -> HealthStatus.PermissionRequired
-                else -> HealthStatus.Ready
+            return if (gateway.grantedPermissions().isEmpty()) {
+                HealthStatus.PermissionRequired
+            } else {
+                HealthStatus.Ready
             }
         }
 
