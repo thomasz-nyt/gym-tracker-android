@@ -2,6 +2,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
+      M5, US-21 (`specs/health-connect.md` §Permissions): read-only, one at a time, each
+      requested only once the member turns the toggle on. No write permission exists, ever
+      (§"We never write").
+    -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+
+    <!--
+      Package-visibility (Android 11+): without this, PackageManager cannot see the Health
+      Connect provider at all, and `HealthConnectClient.getSdkStatus` reads "not installed"
+      even when it is — which would be indistinguishable from the real Unavailable case in
+      the UI, but wrong for a reason nobody could diagnose from the app alone.
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
+    <!--
       Class names are fully qualified on purpose. A leading-dot name resolves against the
       module's `namespace` (com.gymtracker), not against the package the Kotlin files are
       actually in (com.gymtracker.app), and the mismatch only shows up as a

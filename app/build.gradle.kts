@@ -13,6 +13,22 @@ android {
         applicationId = "com.gymtracker"
         // Hilt needs its own Application in instrumented tests; see GymTrackerTestRunner.
         testInstrumentationRunner = "com.gymtracker.GymTrackerTestRunner"
+
+        // The optional-feature suite (testing-strategy.md §1): `:app:connectedDebugAndroidTest
+        // -Pgymtracker.optionalFeatures=off` runs the full UI suite a second time with
+        // HealthMetricsSource bound to its no-op implementation, so a screen that only renders
+        // correctly when a health source happens to be present is caught mechanically rather
+        // than by inspection. Off is exactly this one Gradle property away; on (the default)
+        // needs nothing, so a plain `./gradlew ...` still exercises the real binding.
+        buildConfigField(
+            "boolean",
+            "OPTIONAL_FEATURES_ENABLED",
+            (findProperty("gymtracker.optionalFeatures") != "off").toString(),
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -27,6 +43,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
     implementation(project(":feature:catalog"))
+    implementation(project(":feature:health"))
     implementation(project(":feature:logging"))
     implementation(project(":feature:progress"))
     implementation(project(":feature:routines"))
