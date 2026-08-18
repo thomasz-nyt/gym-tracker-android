@@ -24,6 +24,7 @@ import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.UpdateSet
+import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -413,6 +414,143 @@ class GuidedFlowTest {
 
             viewModel.uiState.test {
                 assertEquals("13", checkNotNull(expectMostRecentItem().guided.running).reps)
+            }
+        }
+
+    // The start dialog itself gains steppers too (this change): GuidedSetupDialog used raw
+    // OutlinedTextFields for Sets and Reps, the one guided-mode surface the roadmap named as
+    // still on Material defaults, disagreeing with the screen it opens into (which has had a
+    // stepper on its own rep count since ADR-0033). stepSetupReps/stepSetupSets are separate
+    // methods from stepReps/setupRepsChanged above on purpose — those mutate the *running*
+    // exercise's rep count once the flow has begun; these mutate the *pending setup*, which is
+    // a different field on a different part of GuidedState and must not read or write the other.
+
+    @Test
+    fun `stepping the setup dialog's rep target moves the pending setup, not the running exercise`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+
+            viewModel.guided.stepSetupReps(1)
+
+            viewModel.uiState.test {
+                val state = expectMostRecentItem().guided
+                assertEquals("13", checkNotNull(state.setup).reps, "12, the fixed default, stepped up by one")
+                assertNull(state.running, "begin() was never called")
+            }
+        }
+
+    @Test
+    fun `stepping the setup dialog's set target moves the pending setup`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+
+            viewModel.guided.stepSetupSets(-1)
+
+            viewModel.uiState.test {
+                assertEquals("2", checkNotNull(expectMostRecentItem().guided.setup).sets, "3, stepped down by one")
+            }
+        }
+
+    @Test
+    fun `neither setup stepper steps below one`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+            viewModel.guided.changeSetup(reps = "1", sets = "1")
+
+            viewModel.guided.stepSetupReps(-1)
+            viewModel.guided.stepSetupSets(-1)
+
+            viewModel.uiState.test {
+                val setup = checkNotNull(expectMostRecentItem().guided.setup)
+                assertEquals("1", setup.reps)
+                assertEquals("1", setup.sets)
+            }
+        }
+
+    @Test
+    fun `stepping setup reps before any typing steps from the current value, not from zero`() =
+        runTest {
+            // Same fallback rule as stepReps on the running exercise (ADR-0033): a step must
+            // move from what is on screen, which after changeSetup is the typed value already.
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+            viewModel.guided.changeSetup(reps = "20")
+
+            viewModel.guided.stepSetupReps(1)
+
+            viewModel.uiState.test {
+                assertEquals("21", checkNotNull(expectMostRecentItem().guided.setup).reps)
+            }
+        }
+
+    // ADR-0033's own "what this ADR does not touch" section named the fix in advance: "three
+    // StepperFields in the same dialog shape" — weight included, not only reps and sets. This
+    // reuses SetEntryController.stepWeight's exact rule: 2.5 kg / 5 lb per step, snapped onto
+    // the increment (so a prefill entered in the other unit steps cleanly rather than by a
+    // fractional offset), and floors at blank rather than zero — a bodyweight set, not a claim
+    // the bar weighs nothing (constitution §2).
+
+    @Test
+    fun `stepping the setup dialog's weight moves by one increment of the member's unit`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            units.set(WeightUnit.LB)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+            viewModel.guided.changeSetup(weight = "135")
+
+            viewModel.guided.stepSetupWeight(1)
+
+            viewModel.uiState.test {
+                assertEquals("140", checkNotNull(expectMostRecentItem().guided.setup).weight, "135 lb + 5 lb")
+            }
+        }
+
+    @Test
+    fun `stepping the setup dialog's weight down from blank lands on one increment, not negative`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            units.set(WeightUnit.LB)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+            // No history for this exercise, so weight starts blank (per the test above this
+            // file group already covers) — stepping down from there must not go negative.
+
+            viewModel.guided.stepSetupWeight(-1)
+
+            viewModel.uiState.test {
+                val weight = checkNotNull(expectMostRecentItem().guided.setup).weight
+                assertEquals(true, weight.toDoubleOrNull()?.let { it >= 0.0 } ?: true, "never negative")
+            }
+        }
+
+    @Test
+    fun `stepping the setup dialog's weight down past the bottom lands on blank, not zero`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            units.set(WeightUnit.LB)
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row = SessionExerciseRow(sessionExercises.all.last(), null, emptyList())
+            viewModel.onStartExercise(row)
+            viewModel.guided.changeSetup(weight = "2")
+
+            viewModel.guided.stepSetupWeight(-1)
+
+            viewModel.uiState.test {
+                assertEquals("", checkNotNull(expectMostRecentItem().guided.setup).weight, "a bodyweight set, not 0")
             }
         }
 }

@@ -159,10 +159,13 @@ private fun ActiveSessionViewModel.guidedActions() =
         onStartExercise = ::onStartExercise,
         onStartNext = ::onStartNextExercise,
         onWeightChanged = { guided.changeSetup(weight = it) },
+        onSetupWeightStepped = guided::stepSetupWeight,
         onSetupRepsChanged = { guided.changeSetup(reps = it) },
+        onSetupRepsStepped = guided::stepSetupReps,
         onRepsChanged = guided::changeReps,
         onRepsStepped = guided::stepReps,
         onSetsChanged = { guided.changeSetup(sets = it) },
+        onSetupSetsStepped = guided::stepSetupSets,
         onBegin = guided::begin,
         onDismissSetup = guided::dismissSetup,
         onFinishSet = guided::finishSet,
@@ -180,13 +183,19 @@ data class GuidedActions(
     val onStartExercise: (SessionExerciseRow) -> Unit = {},
     val onStartNext: (SessionExerciseRow) -> Unit = {},
     val onWeightChanged: (String) -> Unit = {},
+    /** Steps the start dialog's weight by one increment of the member's unit. */
+    val onSetupWeightStepped: (Int) -> Unit = {},
     /** The target typed in the start dialog. */
     val onSetupRepsChanged: (String) -> Unit = {},
+    /** Steps that same target by -1 or +1, before the flow has begun. */
+    val onSetupRepsStepped: (Int) -> Unit = {},
     /** The count actually managed on the set about to be finished — not the same thing. */
     val onRepsChanged: (String) -> Unit = {},
     /** Steps that same count by -1 or +1 (ADR-0033), sharing [onFinishSet]'s own fallback. */
     val onRepsStepped: (Int) -> Unit = {},
     val onSetsChanged: (String) -> Unit = {},
+    /** Steps the start dialog's set target by -1 or +1. */
+    val onSetupSetsStepped: (Int) -> Unit = {},
     val onBegin: () -> Unit = {},
     val onDismissSetup: () -> Unit = {},
     val onFinishSet: () -> Unit = {},
