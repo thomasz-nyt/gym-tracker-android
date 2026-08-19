@@ -38,3 +38,13 @@ data class DiscoveredHeartRateBand(
     val address: String,
     val name: String?,
 )
+
+/**
+ * The scan could not be started at all — as distinct from a scan that ran and found nothing
+ * (US-48's honesty rule applied to pairing: "searching" and "searching is broken" must not look
+ * the same on screen). [errorCode] is the platform's own `ScanCallback.SCAN_FAILED_*` value,
+ * passed through rather than interpreted, since `:core:domain` cannot name those constants.
+ */
+class ScanFailedException(
+    val errorCode: Int,
+) : Exception("Bluetooth scan failed to start (code $errorCode)")

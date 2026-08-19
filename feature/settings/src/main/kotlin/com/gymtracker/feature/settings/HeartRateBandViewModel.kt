@@ -12,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,6 +30,12 @@ data class HeartRateBandUiState(
     val pairedDeviceAddress: String? = null,
     val isScanning: Boolean = false,
     val discovered: List<DiscoveredHeartRateBand> = emptyList(),
+    /**
+     * The scan could not be started — distinct from a scan that ran and found nothing, which is
+     * [isScanning] with an empty [discovered]. Without this the two look identical on screen
+     * (US-48's honesty rule applied to pairing).
+     */
+    val scanFailed: Boolean = false,
     /** The permission currently awaiting its on-screen reason, or `null` when no walk is in progress. */
     val pendingPermission: HeartRateBandPermission? = null,
 )
@@ -108,18 +115,21 @@ class HeartRateBandViewModel
 
         private fun startScanning() {
             scanJob?.cancel()
-            _uiState.update { it.copy(isScanning = true, discovered = emptyList()) }
+            _uiState.update { it.copy(isScanning = true, scanFailed = false, discovered = emptyList()) }
             scanJob =
                 viewModelScope.launch {
-                    scanner.scan().collect { device ->
-                        _uiState.update { state ->
-                            if (state.discovered.any { it.address == device.address }) {
-                                state
-                            } else {
-                                state.copy(discovered = state.discovered + device)
+                    scanner
+                        .scan()
+                        .catch { _uiState.update { state -> state.copy(isScanning = false, scanFailed = true) } }
+                        .collect { device ->
+                            _uiState.update { state ->
+                                if (state.discovered.any { it.address == device.address }) {
+                                    state
+                                } else {
+                                    state.copy(discovered = state.discovered + device)
+                                }
                             }
                         }
-                    }
                 }
         }
 
