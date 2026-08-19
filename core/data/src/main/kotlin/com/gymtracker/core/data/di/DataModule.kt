@@ -17,6 +17,7 @@ import com.gymtracker.core.data.exercise.ExerciseDao
 import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.guided.DataStoreGuidedPlanStore
 import com.gymtracker.core.data.health.DataStoreHealthIntegration
+import com.gymtracker.core.data.health.DataStoreHeartRateBandPreference
 import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
@@ -45,6 +46,7 @@ import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
 import com.gymtracker.core.domain.health.HealthIntegration
 import com.gymtracker.core.domain.health.HealthMetricsSource
+import com.gymtracker.core.domain.health.HeartRateBandPreference
 import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
@@ -448,6 +450,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun healthIntegration(impl: DataStoreHealthIntegration): HealthIntegration
+
+    @Binds
+    abstract fun heartRateBandPreference(impl: DataStoreHeartRateBandPreference): HeartRateBandPreference
 
     @Binds
     abstract fun restTimerStore(impl: DataStoreRestTimerStore): RestTimerStore
