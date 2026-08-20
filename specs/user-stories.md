@@ -816,8 +816,28 @@ machine-specific placards from the same drawing set are explicitly out of scope.
   "not recorded" — never zero, never estimated.
 
 ### US-23 — Revoke
-- Turning the toggle off stops all reads immediately and offers to delete
-  previously imported metrics.
+See `adr/0040-revoking-health-access-clears-every-column.md`.
+
+- Turning the toggle off stops all reads immediately: the next session to end reads
+  nothing. Turning it off is not conditional on answering anything else.
+- If any of my workouts carry imported metrics, turning it off offers to delete them,
+  naming the real number — "Delete health metrics from 7 workouts?" — the same way
+  US-41's import confirmation names real counts.
+- If none of my workouts carry any, nothing is offered at all. No dialog, no banner:
+  an offer to delete nothing is the nag US-20 forbids.
+- Accepting clears the average heart rate, peak heart rate, active calories **and the
+  source marker** on every one of my workouts. Afterwards those workouts show no health
+  line at all — not "not recorded", which under US-22 means a read happened and found
+  nothing, but absent, exactly like a workout logged before I ever opted in.
+- Nothing else about a workout changes: it keeps its start, its end, its routine, its
+  exercises and every set. My sets are mine; the metrics were borrowed.
+- Declining deletes nothing, and is not remembered. Turning the toggle off again later,
+  with metrics still there, offers again.
+- It only ever touches my own workouts, never another member's.
+- A backup file I already exported still holds the metrics — it left this device and the
+  app cannot reach it. Importing that file restores them, exactly as US-41 promises, and
+  the toggle stays off, so nothing new is read (ADR-0038).
+- Exporting after deleting produces a file with no metrics in it.
 
 ---
 
