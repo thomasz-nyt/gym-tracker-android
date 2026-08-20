@@ -534,12 +534,28 @@ revoke (US-23) — since none of the three needs the others' code to land first.
       that turns the toggle on. PR A, 2026-08-18
 - [x] Full UI suite passes with the no-op binding, `-Pgymtracker.optionalFeatures=off`
       (`specs/testing-strategy.md` §1), enforced by `HealthSettingsTest`. PR A, 2026-08-18
-- [ ] Turning the toggle off stops reads and offers to delete previously imported metrics
-      (US-23, PR C — not started). Missing from this list until now; added rather than left
-      implicit the way M3c's and M4a's boxes went unticked across their own PRs
+- [x] Turning the toggle off stops reads and offers to delete previously imported metrics
+      (US-23, PR C, 2026-08-20). Two guarantees, deliberately not conflated: reads stop the
+      instant the toggle write lands, whether or not the offer is ever answered, and the
+      offer itself only appears when there is something to delete — an offer to delete
+      nothing is the nag this document forbids. All four metrics columns go null together,
+      `metrics_source` included (ADR-0040): leaving the source marker set would render every
+      cleared workout "not recorded" forever, which under US-22 claims a read happened and
+      found nothing. Declining is not remembered
 
 **Exit:** installing on a device with no Health Connect at all produces zero
 crashes, zero empty holes, and no prompts.
+
+PR C (US-23): all four gates plus `verifyDomainHasNoAndroidDeps` green. The `metrics_source`
+rule is proved rather than asserted — removing `metrics_source = NULL` from the `UPDATE` turns
+four of `SessionMetricsRevocationTest`'s seven cases red, which is the whole reason that test
+exists against real SQL rather than only against the domain fake. The `WHERE`-guard on the
+update is load-bearing too, and separately tested: without it every metrics-free session takes
+a fresh `updated_at` and `sync_state = 'PENDING'`, so a member toggling a switch would mark
+their entire history dirty for M2's sync to push. "Stops reads immediately" needed no new
+production code at all — `RecordSessionMetrics` already gates on `HealthIntegration`, and
+`RecordSessionMetricsTest` already pinned it; the box is ticked on an existing test rather than
+on work invented to fill it. **Not yet verified on device** — see the note below.
 
 PR A: all four gates plus `verifyDomainHasNoAndroidDeps` green. The full instrumented suite ran
 twice on `Medium_Phone_API_36.1(AVD)` — default bindings (22 tests, 0 failed, `HealthSettingsTest`

@@ -116,3 +116,6 @@ ever changes it needs an ADR and a constitution amendment.
 | Granted, samples present | Correct avg/max against a fixture sample set |
 | Permission revoked in system settings between launches | Detected on next read; degrades silently |
 | Toggle turned off after use | Reads stop; offer to delete imported metrics (US-23) |
+| Toggle turned off, no metrics ever imported | Reads stop; **nothing offered** — no dialog (US-23) |
+| Imported metrics deleted | Those workouts render no health line at all, not "not recorded" (ADR-0040) |
+| Backup exported before a delete, imported after | Metrics come back, toggle stays off, no new reads (ADR-0038, ADR-0040) |

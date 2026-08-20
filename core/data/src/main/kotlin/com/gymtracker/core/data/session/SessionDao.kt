@@ -74,6 +74,33 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun delete(id: String)
 
+    /**
+     * US-23, ADR-0040: clears every metrics column the member has imported, returning the
+     * number of rows actually changed — Room reports an `UPDATE`'s affected-row count, so one
+     * round trip both does the work and supplies the number the offer named.
+     *
+     * `metrics_source` goes null with the three numbers, not after them: [SessionEntity]'s
+     * own mapping treats a row as having metrics when *any* of the four is set, so a surviving
+     * source marker would render every cleared session as "read, found nothing" forever.
+     *
+     * The [HAS_METRICS] guard is not an optimisation. Without it every metrics-free session
+     * takes a fresh `updated_at` and `sync_state = 'PENDING'`, which M2's last-write-wins sync
+     * would then push wholesale — a member toggling a switch would dirty their whole history.
+     */
+    @Query(
+        "UPDATE sessions SET avg_hr = NULL, max_hr = NULL, active_kcal = NULL, " +
+            "metrics_source = NULL, updated_at = :updatedAt, sync_state = '$SYNC_STATE_PENDING' " +
+            "WHERE user_id = :userId AND $HAS_METRICS",
+    )
+    suspend fun clearMetricsForUser(
+        userId: String,
+        updatedAt: Long,
+    ): Int
+
+    /** US-23: how many of the member's sessions carry imported metrics. Counts the active one. */
+    @Query("SELECT COUNT(*) FROM sessions WHERE user_id = :userId AND $HAS_METRICS")
+    suspend fun countWithMetrics(userId: String): Int
+
     private companion object {
         /**
          * The member's active session. "Only one active session per member" is enforced by the
@@ -84,6 +111,16 @@ interface SessionDao {
         const val ACTIVE_SESSION =
             "SELECT * FROM sessions WHERE user_id = :userId AND ended_at IS NULL " +
                 "ORDER BY started_at DESC LIMIT 1"
+
+        /**
+         * A session that carries imported health metrics (US-23). Any one of the four columns
+         * is enough: US-22 writes a source marker with null values when a real read found no
+         * samples, and that row is imported data too — the app having looked is exactly what
+         * the member is asking to forget.
+         */
+        const val HAS_METRICS =
+            "(avg_hr IS NOT NULL OR max_hr IS NOT NULL OR active_kcal IS NOT NULL " +
+                "OR metrics_source IS NOT NULL)"
     }
 }
 

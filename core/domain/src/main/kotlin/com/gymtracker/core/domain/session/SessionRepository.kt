@@ -10,7 +10,15 @@ import java.time.Instant
 /**
  * Sessions as the domain needs them. Implemented over Room in `:core:data`, which is the
  * source of truth for the UI — the network is a sync detail (constitution §2).
+ *
+ * One function past detekt's interface threshold, suppressed for the same reason `SessionDao`
+ * carries the same suppression: this is a persistence port for one table, not a class
+ * accumulating behaviour. US-23's two additions ([clearMetrics], [countSessionsWithMetrics])
+ * are reads and writes of `sessions` like every other member here. Splitting the port by story
+ * would put "sessions I can write" and "sessions I can forget" behind two interfaces over one
+ * table — a worse seam than the count it buys back.
  */
+@Suppress("TooManyFunctions")
 interface SessionRepository {
     /** The member's active session, or null. Emits again whenever it changes. */
     fun observeActiveSession(userId: UserId): Flow<WorkoutSession?>
@@ -68,4 +76,27 @@ interface SessionRepository {
         id: SessionId,
         metrics: SessionMetrics,
     )
+
+    /**
+     * Clears every health metric [userId] has imported, returning how many sessions changed
+     * (US-23, ADR-0040).
+     *
+     * All four metrics columns go together — the average, the peak, the calories **and** the
+     * source marker. Leaving the source set would render a cleared session as "read, found
+     * nothing" (US-22) rather than as one that was never read for, which is a different and
+     * false statement about the member's data.
+     *
+     * Sessions carrying no metrics are left completely alone, `updated_at` included, so
+     * revoking does not mark a member's whole history dirty for a future sync.
+     */
+    suspend fun clearMetrics(userId: UserId): Int
+
+    /**
+     * How many of [userId]'s sessions carry imported metrics — the number the revoke offer
+     * names, and the check that stops it appearing when there is nothing to delete (US-23).
+     *
+     * Counts the active session as well as finished ones: it is the member's data like any
+     * other, and by the time metrics exist on it the read has already happened.
+     */
+    suspend fun countSessionsWithMetrics(userId: UserId): Int
 }
