@@ -156,6 +156,10 @@ fun GymTrackerNavHost(
 
     Scaffold(
         modifier = modifier,
+        // The one place a live heart rate reading shows (US-47): unused by every other screen,
+        // and — unlike the bottom bar — never conditional on which destination is open, since
+        // the reading is meant to be visible everywhere, not just during a workout.
+        topBar = { LiveHeartRateChip() },
         bottomBar = {
             if (backStackEntry.showsBottomBar(hasActiveSession)) {
                 GymBottomBar(

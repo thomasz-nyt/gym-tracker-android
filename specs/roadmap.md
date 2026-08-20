@@ -626,14 +626,23 @@ the pairing infrastructure (US-46) below; PR B wires it into a visible reading
       Robolectric needed for the logic itself — only the real
       `AndroidHeartRateBandGateway` touches actual Bluetooth APIs and needs
       on-device verification
-- [ ] Live BPM visible from every screen while a reading exists; absent entirely
-      otherwise (PR B — not started)
-- [ ] Searching / Beating / Lost are distinct, honestly-labelled states; a stale
-      reading is never shown as current (PR B — not started). The state machine
-      itself is done and unit-tested (PR A, 2026-08-18) — including a
-      fake-gateway test proving a fresh reading resets the staleness window
-      rather than going stale early — but nothing renders these states on screen
-      yet, which is what this box is actually asking for
+- [x] Live BPM visible from every screen while a reading exists; absent entirely
+      otherwise. PR B, 2026-08-18. `LiveHeartRateChip` sits in
+      `GymTrackerNavHost`'s `Scaffold(topBar = …)` — the one slot every
+      destination shares, unlike the bottom bar which is conditional per screen —
+      so it renders the same whether the member is mid-workout, browsing the
+      catalog, or in Settings, exactly what "not just the session screen" asks
+      for. Deliberately not gated on `hasActiveSession`: the connection itself
+      (`BleHeartRateSource`) is driven only by the preference toggle, so a member
+      can check their heart rate without starting a workout, the same way they
+      would glance at the band itself
+- [x] Searching / Beating / Lost are distinct, honestly-labelled states; a stale
+      reading is never shown as current. PR B, 2026-08-18. Rendered as three
+      distinct `Text`/`NumeralText` branches — never a shared "unknown" state
+      that could paper over the difference. `LiveHeartRateChipTest` pins the
+      absence rule at the instrumented level: zero nodes containing "bpm",
+      "Heart rate: searching…", or "Heart rate: lost" anywhere, under the no-op
+      binding — mirrors `HealthSettingsTest`'s exact shape
 - [x] Per-member toggle, default **off**; nothing is ever persisted. PR A,
       2026-08-18. The chosen device address is the one thing that *does* survive
       the toggle turning off, by design (`HeartRateBandPreference`'s class doc):
@@ -642,17 +651,26 @@ the pairing infrastructure (US-46) below; PR B wires it into a visible reading
       revoke, which offers to delete previously *imported* metrics — there is
       nothing here to delete, since nothing is ever written to Room
 - [x] Full UI suite passes with the no-op binding; `TwoTapSetLoggingTest` unedited.
-      PR A, 2026-08-18 — full instrumented suite ran twice on
-      `Medium_Phone_API_36.1(AVD)`: default bindings (22 tests, 0 failed,
-      `HealthSettingsTest` skipped as designed) and
-      `-Pgymtracker.optionalFeatures=off` (20 tests, 0 failed, `HealthSettingsTest`
-      running and passing)
+      PR A, 2026-08-18, re-verified PR B, 2026-08-18 — full instrumented suite ran
+      twice more on `Medium_Phone_API_36.1(AVD)` after the chip landed: default
+      bindings (22 tests, 0 failed, `HealthSettingsTest` and `LiveHeartRateChipTest`
+      both skipped as designed) and `-Pgymtracker.optionalFeatures=off` (22 tests,
+      0 failed, both running and passing). One flake surfaced and was chased down
+      before trusting it: `OneTapSetLoggingTest` failed once on a full-suite run
+      with a `SQLiteConstraintException`, passed in isolation, then passed again
+      on a full clean re-run — pre-existing cross-test contamination in the shared
+      Room instance, unrelated to this change (confirmed, not assumed)
 
-**Exit (not yet reached — PR B):** installing on a device below API 31, or with no
-Bluetooth adapter, produces zero crashes, zero empty holes, and no prompts;
-pairing a Fitbit Charge 6 shows live BPM tracking the band's own display within
-the app's session screen and every other screen, and turning the toggle off drops
-the connection immediately.
+**Exit — partially reached.** Verified: installing with `-Pgymtracker.optionalFeatures=off`
+(the no-Bluetooth/below-API-31 case's mechanical proxy, since CI's own emulator has
+a working adapter) produces zero crashes, zero empty holes, no prompts, and the
+full suite stays green; turning the toggle off drops the connection immediately
+(unit-tested in `BleHeartRateSourceTest`). **Not verified: pairing a real Fitbit
+Charge 6 and confirming live BPM tracks the band's own display.** That needs actual
+hardware — nothing in this session had one paired to the test device — and is the
+one thing left before this box is honestly closed. `AndroidHeartRateBandGateway`
+(the only class touching real Bluetooth APIs) is the one piece of PR A/B with no
+test coverage of any kind for exactly this reason.
 
 ---
 

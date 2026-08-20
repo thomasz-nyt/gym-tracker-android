@@ -19,6 +19,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
 import androidx.core.content.ContextCompat
+import com.gymtracker.core.domain.health.ScanFailedException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -94,6 +95,16 @@ internal class AndroidHeartRateBandGateway
                             result: ScanResult,
                         ) {
                             trySend(DiscoveredDevice(result.device.address, result.device.name))
+                        }
+
+                        // Without this, a scan that never starts is indistinguishable on screen
+                        // from a scan finding nothing — the UI sits on "Looking for nearby
+                        // devices…" forever. Android throttles an app to 5 scan starts per 30
+                        // seconds (SCAN_FAILED_SCANNING_TOO_FREQUENTLY), which a member toggling
+                        // this off and on while pairing hits easily. Found on device; no unit
+                        // test could have caught it, since it needs the real scanner.
+                        override fun onScanFailed(errorCode: Int) {
+                            close(ScanFailedException(errorCode))
                         }
                     }
 

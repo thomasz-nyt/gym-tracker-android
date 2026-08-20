@@ -394,9 +394,23 @@ private fun HeartRateBandSection(
             )
         }
 
+        if (state.scanFailed) {
+            // Never silently identical to "searching and finding nothing" — that ambiguity is
+            // what made a throttled scan undiagnosable on a real phone.
+            Text(
+                text =
+                    "Couldn't start the Bluetooth scan. Turn this off and on again in a " +
+                        "moment — Android limits how often an app may scan.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         if (state.isScanning) {
             Text(
-                text = "Looking for nearby devices…",
+                text =
+                    "Looking for nearby devices… Your band only appears while it is " +
+                        "broadcasting heart rate — start that on the band itself first.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

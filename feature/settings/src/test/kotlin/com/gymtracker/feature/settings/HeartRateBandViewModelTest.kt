@@ -6,11 +6,13 @@ import com.gymtracker.core.domain.health.HeartRateBandPermission
 import com.gymtracker.core.domain.health.HeartRateBandPreference
 import com.gymtracker.core.domain.health.HeartRateBandScanner
 import com.gymtracker.core.domain.health.HeartRateBandSelection
+import com.gymtracker.core.domain.health.ScanFailedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -144,6 +146,24 @@ class HeartRateBandViewModelTest {
         }
 
     @Test
+    fun `a scan that cannot start reports it rather than looking like an empty search`() =
+        runTest {
+            // Android throttles an app to 5 scan starts per 30 seconds; without this, the UI
+            // sits on "Looking for nearby devices…" forever and a broken scan is
+            // indistinguishable from no devices nearby (US-48's honesty rule, applied to
+            // pairing). Found on a real phone, not by this suite.
+            val scanner = FakeScanner(availability = HeartRateBandAvailability.Ready, failWith = ScanFailedException(2))
+            val viewModel = viewModel(scanner = scanner)
+
+            viewModel.onToggled(true)
+            viewModel.onPermissionResult(HeartRateBandPermission.SCAN)
+            viewModel.onPermissionResult(HeartRateBandPermission.CONNECT)
+
+            assertEquals(false, viewModel.uiState.value.isScanning)
+            assertEquals(true, viewModel.uiState.value.scanFailed)
+        }
+
+    @Test
     fun `the paired device survives the toggle turning off (US-49 - pairing is not deleted)`() =
         runTest {
             val preference = FakePreference()
@@ -180,12 +200,13 @@ private class FakePreference : HeartRateBandPreference {
 
 private class FakeScanner(
     private val availability: HeartRateBandAvailability,
+    private val failWith: Throwable? = null,
 ) : HeartRateBandScanner {
     private val found = MutableSharedFlow<DiscoveredHeartRateBand>(extraBufferCapacity = 8)
 
     override fun availability(): HeartRateBandAvailability = availability
 
-    override fun scan(): Flow<DiscoveredHeartRateBand> = found
+    override fun scan(): Flow<DiscoveredHeartRateBand> = failWith?.let { flow { throw it } } ?: found
 
     suspend fun discover(device: DiscoveredHeartRateBand) {
         found.emit(device)
