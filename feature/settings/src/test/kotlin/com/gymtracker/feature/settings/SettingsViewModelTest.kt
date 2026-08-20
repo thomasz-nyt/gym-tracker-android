@@ -13,14 +13,17 @@ import com.gymtracker.core.domain.backup.FakeBackupStore
 import com.gymtracker.core.domain.backup.ImportBackup
 import com.gymtracker.core.domain.backup.PreviewBackupImport
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
+import com.gymtracker.core.domain.health.ForgetHealthMetrics
 import com.gymtracker.core.domain.health.HealthIntegration
 import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
+import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.rest.RestTimerStore
@@ -118,6 +121,8 @@ class SettingsViewModelTest {
         restTimerStore = restTimerStore,
         healthMetricsSource = healthMetricsSource,
         healthIntegration = healthIntegration,
+        forgetHealthMetrics = ForgetHealthMetrics(sessions),
+        sessionsWithHealthMetrics = SessionsWithHealthMetrics(sessions),
     )
 
     // --- Export (US-40) ---
@@ -510,6 +515,127 @@ class SettingsViewModelTest {
 
             assertEquals(false, healthIntegration.current())
             assertNull(viewModel.uiState.value.pendingHealthPermission)
+        }
+
+    // --- Revoke (US-23, ADR-0040) ---
+
+    private fun sessionWithMetrics(
+        id: String,
+        owner: UserId = member,
+        metrics: SessionMetrics? = SessionMetrics(120, 160, 300, "health_connect"),
+    ) = WorkoutSession(
+        id = SessionId(id),
+        userId = owner,
+        gymName = null,
+        startedAt = now,
+        endedAt = now.plusSeconds(3600),
+        metrics = metrics,
+    )
+
+    @Test
+    fun `turning the toggle off stops reads whether or not the offer is ever answered`() =
+        runTest {
+            val healthIntegration = FakeHealthIntegration(initial = true)
+            val sessions = FakeSessionRepository(listOf(sessionWithMetrics("s1")))
+            val viewModel = viewModel(sessions = sessions, healthIntegration = healthIntegration)
+
+            viewModel.onHealthIntegrationToggled(false)
+
+            // The write lands first and unconditionally. The offer below is only ever about
+            // rows already imported — it never gates whether reads stop.
+            assertEquals(false, healthIntegration.current())
+            assertNotNull(viewModel.uiState.value.forgetMetricsOffer)
+        }
+
+    @Test
+    fun `the offer names the real number of workouts carrying metrics`() =
+        runTest {
+            val sessions =
+                FakeSessionRepository(
+                    listOf(
+                        sessionWithMetrics("s1"),
+                        sessionWithMetrics("s2"),
+                        sessionWithMetrics("s3", metrics = null),
+                        sessionWithMetrics("s4", owner = UserId("someone-else")),
+                    ),
+                )
+            val viewModel = viewModel(sessions = sessions, healthIntegration = FakeHealthIntegration(initial = true))
+
+            viewModel.onHealthIntegrationToggled(false)
+
+            assertEquals(
+                2,
+                viewModel.uiState.value.forgetMetricsOffer
+                    ?.sessionCount,
+            )
+        }
+
+    @Test
+    fun `with nothing imported, turning it off offers nothing at all`() =
+        runTest {
+            val sessions = FakeSessionRepository(listOf(sessionWithMetrics("s1", metrics = null)))
+            val healthIntegration = FakeHealthIntegration(initial = true)
+            val viewModel = viewModel(sessions = sessions, healthIntegration = healthIntegration)
+
+            viewModel.onHealthIntegrationToggled(false)
+
+            assertEquals(false, healthIntegration.current())
+            assertNull(viewModel.uiState.value.forgetMetricsOffer)
+        }
+
+    @Test
+    fun `accepting clears the metrics and dismisses the offer`() =
+        runTest {
+            val sessions = FakeSessionRepository(listOf(sessionWithMetrics("s1"), sessionWithMetrics("s2")))
+            val viewModel = viewModel(sessions = sessions, healthIntegration = FakeHealthIntegration(initial = true))
+            viewModel.onHealthIntegrationToggled(false)
+
+            viewModel.onForgetMetricsConfirmed()
+
+            assertNull(viewModel.uiState.value.forgetMetricsOffer)
+            assertEquals(listOf(null, null), sessions.sessions.map { it.metrics })
+        }
+
+    @Test
+    fun `declining deletes nothing`() =
+        runTest {
+            val sessions = FakeSessionRepository(listOf(sessionWithMetrics("s1")))
+            val viewModel = viewModel(sessions = sessions, healthIntegration = FakeHealthIntegration(initial = true))
+            viewModel.onHealthIntegrationToggled(false)
+
+            viewModel.onForgetMetricsDeclined()
+
+            assertNull(viewModel.uiState.value.forgetMetricsOffer)
+            assertNotNull(sessions.sessions.single().metrics)
+        }
+
+    @Test
+    fun `declining is not remembered — toggling off again offers again`() =
+        runTest {
+            val sessions = FakeSessionRepository(listOf(sessionWithMetrics("s1")))
+            val viewModel = viewModel(sessions = sessions, healthIntegration = FakeHealthIntegration(initial = true))
+            viewModel.onHealthIntegrationToggled(false)
+            viewModel.onForgetMetricsDeclined()
+
+            viewModel.onHealthIntegrationToggled(true)
+            viewModel.onHealthIntegrationToggled(false)
+
+            assertEquals(
+                1,
+                viewModel.uiState.value.forgetMetricsOffer
+                    ?.sessionCount,
+            )
+        }
+
+    @Test
+    fun `turning the toggle on never offers to delete anything`() =
+        runTest {
+            val sessions = FakeSessionRepository(listOf(sessionWithMetrics("s1")))
+            val viewModel = viewModel(sessions = sessions, healthIntegration = FakeHealthIntegration(initial = false))
+
+            viewModel.onHealthIntegrationToggled(true)
+
+            assertNull(viewModel.uiState.value.forgetMetricsOffer)
         }
 
     private class FakeEncoder : BackupEncoder {

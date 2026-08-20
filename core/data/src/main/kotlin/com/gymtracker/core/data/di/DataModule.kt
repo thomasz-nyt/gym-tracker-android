@@ -44,10 +44,12 @@ import com.gymtracker.core.domain.backup.ImportBackup
 import com.gymtracker.core.domain.backup.PreviewBackupImport
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.guided.GuidedPlanStore
+import com.gymtracker.core.domain.health.ForgetHealthMetrics
 import com.gymtracker.core.domain.health.HealthIntegration
 import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HeartRateBandPreference
 import com.gymtracker.core.domain.health.RecordSessionMetrics
+import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.RoutineId
@@ -349,6 +351,13 @@ object DataModule {
         healthMetricsSource: HealthMetricsSource,
         sessions: SessionRepository,
     ): RecordSessionMetrics = RecordSessionMetrics(healthIntegration, healthMetricsSource, sessions)
+
+    @Provides
+    fun forgetHealthMetrics(sessions: SessionRepository): ForgetHealthMetrics = ForgetHealthMetrics(sessions)
+
+    @Provides
+    fun sessionsWithHealthMetrics(sessions: SessionRepository): SessionsWithHealthMetrics =
+        SessionsWithHealthMetrics(sessions)
 
     @Provides
     fun sessionHistory(

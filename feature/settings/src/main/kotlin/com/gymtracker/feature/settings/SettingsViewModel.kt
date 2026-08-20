@@ -9,10 +9,12 @@ import com.gymtracker.core.domain.backup.ImportBackupResult
 import com.gymtracker.core.domain.backup.ImportPreviewResult
 import com.gymtracker.core.domain.backup.ImportRefusalReason
 import com.gymtracker.core.domain.backup.PreviewBackupImport
+import com.gymtracker.core.domain.health.ForgetHealthMetrics
 import com.gymtracker.core.domain.health.HealthIntegration
 import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
+import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.rest.RestTimerStore
@@ -81,6 +83,17 @@ data class SettingsUiState(
      * turning the toggle on and the last permission's result landing.
      */
     val pendingHealthPermission: HealthPermission? = null,
+    /**
+     * US-23's offer, non-null only between turning the toggle off with metrics already
+     * imported and answering the dialog either way. Never gates whether reads stop — that
+     * has already happened by the time this appears (ADR-0040).
+     */
+    val forgetMetricsOffer: ForgetMetricsOfferUi? = null,
+)
+
+/** The revoke offer's one piece of data: how many workouts would lose their metrics (US-23). */
+data class ForgetMetricsOfferUi(
+    val sessionCount: Int,
 )
 
 /**
@@ -124,6 +137,8 @@ class SettingsViewModel
         private val restTimerStore: RestTimerStore,
         private val healthMetricsSource: HealthMetricsSource,
         private val healthIntegration: HealthIntegration,
+        private val forgetHealthMetrics: ForgetHealthMetrics,
+        private val sessionsWithHealthMetrics: SessionsWithHealthMetrics,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(SettingsUiState())
         val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -285,6 +300,8 @@ class SettingsViewModel
          */
         fun onHealthIntegrationToggled(enabled: Boolean) {
             viewModelScope.launch {
+                // Unconditional, and first: US-23's "reads stop immediately" is true the moment
+                // this lands, and never waits on the offer below being answered (ADR-0040).
                 healthIntegration.set(enabled)
                 _uiState.update {
                     it.copy(
@@ -292,7 +309,37 @@ class SettingsViewModel
                         pendingHealthPermission = if (enabled) HealthPermission.entries.first() else null,
                     )
                 }
+                if (!enabled) offerToForgetMetrics()
             }
+        }
+
+        /**
+         * US-23: offer to delete what was imported — but only when there is something to
+         * delete. Counting first is what keeps a member who never imported anything from
+         * seeing a dialog about nothing, which is the nag `health-connect.md` forbids.
+         */
+        private suspend fun offerToForgetMetrics() {
+            val count = sessionsWithHealthMetrics(currentMember.id())
+            if (count > 0) {
+                _uiState.update { it.copy(forgetMetricsOffer = ForgetMetricsOfferUi(sessionCount = count)) }
+            }
+        }
+
+        /** US-23: the member accepted the offer — clear every imported metric they hold. */
+        fun onForgetMetricsConfirmed() {
+            viewModelScope.launch {
+                forgetHealthMetrics(currentMember.id())
+                _uiState.update { it.copy(forgetMetricsOffer = null) }
+            }
+        }
+
+        /**
+         * US-23: the member declined. Nothing is deleted, and nothing is remembered — toggling
+         * off again later, with metrics still there, offers again (ADR-0040's rejected
+         * DataStore-flag alternative).
+         */
+        fun onForgetMetricsDeclined() {
+            _uiState.update { it.copy(forgetMetricsOffer = null) }
         }
 
         /**

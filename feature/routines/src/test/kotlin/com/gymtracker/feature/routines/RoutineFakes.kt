@@ -232,6 +232,15 @@ internal class FakeSessions(
     ) {
         state.value = state.value.map { if (it.id == id) it.copy(metrics = metrics) else it }
     }
+
+    override suspend fun clearMetrics(userId: UserId): Int {
+        val target = state.value.filter { it.userId == userId && it.metrics != null }
+        state.value = state.value.map { if (it in target) it.copy(metrics = null) else it }
+        return target.size
+    }
+
+    override suspend fun countSessionsWithMetrics(userId: UserId): Int =
+        state.value.count { it.userId == userId && it.metrics != null }
 }
 
 internal class FakeSessionExercises : SessionExerciseRepository {

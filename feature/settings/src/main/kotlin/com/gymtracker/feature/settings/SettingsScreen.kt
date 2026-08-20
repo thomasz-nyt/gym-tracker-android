@@ -108,6 +108,8 @@ fun SettingsRoute(
         onUnitChanged = viewModel::onUnitChanged,
         onRestDefaultStepped = viewModel::onRestDefaultStepped,
         onHealthIntegrationToggled = viewModel::onHealthIntegrationToggled,
+        onForgetMetricsConfirmed = viewModel::onForgetMetricsConfirmed,
+        onForgetMetricsDeclined = viewModel::onForgetMetricsDeclined,
         onHealthPermissionRationaleContinue = { permission ->
             requestedHealthPermission = permission
             healthPermissionLauncher.launch(setOf(permission.id))
@@ -133,6 +135,8 @@ internal fun SettingsScreen(
     onRestDefaultStepped: (Int) -> Unit = {},
     onHealthIntegrationToggled: (Boolean) -> Unit = {},
     onHealthPermissionRationaleContinue: (HealthPermission) -> Unit = {},
+    onForgetMetricsConfirmed: () -> Unit = {},
+    onForgetMetricsDeclined: () -> Unit = {},
     onHeartRateBandToggled: (Boolean) -> Unit = {},
     onHeartRateBandPermissionRationaleContinue: (HeartRateBandPermission) -> Unit = {},
     onHeartRateBandDeviceChosen: (String) -> Unit = {},
@@ -207,11 +211,41 @@ internal fun SettingsScreen(
         }
     }
 
+    SettingsDialogs(
+        state = state,
+        onImportConfirmed = onImportConfirmed,
+        onImportCancelled = onImportCancelled,
+        onForgetMetricsConfirmed = onForgetMetricsConfirmed,
+        onForgetMetricsDeclined = onForgetMetricsDeclined,
+    )
+}
+
+/**
+ * The screen's confirm dialogs, extracted so [SettingsScreen] itself stays under detekt's
+ * length threshold as US-23 adds a second one. Both are modal decisions about data the member
+ * already has — replacing it (US-41) or deleting part of it (US-23) — so they share a home.
+ */
+@Composable
+private fun SettingsDialogs(
+    state: SettingsUiState,
+    onImportConfirmed: () -> Unit,
+    onImportCancelled: () -> Unit,
+    onForgetMetricsConfirmed: () -> Unit,
+    onForgetMetricsDeclined: () -> Unit,
+) {
     if (state.importPreview != null) {
         ImportConfirmDialog(
             preview = state.importPreview,
             onConfirm = onImportConfirmed,
             onDismiss = onImportCancelled,
+        )
+    }
+
+    if (state.forgetMetricsOffer != null) {
+        ForgetMetricsDialog(
+            offer = state.forgetMetricsOffer,
+            onConfirm = onForgetMetricsConfirmed,
+            onDismiss = onForgetMetricsDeclined,
         )
     }
 }
@@ -589,6 +623,42 @@ private fun ImportConfirmDialog(
         dismissButton = {
             TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
                 Text("Cancel")
+            }
+        },
+    )
+}
+
+/**
+ * US-23: offered when the member turns Health Connect off with metrics already imported, and
+ * never when there are none — an offer to delete nothing is the nag `health-connect.md` forbids
+ * (ADR-0040). Reads has already stopped by the time this appears; answering it either way does
+ * not change that.
+ */
+@Composable
+private fun ForgetMetricsDialog(
+    offer: ForgetMetricsOfferUi,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete imported health data?") },
+        text = {
+            Text(
+                "Health Connect is off, so nothing new will be read. Delete the heart rate and " +
+                    "calories already imported into ${offer.sessionCount} " +
+                    "${"workout".orPlural(offer.sessionCount)}? Your workouts, sets and routines " +
+                    "are not touched.",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Text("Keep")
             }
         },
     )
