@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.health.connect.client.PermissionController
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -346,12 +348,24 @@ private fun HealthSection(
     if (status == HealthStatus.Unavailable) return
 
     Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        // `toggleable` on the row, with the Switch itself passing `onCheckedChange = null`:
+        // the label and the control become one node, so the row's accessible name is
+        // "Health Connect" rather than an unnamed "off, switch", and tapping the label works.
+        // Found by US-23's own instrumented test failing on device — the dialog this story adds
+        // is reachable only through this control, and the control could not be operated by
+        // anything but a precise tap on the switch. `HeartRateBandSection`'s toggle below has
+        // the identical defect and is deliberately left for M7's accessibility pass, which owns
+        // the sweep; this one is fixed here because US-23 cannot be tested without it.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .toggleable(value = enabled, onValueChange = onToggled, role = Role.Switch),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("Health Connect", style = MaterialTheme.typography.titleSmall)
-            Switch(checked = enabled, onCheckedChange = onToggled)
+            Switch(checked = enabled, onCheckedChange = null)
         }
         Text(
             text =

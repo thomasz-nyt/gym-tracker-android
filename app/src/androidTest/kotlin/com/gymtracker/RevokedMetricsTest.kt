@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
+import com.gymtracker.core.domain.health.HealthIntegration
 import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.member.CurrentMember
@@ -60,6 +61,9 @@ class RevokedMetricsTest {
 
     @Inject
     lateinit var healthMetricsSource: HealthMetricsSource
+
+    @Inject
+    lateinit var healthIntegration: HealthIntegration
 
     @Before
     fun onHomeWithNoWorkoutRunning() {
@@ -123,6 +127,10 @@ class RevokedMetricsTest {
             )
             sessions.endSession(id, Instant.now())
             sessions.saveMetrics(id, SessionMetrics(120, 160, 300, "health_connect"))
+            // The toggle defaults off (ADR-0038). Without this the tap below would turn it
+            // *on*, which offers nothing — the first version of this test failed on device for
+            // exactly that reason, plus a label that was not part of the control at all.
+            healthIntegration.set(true)
         }
 
         awaitHome()
@@ -132,7 +140,7 @@ class RevokedMetricsTest {
         // CI emulator is 320x640 and the health section sits well below the fold.
         compose.onNodeWithText(HEALTH_CONNECT_TITLE).performScrollTo()
 
-        compose.onNodeWithText(HEALTH_CONNECT_TITLE).performScrollTo().performClick()
+        compose.onNodeWithText(HEALTH_CONNECT_TITLE).performClick()
 
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText(DIALOG_TITLE).fetchSemanticsNodes().isNotEmpty()
@@ -147,6 +155,7 @@ class RevokedMetricsTest {
         runBlocking {
             assertNull(sessions.findSession(id)?.metrics)
             sessions.deleteSession(id)
+            healthIntegration.set(false)
         }
     }
 
