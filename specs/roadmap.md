@@ -595,26 +595,64 @@ M4: it touches no table M5 reads. Its code was blocked on #59 and #60 merging so
 could reuse M5's optional-feature scaffolding (`:feature:health`, the no-op default
 binding pattern, the per-member toggle shape) instead of building it twice — both
 are now in `main` (see the section header above), so M5a's implementation can
-start.
+start. Split into two PRs for the same reason M5 itself split into three: PR A is
+the pairing infrastructure (US-46) below; PR B wires it into a visible reading
+(US-47, US-48) and verifies US-49.
 
-- [ ] `LiveHeartRateSource` port in `:core:domain`, independent of
-      `HealthMetricsSource`
-- [ ] Availability check: no Bluetooth adapter / below API 31 / **not available**
-- [ ] Granular permission request (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`); app fully
-      functional if denied or unavailable
-- [ ] Scan, pair, and hold a Bluetooth Heart Rate Profile (0x180D/0x2A37) connection
-      to the chosen device
+- [x] `LiveHeartRateSource` port in `:core:domain`, independent of
+      `HealthMetricsSource`. PR A, 2026-08-18. A second port,
+      `HeartRateBandScanner`, was added alongside it — `:feature:settings` cannot
+      depend on `:feature:health`'s connection machinery just to render a device
+      list, so scanning-for-candidates and holding-a-live-connection stayed two
+      separate ports from the start, the same way `HealthMetricsSource` and
+      `LiveHeartRateSource` are two ports rather than one
+- [x] Availability check: no Bluetooth adapter / below API 31 / **not available**.
+      PR A, 2026-08-18. `HeartRateBandScanner.availability()` is deliberately
+      independent of the per-member toggle (mirrors ADR-0038's `HealthStatus`
+      split) — a design correction made while wiring Settings, not before:
+      `LiveHeartRateSource`'s own `Unavailable` conflates "device incapable" with
+      "toggle off," which is fine for the connection itself but would have left
+      Settings unable to decide whether to show its own toggle
+- [x] Granular permission request (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`); app
+      fully functional if denied or unavailable. PR A, 2026-08-18. One at a time,
+      each with its own reason, via a plain `ActivityResultContracts.
+      RequestPermission()` launcher — no SDK-specific contract needed, unlike
+      Health Connect's
+- [x] Scan, pair, and hold a Bluetooth Heart Rate Profile (0x180D/0x2A37) connection
+      to the chosen device. PR A, 2026-08-18. `HeartRateBandGateway` is the seam
+      (mirrors `HealthConnectGateway`'s shape exactly); `BleHeartRateSource`'s
+      state machine (Searching/Beating/Lost, plus the staleness watchdog below) is
+      fully unit-tested against a fake gateway using virtual time, no device or
+      Robolectric needed for the logic itself — only the real
+      `AndroidHeartRateBandGateway` touches actual Bluetooth APIs and needs
+      on-device verification
 - [ ] Live BPM visible from every screen while a reading exists; absent entirely
-      otherwise
+      otherwise (PR B — not started)
 - [ ] Searching / Beating / Lost are distinct, honestly-labelled states; a stale
-      reading is never shown as current
-- [ ] Per-member toggle, default **off**; nothing is ever persisted
-- [ ] Full UI suite passes with the no-op binding; `TwoTapSetLoggingTest` unedited
+      reading is never shown as current (PR B — not started). The state machine
+      itself is done and unit-tested (PR A, 2026-08-18) — including a
+      fake-gateway test proving a fresh reading resets the staleness window
+      rather than going stale early — but nothing renders these states on screen
+      yet, which is what this box is actually asking for
+- [x] Per-member toggle, default **off**; nothing is ever persisted. PR A,
+      2026-08-18. The chosen device address is the one thing that *does* survive
+      the toggle turning off, by design (`HeartRateBandPreference`'s class doc):
+      the same convention system Bluetooth pairing uses, so turning it back on
+      does not force re-scanning for a band already chosen. Distinct from US-23's
+      revoke, which offers to delete previously *imported* metrics — there is
+      nothing here to delete, since nothing is ever written to Room
+- [x] Full UI suite passes with the no-op binding; `TwoTapSetLoggingTest` unedited.
+      PR A, 2026-08-18 — full instrumented suite ran twice on
+      `Medium_Phone_API_36.1(AVD)`: default bindings (22 tests, 0 failed,
+      `HealthSettingsTest` skipped as designed) and
+      `-Pgymtracker.optionalFeatures=off` (20 tests, 0 failed, `HealthSettingsTest`
+      running and passing)
 
-**Exit:** installing on a device below API 31, or with no Bluetooth adapter,
-produces zero crashes, zero empty holes, and no prompts; pairing a Fitbit Charge 6
-shows live BPM tracking the band's own display within the app's session screen and
-every other screen, and turning the toggle off drops the connection immediately.
+**Exit (not yet reached — PR B):** installing on a device below API 31, or with no
+Bluetooth adapter, produces zero crashes, zero empty holes, and no prompts;
+pairing a Fitbit Charge 6 shows live BPM tracking the band's own display within
+the app's session screen and every other screen, and turning the toggle off drops
+the connection immediately.
 
 ---
 

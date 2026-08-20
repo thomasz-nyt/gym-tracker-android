@@ -2,6 +2,7 @@ package com.gymtracker.feature.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,8 +34,11 @@ import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.domain.health.DiscoveredHeartRateBand
 import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
+import com.gymtracker.core.domain.health.HeartRateBandAvailability
+import com.gymtracker.core.domain.health.HeartRateBandPermission
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Clock
 import java.time.LocalDate
@@ -49,8 +53,10 @@ fun SettingsRoute(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
+    heartRateBandViewModel: HeartRateBandViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val heartRateBandState by heartRateBandViewModel.uiState.collectAsStateWithLifecycle()
 
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -71,8 +77,26 @@ fun SettingsRoute(
             requestedHealthPermission = null
         }
 
+    // Same "read back what this launch was for" shape as requestedHealthPermission above, and
+    // the same reason: a plain ActivityResultContracts.RequestPermission() call, since
+    // BLUETOOTH_SCAN/BLUETOOTH_CONNECT are ordinary runtime permissions with no SDK-specific
+    // contract the way Health Connect's are.
+    var requestedHeartRateBandPermission by remember { mutableStateOf<HeartRateBandPermission?>(null) }
+    val heartRateBandPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            requestedHeartRateBandPermission?.let(heartRateBandViewModel::onPermissionResult)
+            requestedHeartRateBandPermission = null
+        }
+
     SettingsScreen(
         state = state,
+        heartRateBandState = heartRateBandState,
+        onHeartRateBandToggled = heartRateBandViewModel::onToggled,
+        onHeartRateBandPermissionRationaleContinue = { permission ->
+            requestedHeartRateBandPermission = permission
+            heartRateBandPermissionLauncher.launch(permission.id)
+        },
+        onHeartRateBandDeviceChosen = heartRateBandViewModel::onDeviceChosen,
         onExportClick = { exportLauncher.launch(suggestedBackupFileName()) },
         onExportErrorDismissed = viewModel::onExportErrorDismissed,
         onExportSuccessDismissed = viewModel::onExportSuccessDismissed,
@@ -96,6 +120,7 @@ fun SettingsRoute(
 @Composable
 internal fun SettingsScreen(
     state: SettingsUiState,
+    heartRateBandState: HeartRateBandUiState = HeartRateBandUiState(),
     onExportClick: () -> Unit = {},
     onExportErrorDismissed: () -> Unit = {},
     onExportSuccessDismissed: () -> Unit = {},
@@ -108,6 +133,9 @@ internal fun SettingsScreen(
     onRestDefaultStepped: (Int) -> Unit = {},
     onHealthIntegrationToggled: (Boolean) -> Unit = {},
     onHealthPermissionRationaleContinue: (HealthPermission) -> Unit = {},
+    onHeartRateBandToggled: (Boolean) -> Unit = {},
+    onHeartRateBandPermissionRationaleContinue: (HeartRateBandPermission) -> Unit = {},
+    onHeartRateBandDeviceChosen: (String) -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -168,6 +196,13 @@ internal fun SettingsScreen(
                 pendingPermission = state.pendingHealthPermission,
                 onToggled = onHealthIntegrationToggled,
                 onPermissionRationaleContinue = onHealthPermissionRationaleContinue,
+            )
+
+            HeartRateBandSection(
+                state = heartRateBandState,
+                onToggled = onHeartRateBandToggled,
+                onPermissionRationaleContinue = onHeartRateBandPermissionRationaleContinue,
+                onDeviceChosen = onHeartRateBandDeviceChosen,
             )
         }
     }
@@ -305,20 +340,110 @@ private fun HealthSection(
     }
 
     pendingPermission?.let { permission ->
-        PermissionRationaleCard(
-            permission = permission,
-            onContinue = { onPermissionRationaleContinue(permission) },
+        PermissionRationaleCard(reason = permission.reason, onContinue = { onPermissionRationaleContinue(permission) })
+    }
+}
+
+/**
+ * US-46, ADR-0039. Renders nothing while [availability] is [HeartRateBandAvailability.Unavailable]
+ * — the same absence rule [HealthSection] follows, for the same reason: below API 31 or with no
+ * Bluetooth adapter, there is nothing this section could offer.
+ */
+@Composable
+private fun HeartRateBandSection(
+    state: HeartRateBandUiState,
+    onToggled: (Boolean) -> Unit,
+    onPermissionRationaleContinue: (HeartRateBandPermission) -> Unit,
+    onDeviceChosen: (String) -> Unit,
+) {
+    if (state.availability == HeartRateBandAvailability.Unavailable) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Live heart rate", style = MaterialTheme.typography.titleSmall)
+            Switch(checked = state.enabled, onCheckedChange = onToggled)
+        }
+        Text(
+            text =
+                "Reads live heart rate directly from a paired band during a workout — " +
+                    "not Health Connect, and nothing here is ever saved. Off by default.",
+            style = MaterialTheme.typography.bodyMedium,
         )
+
+        state.pairedDeviceAddress?.let { address ->
+            Text(
+                text = "Paired: $address",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (state.enabled &&
+            state.availability == HeartRateBandAvailability.PermissionRequired &&
+            state.pendingPermission == null
+        ) {
+            // Same shape as HealthSection's own message: the toggle is on, but nothing was
+            // ever granted. No retry affordance in this PR, for the same reason.
+            Text(
+                text = "No permissions were granted, so nothing is read.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (state.isScanning) {
+            Text(
+                text = "Looking for nearby devices…",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.discovered.forEach { device ->
+                DiscoveredDeviceRow(device = device, onClick = { onDeviceChosen(device.address) })
+            }
+        }
+    }
+
+    state.pendingPermission?.let { permission ->
+        PermissionRationaleCard(reason = permission.reason, onContinue = { onPermissionRationaleContinue(permission) })
+    }
+}
+
+@Composable
+private fun DiscoveredDeviceRow(
+    device: DiscoveredHeartRateBand,
+    onClick: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .padding(GymDimens.Gap)
+                    .clickable(onClick = onClick),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(device.name ?: "Unnamed device", style = MaterialTheme.typography.bodyMedium)
+            Text(device.address, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
 /**
  * One permission's plain-language reason, shown before the system request for it
- * (`health-connect.md` §Permissions: "each with a plain-language reason on screen first").
+ * (`health-connect.md` §Permissions: "each with a plain-language reason on screen first") —
+ * shared by [HealthSection]'s Health Connect walk and [HeartRateBandSection]'s Bluetooth walk.
  */
 @Composable
 private fun PermissionRationaleCard(
-    permission: HealthPermission,
+    reason: String,
     onContinue: () -> Unit,
 ) {
     Surface(
@@ -330,7 +455,7 @@ private fun PermissionRationaleCard(
             modifier = Modifier.fillMaxWidth().padding(GymDimens.Gap),
             verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
         ) {
-            Text(permission.reason, style = MaterialTheme.typography.bodyMedium)
+            Text(reason, style = MaterialTheme.typography.bodyMedium)
             PrimaryActionButton(text = "Continue", onClick = onContinue)
         }
     }

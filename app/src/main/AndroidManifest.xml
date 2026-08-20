@@ -21,6 +21,19 @@
     </queries>
 
     <!--
+      US-46, ADR-0039: live heart rate from a directly-paired band — not Health Connect.
+      `neverForLocation` on BLUETOOTH_SCAN drops the ACCESS_FINE_LOCATION requirement that
+      scanning would otherwise carry on API 26–30; this app never derives location from a
+      scan result, so the flag is honest, and it is the reason this feature is gated to
+      API 31+ rather than supporting the app's full min-SDK 26 floor. `usesPermissionFlags`
+      only affects behaviour on API 31+; API 30 and below ignore it and would need
+      ACCESS_FINE_LOCATION regardless, which is exactly why the feature stays unavailable
+      there instead of requesting it.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!--
       Class names are fully qualified on purpose. A leading-dot name resolves against the
       module's `namespace` (com.gymtracker), not against the package the Kotlin files are
       actually in (com.gymtracker.app), and the mismatch only shows up as a
