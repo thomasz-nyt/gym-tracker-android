@@ -10,7 +10,14 @@ import kotlinx.coroutines.flow.map
 import java.time.Instant
 import javax.inject.Inject
 
-/** [SessionRepository] over Room. */
+/**
+ * [SessionRepository] over Room.
+ *
+ * Carries the same `TooManyFunctions` suppression as the interface it implements: this class is
+ * that port's one implementation, so its function count *is* the port's count and cannot be
+ * reduced independently of it.
+ */
+@Suppress("TooManyFunctions")
 class RoomSessionRepository
     @Inject
     constructor(
@@ -51,6 +58,11 @@ class RoomSessionRepository
         override suspend fun deleteSession(id: SessionId) {
             dao.delete(id.value)
         }
+
+        override suspend fun clearMetrics(userId: UserId): Int =
+            dao.clearMetricsForUser(userId.value, Instant.now().toEpochMilli())
+
+        override suspend fun countSessionsWithMetrics(userId: UserId): Int = dao.countWithMetrics(userId.value)
 
         override suspend fun saveMetrics(
             id: SessionId,
