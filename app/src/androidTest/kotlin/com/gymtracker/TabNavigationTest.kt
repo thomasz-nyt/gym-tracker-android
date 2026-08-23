@@ -1,6 +1,7 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -22,6 +23,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
 import javax.inject.Inject
+import kotlin.test.assertTrue
 
 /**
  * ADR-0024's bottom bar, and the bug it shipped with.
@@ -149,6 +151,45 @@ class TabNavigationTest {
         compose.onNodeWithText(SEARCH_FIELD).assertIsDisplayed()
     }
 
+    @Test
+    fun catalogMetadataDoesNotPretendToBeInteractive() {
+        awaitExerciseDetail()
+
+        compose.onNodeWithText(EQUIPMENT).assertHasNoClickAction()
+    }
+
+    @Test
+    fun aCatalogRowWithoutAPhotoDoesNotReserveThumbnailSpace() {
+        awaitHome()
+        compose.onNodeWithText("Browse exercises").performClick()
+        awaitLeftHome()
+
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText(AN_EXERCISE).fetchSemanticsNodes().isNotEmpty()
+        }
+        val leftPx = compose.onAllNodesWithText(AN_EXERCISE)[0].fetchSemanticsNode().boundsInRoot.left
+        val leftDp = leftPx / compose.activity.resources.displayMetrics.density
+
+        assertTrue(
+            leftDp < MAX_TEXT_INSET_DP,
+            "a missing image must omit leading content; the exercise name started at ${leftDp}dp",
+        )
+    }
+
+    private fun awaitExerciseDetail() {
+        awaitHome()
+        compose.onNodeWithText("Browse exercises").performClick()
+        awaitLeftHome()
+
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText(AN_EXERCISE).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onAllNodesWithText(AN_EXERCISE)[0].performClick()
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText(EQUIPMENT).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun awaitHome() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText(START).fetchSemanticsNodes().isNotEmpty()
@@ -174,6 +215,8 @@ class TabNavigationTest {
         /** Only on the browse screen, so it is the signal that the list is what is showing. */
         const val SEARCH_FIELD = "Search exercises"
         const val BACK = "Back"
+        const val EQUIPMENT = "Machine"
+        const val MAX_TEXT_INSET_DP = 64f
 
         /** Train's one entry point to Routines (ADR-0030), present regardless of routine count. */
         const val ROUTINES_BUTTON = "Routines"
