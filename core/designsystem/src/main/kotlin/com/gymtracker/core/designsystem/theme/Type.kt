@@ -92,6 +92,10 @@ internal val ArchivoFamily =
  *   with Archivo wired — the same treatment `displaySmall`/`headlineLarge` get — rather than
  *   being claimed for something that does not yet exist, so an accidental future use does not
  *   silently fall back to the system font.
+ * - `displaySmall` — the persistent live-heart-rate readout (US-47). It is large enough to
+ *   read at arm's length without competing with `headlineMedium` or the countdown. Keeping the
+ *   complete 36sp/44sp style here prevents a feature-level font-size copy from inheriting the
+ *   16sp line height of a section eyebrow.
  * - `headlineMedium` — the rest banner's big weight readout.
  * - `headlineSmall` — a movement name, on the session screen or in the rest banner's "Up next".
  * - `labelMedium` / `labelSmall` — row labels and section eyebrows. **Both sit below ADR-0011's
@@ -165,7 +169,15 @@ val GymTypography: Typography =
             // pre-committed to a screen that does not exist, and still carries Archivo so an
             // accidental future use does not silently fall back to Roboto.
             displayMedium = displayMedium.copy(fontFamily = ArchivoFamily),
-            displaySmall = displaySmall.copy(fontFamily = ArchivoFamily),
+            // US-47: a persistent vital reading, selected on device at arm's length. This is a
+            // content role rather than a section eyebrow, so it owns a complete type style.
+            displaySmall =
+                displaySmall.copy(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 36.sp,
+                    lineHeight = 44.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
             headlineLarge = headlineLarge.copy(fontFamily = ArchivoFamily),
             // ADR-0029: the rest banner's big weight readout ("100 lb × 8 · 45.4 kg").
             headlineMedium =
