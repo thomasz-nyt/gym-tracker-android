@@ -675,8 +675,13 @@ the pairing infrastructure (US-46) below; PR B wires it into a visible reading
       0 failed, both running and passing). One flake surfaced and was chased down
       before trusting it: `OneTapSetLoggingTest` failed once on a full-suite run
       with a `SQLiteConstraintException`, passed in isolation, then passed again
-      on a full clean re-run — pre-existing cross-test contamination in the shared
-      Room instance, unrelated to this change (confirmed, not assumed)
+      on a full clean re-run — cross-test contamination in the shared persistent
+      Room/DataStore bindings, unrelated to this change (confirmed, not assumed).
+      **Resolved 2026-08-23:** the instrumented graph now replaces only
+      `PersistenceModule` with fresh in-memory stores per Hilt test component;
+      `PersistenceIsolationTest` dirties both stores in each of two methods so a
+      shared binding fails mechanically, and running tests can no longer touch a
+      real workout database on the connected device
 
 **Exit — partially reached.** Verified: installing with `-Pgymtracker.optionalFeatures=off`
 (the no-Bluetooth/below-API-31 case's mechanical proxy, since CI's own emulator has
