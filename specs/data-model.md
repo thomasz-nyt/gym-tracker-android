@@ -245,6 +245,12 @@ Per ADR-0005, anything that only ever describes *this device or this install* li
 DataStore rather than Room: the local member UUID, the unit preference, the rest timer's end
 time and default (ADR-0010), and the guided flow's in-flight target (US-05a, ADR-0017).
 
+Exact-machine guides (US-50/US-51, ADR-0041) are also not a table, for a different reason: they
+are reviewed app content, bundled in `machine_guides.json` and keyed by the catalog's stable
+exercise UUID. They carry no member data, never sync and never travel in a backup. The packaged
+manifest remains empty until a guide has its source SVG, exact make/model, manual and human
+review; absence is the safe fallback.
+
 The last one is the one worth stating explicitly, because it looks like it wants a table and
 does not have one. A guided target is the sets-by-reps typed when the exercise was started; it
 lasts for that exercise and is discarded. Giving it a row would make it a prescription entity —

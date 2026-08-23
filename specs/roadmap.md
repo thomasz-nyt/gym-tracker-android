@@ -517,7 +517,10 @@ field or network dependency. It never infers or logs a rep (ADR-0018).
 - [x] Non-packaged source/provenance intake directory and checklist
 - [ ] Receive the original `leg-press.svg`, exact make/model, manufacturer manual, side/front
       photos and designated reviewer
-- [ ] Pure guide model and exact-id bundled repository; unknown/unreviewed guides fail absent
+- [x] Pure guide model and exact-id bundled repository; unknown, malformed, duplicated and
+      unreviewed guides fail absent. The packaged manifest is deliberately empty until the pilot
+      source and reviews arrive; `PersistenceIsolationTest`'s test graph remains valid through
+      the new binding
 - [ ] Testable leg-press keyframes and Canvas renderer with Play/Pause/Replay and reduced-motion
       start/end poses
 - [ ] Exercise-detail and guided-setup integration; no active-set placement and no logging-path
