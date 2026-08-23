@@ -209,7 +209,10 @@ private fun PerformedExerciseCard(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap),
     ) {
-        DetailThumbnail(performed.exercise?.imageAsset)
+        // US-06b promises no placeholder when the catalog has no photo. Omitting the child is
+        // also what lets the exercise details use the full row width instead of reserving an
+        // invisible thumbnail for almost every catalog entry.
+        performed.exercise?.imageAsset?.let { DetailThumbnail(it) }
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -306,12 +309,7 @@ private fun PerformedExercise.describeTotals(unit: WeightUnit): String =
 
 /** As on the search screen: no image rather than a placeholder that pretends (ADR-0007). */
 @Composable
-private fun DetailThumbnail(imageAsset: String?) {
-    if (imageAsset == null) {
-        Box(modifier = Modifier.size(GymDimens.Thumbnail))
-        return
-    }
-
+private fun DetailThumbnail(imageAsset: String) {
     GymPhoto(
         model = "file:///android_asset/exercise_images/$imageAsset",
         contentDescription = null,

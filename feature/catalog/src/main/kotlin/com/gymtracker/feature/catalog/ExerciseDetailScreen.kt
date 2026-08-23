@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -171,15 +170,13 @@ private fun MovementPhoto(imageAsset: String?) {
 @Composable
 private fun MuscleTags(exercise: Exercise) {
     Text("Works", style = MaterialTheme.typography.titleMedium)
-    Row(horizontalArrangement = Arrangement.spacedBy(TAG_GAP)) {
-        AssistChip(
-            onClick = {},
-            label = { Text(exercise.equipment.label()) },
-            // ADR-0019: AssistChip reads CornerFull unless told otherwise — redesign audit,
-            // PR A finding 1.
-            shape = MaterialTheme.shapes.large,
-        )
-    }
+    // Metadata, not a control. AssistChip used to expose a click action that did nothing,
+    // which lied to touch and TalkBack users about what could be operated here (US-13).
+    Text(
+        text = "Equipment  ·  ${exercise.equipment.label()}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     Text(
         text = exercise.primaryMuscles.joinToString { it.label() }.ifEmpty { "Not recorded" },
         style = MaterialTheme.typography.bodyLarge,
@@ -222,7 +219,6 @@ private fun Instructions(steps: List<String>) {
 
 private val DETAIL_PADDING = GymDimens.ScreenPadding
 private val DETAIL_GAP = GymDimens.Gap
-private val TAG_GAP = GymDimens.TightGap
 private val MIN_TARGET = GymDimens.MinTouchTarget
 
 @Preview
