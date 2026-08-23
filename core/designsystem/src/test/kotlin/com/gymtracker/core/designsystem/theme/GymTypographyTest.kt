@@ -129,6 +129,17 @@ class GymTypographyTest {
     }
 
     @Test
+    fun `displaySmall is the persistent vital reading role`() {
+        // US-47: the live heart-rate readout has to remain legible at arm's length without
+        // borrowing the rest timer's much larger headline role or hard-coding sp at its call
+        // site. The complete role is pinned so a 36sp glyph can never inherit a 16sp line box.
+        assertEquals(36.sp, GymTypography.displaySmall.fontSize)
+        assertEquals(44.sp, GymTypography.displaySmall.lineHeight)
+        assertEquals(FontWeight.Medium, GymTypography.displaySmall.fontWeight)
+        assertEquals(ArchivoFamily, GymTypography.displaySmall.fontFamily)
+    }
+
+    @Test
     fun `displayMedium stays at Material's size, because no role reads it`() {
         // ADR-0029 gave the countdown its own role (displayLarge) rather than resizing this one;
         // ADR-0033 later moved GuidedExerciseScreen's countdown to displayLarge too, so this slot
