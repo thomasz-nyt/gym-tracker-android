@@ -4,20 +4,21 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-M0, M1, M3, M3a, M3b, M3c, M4 and M4a are all complete as of 2026-08-16 — the last three closed
+M0, M1, M3, M3a, M3b, M3c, M4, M4a and M5 are complete as of 2026-08-20 — several closed
 in name only for a while, their checkboxes left unticked across the PRs that shipped them, until
 this entry reconciled the file against the code (see each section's own "Exit" note for what was
 verified and how). M2 is deliberately postponed so the offline core can be finished before
 accounts and sync arrive; M3a, M3b, M3c and M4a were all taken ahead of their sequential position
-for reasons argued in each one's own section below. Per the sequential rule at the top of this
-file, **M5 is next** — US-20, US-21 and US-22 are merged (#59, then #60/#62 — #60 initially
-merged into #59's now-dead head branch rather than `main` and had to be re-landed via #62,
-2026-08-18); only US-23 (revoke) remains open. **M5a is specced (ADR-0039, 2026-08-18) and now
-unblocked** — it runs alongside M5 on the same terms M3b and M3c ran alongside M4, and reuses
-M5's optional-feature scaffolding (`:feature:health`, the no-op default binding, the per-member
-toggle shape) now that it exists in `main`, rather than rebuilding it. Redesign-audit follow-up
-work (below) continues alongside as well, on the same terms: it touches no table any milestone
-reads.
+for reasons argued in each one's own section below. US-23, M5's last story, merged in PR #65;
+the opening status had not been updated with it. Per the sequential rule at the top of this file,
+**M2 is now next**.
+
+M5a's implementation is also shipped (ADR-0039, US-46 … US-49). Subsequent live use with a
+Fitbit Charge 6 proved the real pairing-to-readout path well enough to expose a legibility bug in
+the 12sp readout; it does not, by itself, record the exit criterion's value-by-value comparison
+against the band's own display, so that final hardware observation stays open in M5a's section
+rather than being inferred. Redesign-audit follow-up work (below) continues alongside on the same
+terms as before: it touches no table any milestone reads.
 
 M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
 it was routines work that touched no table M4 reads, so running it beside M4 risked nothing

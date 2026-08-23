@@ -216,8 +216,9 @@ private fun PerformedExerciseCard(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                // The catalog entry is only absent if the row outlived its exercise, which the
-                // schema forbids; show the id rather than a blank line.
+                // The derived catalog can be wiped and re-seeded across an app upgrade, so
+                // Room deliberately does not FK this appearance to it. If an older id ever
+                // disappears, show that stable id rather than a blank line or invented name.
                 text = performed.exercise?.name ?: performed.sessionExercise.exerciseId.value,
                 style = MaterialTheme.typography.titleMedium,
             )

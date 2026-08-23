@@ -46,6 +46,8 @@ data class Exercise(
     val mediaType: MediaType?,    // GIF | VIDEO | NONE
     val youtubeUrl: String?,
     val source: String,           // provenance: "free-exercise-db" | "household"
+    val isStarter: Boolean,       // curated above the alphabetical tail (ADR-0007)
+    val imageAsset: String?,      // bundled photo filename; null means no image slot
 )
 
 data class WorkoutSession(
@@ -157,7 +159,7 @@ Tables mirror the domain entities plus sync bookkeeping:
 ```
 exercises(id PK, name, aliases_json, primary_json, secondary_json, equipment,
           instructions_json, media_url, media_type, youtube_url, source,
-          updated_at)
+          is_starter, image_asset, updated_at)
 
 sessions(id PK, user_id, gym_name, started_at, ended_at,
          avg_hr, max_hr, active_kcal, metrics_source,
@@ -165,7 +167,7 @@ sessions(id PK, user_id, gym_name, started_at, ended_at,
          routine_name NULL, routine_id NULL)
 
 session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
-                  exercise_id FK→exercises, position,
+                  exercise_id, position,
                   target_sets NULL, target_reps NULL, target_weight_kg NULL,
                   updated_at, sync_state)
 
@@ -190,6 +192,12 @@ sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
 working on it unchanged. As of schema v9 (see the routine-provenance note below), a session
 carries a copy of the routine's name and id — but still no foreign key, and no query joins
 `sessions` back to `routines`. Editing today never edits Tuesday.
+
+`session_exercises.exercise_id` deliberately has an index but **no Room foreign key** to the
+derived catalog. Migrations v4→v5 and v5→v6 wipe and re-seed `exercises` while session history
+survives; an FK would make that impossible. Read paths therefore keep an honest missing-catalog
+fallback. `routine_items.exercise_id` does have the FK because backup validation rejects a file
+whose routine references an id the current bundled catalog no longer contains.
 
 **Targets (schema v8, US-30, ADR-0027).** The three nullable `target_*` columns above are new,
 and `session_exercises` gains the same three, which `StartSessionFromRoutine` fills in as it
@@ -244,12 +252,10 @@ which ADR-0009 rejected and ADR-0017 keeps rejecting. The **sets it produces** a
 rows in `sets`, written one at a time as they are performed.
 
 A routine (US-29) does **not** contradict this, and the distinction is the whole of ADR-0020.
-A routine stores a name and an ordered list of exercise ids — no sets, no reps, no load. A
-list of names is not a value, so it cannot be dishonest, and "no prescription entity" survives
-intact: only ADR-0017's "nothing outlives the workout" is amended. The numbers the routine
-screens show beside each movement come from `sets` through `PrefillFromLastSet` and are
-labelled as what was lifted (`Last Tue · 100 lb × 8`), never as what to lift. **A stored
-target is still not a table**, and the routine editor has no control that would create one.
+A routine stores a name and an ordered list of exercise ids. ADR-0027 later added three nullable
+target columns to each routine item rather than a target table; the routine editor can set or
+clear those explicitly and always labels them as targets. The numbers describing what was
+actually lifted still come from `sets`, and every chart and record still ignores targets.
 
 The warm-up stopwatch (US-28, ADR-0021) is the second of these, and it is excluded for a
 different reason. It is not a prescription; it is a *second kind of thing a session could
@@ -268,8 +274,9 @@ The bundled catalog (free-exercise-db) is converted at build time by a script in
 `tools/catalog/`; each exercise id is a **UUIDv5** derived from a fixed
 namespace plus the source slug (e.g. `Lat_Pulldown`). Every device therefore
 seeds identical ids, and the same script seeds the Supabase global catalog at
-M2, so `sets.exercise_id` needs no remapping at first sync. Household-created
-exercises (M3) still use `gen_random_uuid()`.
+M2, so an exercise reference needs no remapping at first sync. Household media added in M2
+references these same stable ids; it does not mint a second exercise identity for the same
+movement.
 
 ### What travels in a backup
 
@@ -352,6 +359,8 @@ create table sessions (
   started_at timestamptz not null,
   ended_at timestamptz,
   avg_hr int, max_hr int, active_kcal int, metrics_source text,
+  routine_name text,
+  routine_id uuid, -- provenance snapshot only: deliberately no FK to routines (ADR-0028)
   updated_at timestamptz not null default now()
 );
 
@@ -360,6 +369,29 @@ create table session_exercises (
   session_id uuid not null references sessions on delete cascade,
   exercise_id uuid not null references exercises on delete restrict,
   position int not null check (position >= 1),
+  target_sets int check (target_sets >= 1),
+  target_reps int check (target_reps >= 1),
+  target_weight_kg numeric(6,2) check (target_weight_kg >= 0),
+  updated_at timestamptz not null default now()
+);
+
+create table routines (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles on delete cascade,
+  name text not null,
+  position int not null check (position >= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table routine_items (
+  id uuid primary key default gen_random_uuid(),
+  routine_id uuid not null references routines on delete cascade,
+  exercise_id uuid not null references exercises on delete restrict,
+  position int not null check (position >= 1),
+  target_sets int check (target_sets >= 1),
+  target_reps int check (target_reps >= 1),
+  target_weight_kg numeric(6,2) check (target_weight_kg >= 0),
   updated_at timestamptz not null default now()
 );
 
@@ -394,6 +426,8 @@ alter table exercises        enable row level security;
 alter table sessions         enable row level security;
 alter table session_exercises enable row level security;
 alter table sets             enable row level security;
+alter table routines         enable row level security;
+alter table routine_items    enable row level security;
 alter table coach_responses  enable row level security;
 
 create or replace function my_household() returns uuid
@@ -438,6 +472,21 @@ create policy sets_write on sets for all using (
   exists (select 1 from session_exercises se
           join sessions s on s.id = se.session_id
           where se.id = sets.session_exercise_id and s.user_id = auth.uid())
+);
+
+create policy routines_select on routines for select using (user_id = auth.uid());
+create policy routines_write on routines for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy routine_items_select on routine_items for select using (
+  exists (select 1 from routines r where r.id = routine_items.routine_id)
+);
+create policy routine_items_write on routine_items for all using (
+  exists (select 1 from routines r
+          where r.id = routine_items.routine_id and r.user_id = auth.uid())
+) with check (
+  exists (select 1 from routines r
+          where r.id = routine_items.routine_id and r.user_id = auth.uid())
 );
 
 -- Exercises: the global catalog is readable by all; household media is scoped.
