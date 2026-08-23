@@ -503,6 +503,35 @@ he holds a pose instead of vanishing; the four unedited suites above stay green.
 
 ---
 
+## M4b — Exact-machine form guides
+
+Stories: US-50, US-51. See ADR-0041.
+
+Added 2026-08-23 after the product audit clarified that "line graph" means REP demonstrating
+movement as precise line art, not another progress chart. This runs beside M2 on the same narrow
+exception M4a used: bundled UI and pure geometry only, with no Room table, sync payload, backup
+field or network dependency. It never infers or logs a rep (ADR-0018).
+
+- [x] ADR-0041 and US-50/US-51 written before production code; exact UUID mapping, placement,
+      reduced-motion behavior and validation gate decided
+- [x] Non-packaged source/provenance intake directory and checklist
+- [ ] Receive the original `leg-press.svg`, exact make/model, manufacturer manual, side/front
+      photos and designated reviewer
+- [ ] Pure guide model and exact-id bundled repository; unknown/unreviewed guides fail absent
+- [ ] Testable leg-press keyframes and Canvas renderer with Play/Pause/Replay and reduced-motion
+      start/end poses
+- [ ] Exercise-detail and guided-setup integration; no active-set placement and no logging-path
+      changes
+- [ ] Manual plus human sign-off and real session on the exact leg press
+- [ ] Expand one reviewed PR at a time to leg extension, chest press, shoulder press, seated row,
+      seated leg curl and wide-grip lat pulldown
+
+**Exit:** all seven exact machines have reviewed offline guides; every mapping, cue and geometry
+is traceable to its source; absence is honest for every other exercise; core logging tests stay
+unedited. The leg-press pilot must pass its real-machine exit before work begins on the other six.
+
+---
+
 ## M5 — Health Connect (optional)
 
 Stories: US-20 … US-23. Read `specs/health-connect.md` first. Split into three PRs per

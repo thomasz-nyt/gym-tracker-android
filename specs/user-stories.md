@@ -795,6 +795,49 @@ machine-specific placards from the same drawing set are explicitly out of scope.
 
 ---
 
+## M4b — REP demonstrates exact machines
+
+Runs beside M2 under ADR-0041: bundled, schema-neutral instruction UI with no logged-data or
+sync changes. "Line graph" here means an animated line-art technique demonstration, not a data
+chart and not automatic rep counting.
+
+### US-50 — REP demonstrates our exact leg press
+
+- A guide exists only for catalog exercise id `492fa83f-3134-5d16-8b03-386dada93dad`
+  (Leg Press), selected by exact UUID rather than name, alias, equipment or body part.
+- The bundled guide names the actual manufacturer and model and carries Setup, Move and
+  Checkpoints cues approved against that model's manufacturer manual and by a designated human
+  trainer or machine maintainer. The source reference, reviewer and review date are not null.
+- Exercise detail shows a `Form guide` section after the movement photo when the exact reviewed
+  guide exists: model label, REP line animation, and the three concise cue groups. The original
+  catalog instructions remain available below it as `Full instructions` rather than being
+  overwritten.
+- Guided setup offers a secondary `Form guide` action. It opens the same reviewed guide and
+  returns with weight, reps and set count unchanged. There is no guide animation while a set is
+  active, and `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and `GuidedFlowScreenTest` remain
+  unedited.
+- Play, Pause and Replay are operable and have semantics that describe the demonstrated motion.
+  With system animations disabled, labelled start and end poses and the direction of movement
+  render instead of an unexplained frozen frame.
+- With an unknown exercise id, missing review metadata or an unreviewed machine variant, no guide
+  section or action renders — zero-height absence, never a generic substitute.
+- The guide is fully offline. Watching it never counts a rep, changes a form field or writes to
+  Room/DataStore.
+- Pilot exit requires a real session on the exact leg press, manual verification and recorded
+  reviewer sign-off, in light/dark mode, at 200% font, with TalkBack and animations on/off.
+
+### US-51 — Extend the reviewed guide to the other six machines
+
+US-50's acceptance criteria apply independently to each explicit mapping below. Each guide is a
+small reviewable change; a missing or failed review leaves only that guide absent.
+
+- Leg Extensions — `a891e1cb-7f5d-5cc8-aed1-ce306ca67343`
+- Leverage Chest Press — `0311e6bf-4717-5e7f-b9c3-d7232e22df55`
+- Leverage Shoulder Press — `10fec4c1-2a59-50cd-bbf0-af1aee9c6fe6`
+- Seated Cable Rows — `c5db7545-f496-5bc0-b69e-ed1bf36d2aed`
+- Seated Leg Curl — `32e4fe44-fd87-515a-9836-68304520c90c`
+- Wide-Grip Lat Pulldown — `16eb68ba-df84-5d85-bc08-4ae204616974`
+
 ## M5 — Health Connect (optional)
 
 ### US-20 — Availability
