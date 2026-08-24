@@ -167,7 +167,12 @@ class TabNavigationTest {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText(AN_EXERCISE).fetchSemanticsNodes().isNotEmpty()
         }
-        val leftPx = compose.onAllNodesWithText(AN_EXERCISE)[0].fetchSemanticsNode().boundsInRoot.left
+        val leftPx =
+            compose
+                .onAllNodesWithText(AN_EXERCISE)[0]
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .left
         val leftDp = leftPx / compose.activity.resources.displayMetrics.density
 
         assertTrue(

@@ -47,7 +47,13 @@ class PersistenceIsolationTest {
     private fun assertFreshThenDirty() {
         runBlocking {
             assertTrue(database.sessionDao().allForUser(PROBE_USER).isEmpty(), "Room leaked from another test")
-            assertTrue(preferences.data.first().asMap().isEmpty(), "DataStore leaked from another test")
+            assertTrue(
+                preferences.data
+                    .first()
+                    .asMap()
+                    .isEmpty(),
+                "DataStore leaked from another test",
+            )
 
             database.sessionDao().insert(
                 SessionEntity(

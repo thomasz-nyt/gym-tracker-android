@@ -14,11 +14,11 @@ import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.guided.DataStoreGuidedPlanStore
 import com.gymtracker.core.data.health.DataStoreHealthIntegration
 import com.gymtracker.core.data.health.DataStoreHeartRateBandPreference
-import com.gymtracker.core.data.member.DataStoreCurrentMember
-import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.machineguide.AndroidMachineGuideAssetReader
 import com.gymtracker.core.data.machineguide.BundledMachineGuideRepository
 import com.gymtracker.core.data.machineguide.MachineGuideAssetReader
+import com.gymtracker.core.data.member.DataStoreCurrentMember
+import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
 import com.gymtracker.core.data.routine.RoomRoutineItemRepository
 import com.gymtracker.core.data.routine.RoomRoutineRepository
@@ -49,9 +49,9 @@ import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HeartRateBandPreference
 import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
+import com.gymtracker.core.domain.machineguide.MachineGuideRepository
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
-import com.gymtracker.core.domain.machineguide.MachineGuideRepository
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.model.SessionExerciseId
