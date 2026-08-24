@@ -56,6 +56,7 @@ data class MachineGuide(
     val demonstration: MachineDemonstration,
 ) {
     init {
+        require(exerciseId.value.isNotBlank()) { "Machine guide exercise id cannot be blank" }
         require(manufacturer.isNotBlank()) { "Machine manufacturer cannot be blank" }
         require(model.isNotBlank()) { "Machine model cannot be blank" }
         require(manualReference.isNotBlank()) { "Manufacturer manual reference cannot be blank" }

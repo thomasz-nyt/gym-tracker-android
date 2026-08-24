@@ -9,6 +9,7 @@ import com.gymtracker.core.domain.machineguide.MachineGuideId
 import com.gymtracker.core.domain.machineguide.MachineGuideRepository
 import com.gymtracker.core.domain.model.ExerciseId
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -34,7 +35,10 @@ class AndroidMachineGuideAssetReader
     ) : MachineGuideAssetReader {
         override suspend fun read(): String =
             withContext(io) {
-                context.assets.open(ASSET_NAME).bufferedReader().use { it.readText() }
+                context.assets
+                    .open(ASSET_NAME)
+                    .bufferedReader()
+                    .use { it.readText() }
             }
 
         private companion object {
@@ -58,12 +62,20 @@ class BundledMachineGuideRepository
         private var cached: Map<ExerciseId, MachineGuide>? = null
         private val loadMutex = Mutex()
 
-        override fun observeFor(exerciseId: ExerciseId): Flow<MachineGuide?> =
-            flow { emit(guides()[exerciseId]) }
+        override fun observeFor(exerciseId: ExerciseId): Flow<MachineGuide?> = flow { emit(guides()[exerciseId]) }
 
         private suspend fun guides(): Map<ExerciseId, MachineGuide> =
             cached ?: loadMutex.withLock {
-                cached ?: parse(assets.read()).also { cached = it }
+                cached ?: loadGuides().also { cached = it }
+            }
+
+        private suspend fun loadGuides(): Map<ExerciseId, MachineGuide> =
+            try {
+                parse(assets.read())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyMap()
             }
 
         private fun parse(raw: String): Map<ExerciseId, MachineGuide> =
