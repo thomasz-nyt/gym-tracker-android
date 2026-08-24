@@ -155,7 +155,7 @@ class TabNavigationTest {
     fun catalogMetadataDoesNotPretendToBeInteractive() {
         awaitExerciseDetail()
 
-        compose.onNodeWithText(EQUIPMENT).assertHasNoClickAction()
+        compose.onNodeWithText(EQUIPMENT_METADATA).assertHasNoClickAction()
     }
 
     @Test
@@ -191,7 +191,7 @@ class TabNavigationTest {
         }
         compose.onAllNodesWithText(AN_EXERCISE)[0].performClick()
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText(EQUIPMENT).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText(EQUIPMENT_METADATA).fetchSemanticsNodes().isNotEmpty()
         }
     }
 
@@ -220,7 +220,7 @@ class TabNavigationTest {
         /** Only on the browse screen, so it is the signal that the list is what is showing. */
         const val SEARCH_FIELD = "Search exercises"
         const val BACK = "Back"
-        const val EQUIPMENT = "Machine"
+        const val EQUIPMENT_METADATA = "Equipment  ·  Machine"
         const val MAX_TEXT_INSET_DP = 64f
 
         /** Train's one entry point to Routines (ADR-0030), present regardless of routine count. */
