@@ -15,6 +15,7 @@ class MachineGuideTest {
             { validGuide(model = " ") },
             { validGuide(manualReference = "") },
             { validGuide(reviewer = "") },
+            { validGuide(exerciseId = ExerciseId("")) },
             { validGuide(setup = emptyList()) },
             { validGuide(movement = emptyList()) },
             { validGuide(checkpoints = emptyList()) },
@@ -33,13 +34,14 @@ class MachineGuideTest {
         model: String = "LP-100",
         manualReference: String = "manuals.example/LP-100",
         reviewer: String = "Gym trainer",
+        exerciseId: ExerciseId = ExerciseId("492fa83f-3134-5d16-8b03-386dada93dad"),
         setup: List<String> = listOf("Set the seat"),
         movement: List<String> = listOf("Press through the platform"),
         checkpoints: List<String> = listOf("Keep hips against the pad"),
     ): MachineGuide =
         MachineGuide(
             id = MachineGuideId("leg-press-lp-100-v1"),
-            exerciseId = ExerciseId("492fa83f-3134-5d16-8b03-386dada93dad"),
+            exerciseId = exerciseId,
             manufacturer = manufacturer,
             model = model,
             cues = MachineGuideCues(setup, movement, checkpoints),

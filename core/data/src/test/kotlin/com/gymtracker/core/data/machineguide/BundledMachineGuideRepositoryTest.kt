@@ -2,11 +2,13 @@ package com.gymtracker.core.data.machineguide
 
 import com.gymtracker.core.domain.machineguide.MachineDemonstration
 import com.gymtracker.core.domain.model.ExerciseId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class BundledMachineGuideRepositoryTest {
@@ -43,8 +45,9 @@ class BundledMachineGuideRepositoryTest {
     @Test
     fun `duplicate mappings fail closed instead of picking one`() =
         runBlocking {
-            val duplicate = "[${GOOD_GUIDE.removePrefix("[").removeSuffix("]")}," +
-                GOOD_GUIDE.removePrefix("[").removeSuffix("]") + "]"
+            val duplicate =
+                "[${GOOD_GUIDE.removePrefix("[").removeSuffix("]")}," +
+                    GOOD_GUIDE.removePrefix("[").removeSuffix("]") + "]"
 
             assertNull(repository(duplicate).observeFor(ExerciseId(LEG_PRESS_ID)).first())
         }
@@ -53,6 +56,33 @@ class BundledMachineGuideRepositoryTest {
     fun `malformed bundled data is absent rather than crashing exercise detail`() =
         runBlocking {
             assertNull(repository("not json").observeFor(ExerciseId(LEG_PRESS_ID)).first())
+        }
+
+    @Test
+    fun `an unreadable bundled asset is absent rather than crashing exercise detail`() =
+        runBlocking {
+            val repository =
+                BundledMachineGuideRepository(
+                    assets = MachineGuideAssetReader { error("asset unavailable") },
+                    json = Json { ignoreUnknownKeys = true },
+                )
+
+            assertNull(repository.observeFor(ExerciseId(LEG_PRESS_ID)).first())
+        }
+
+    @Test
+    fun `cancelling an asset read still cancels the observation`() =
+        runBlocking {
+            val repository =
+                BundledMachineGuideRepository(
+                    assets = MachineGuideAssetReader { throw CancellationException("cancelled") },
+                    json = Json { ignoreUnknownKeys = true },
+                )
+
+            assertFailsWith<CancellationException> {
+                repository.observeFor(ExerciseId(LEG_PRESS_ID)).first()
+            }
+            Unit
         }
 
     @Test
