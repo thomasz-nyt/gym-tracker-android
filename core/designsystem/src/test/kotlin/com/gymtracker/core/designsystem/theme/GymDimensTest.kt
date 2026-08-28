@@ -76,8 +76,15 @@ class GymDimensTest {
         assertEquals(220.dp, GymDimens.PhotoHeight)
         assertEquals(240.dp, GymDimens.ChartHeight)
         assertEquals(12.dp, GymDimens.VolumeBarHeight)
-        assertEquals(88.dp, GymDimens.CatalogRowHeight)
         assertEquals(88.dp, GymDimens.FabClearance)
+    }
+
+    @Test
+    fun `the catalog row is 80dp, retuned by ADR-0011's Turn 4 amendment from 88dp`() {
+        // BrowseScreen is the sole reader of this token (grep-verified), so lowering it here
+        // cannot reflow a screen this pass does not touch — the same reasoning that keeps the
+        // other four Turn 4 tokens below as new, additive names rather than repointed old ones.
+        assertEquals(80.dp, GymDimens.CatalogRowHeight)
     }
 
     @Test
@@ -99,5 +106,24 @@ class GymDimensTest {
         // label or a single-line name, not a photo grid, so there is headroom to spare.
         assertTrue(GymDimens.MascotInline > GymDimens.Thumbnail)
         assertTrue(GymDimens.MascotHome > GymDimens.MascotInline)
+    }
+
+    @Test
+    fun `ADR-0011's Turn 4 amendment adds five tokens, all new names rather than repointed old ones`() {
+        // Each backs a value the redesign's frames pin, scoped to the one or two migrated call
+        // sites that read it — see the amendment's "An additive scale, not a value change" for
+        // why these are new tokens (CompactScreenPadding, CatalogThumbnail) rather than
+        // ScreenPadding/Thumbnail repointed, which would reflow the fourteen and two other
+        // files (respectively) that read those two tokens unchanged.
+        assertEquals(20.dp, GymDimens.CompactScreenPadding)
+        assertTrue(GymDimens.CompactScreenPadding < GymDimens.ScreenPadding)
+        assertEquals(56.dp, GymDimens.CatalogThumbnail)
+        assertEquals(54.dp, GymDimens.AddExerciseCellWidth)
+        assertEquals(44.dp, GymDimens.AddExerciseButtonHeight)
+        assertTrue(GymDimens.AddExerciseButtonHeight < GymDimens.AddExerciseCellWidth)
+        assertEquals(64.dp, GymDimens.LogRowHeight)
+        assertTrue(GymDimens.LogRowHeight < GymDimens.PrimaryAction)
+        assertEquals(44.dp, GymDimens.WarmUpRowHeight)
+        assertEquals(340.dp, GymDimens.StackedButtonsBreakpoint)
     }
 }

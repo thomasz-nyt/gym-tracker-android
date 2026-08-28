@@ -84,8 +84,12 @@ object GymDimens {
     /** One muscle's bar in the weekly volume screen (US-17). */
     val VolumeBarHeight = 12.dp
 
-    /** A result row on the catalog browse screen (US-12). */
-    val CatalogRowHeight = 88.dp
+    /**
+     * A result row on the catalog browse screen (US-12). Retuned 88dp → 80dp by ADR-0011's
+     * Turn 4 amendment (frame `4a`) — safe to lower here rather than as a new token, because
+     * `BrowseScreen.kt` is this token's only reader.
+     */
+    val CatalogRowHeight = 80.dp
 
     /** Room for the "Done · N added" floating button so the last browse result clears it. */
     val FabClearance = 88.dp
@@ -130,4 +134,39 @@ object GymDimens {
      * this value.
      */
     val MascotInline = 80.dp
+
+    /**
+     * ADR-0011's Turn 4 amendment: five tokens for the six screens that pass moves to the new
+     * [GymTextRoles] scale, each a **new name**, not [ScreenPadding] or [Thumbnail] repointed —
+     * both of those are read by files this pass does not touch, and lowering them in place
+     * would reflow every one as a side effect. See the amendment's "An additive scale, not a
+     * value change" for the full reasoning; it applies to dp the same way it applies to sp.
+     */
+    val CompactScreenPadding = 20.dp
+
+    /** The picker row's thumbnail (frame `4a`), replacing [Thumbnail] there only. */
+    val CatalogThumbnail = 56.dp
+
+    /**
+     * The picker row's fixed-width trailing cell (frame `4a`): a `tag.caps` "ADDED" label or a
+     * `+` button, whichever the row needs, always the same width — so adding an exercise never
+     * changes the name column's width and never reflows the row.
+     */
+    val AddExerciseCellWidth = 54.dp
+
+    /** The `+` button inside [AddExerciseCellWidth] (frame `4a`). */
+    val AddExerciseButtonHeight = 44.dp
+
+    /**
+     * The one-tap log button's floor once its eyebrow/detail overload becomes two fixed lines
+     * (frame `4b`/`4c`) rather than a variable-height sentence — [PrimaryAction] (72dp) is
+     * unchanged and still the floor for every single-line primary button elsewhere in the app.
+     */
+    val LogRowHeight = 64.dp
+
+    /** The warm-up row, once it stops floating as loose text (frame `4c`). */
+    val WarmUpRowHeight = 44.dp
+
+    /** Below this width, the finish dialog's two buttons stack rather than shrink (frame `4e`). */
+    val StackedButtonsBreakpoint = 340.dp
 }
