@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import com.gymtracker.core.designsystem.component.GymLoadRow
 import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.NumeralText
@@ -458,6 +459,30 @@ private fun GuidedRestingPreview() {
     }
 }
 
+/**
+ * ADR-0011's Turn 4 amendment: 320dp, 130% font scale, the longest exercise name in the bundled
+ * database, and a bodyweight movement — the two worst cases frame `4b` names, together, on both
+ * the resting hero (`RestHero`) and `GuidedControls`' stepper/log row below it.
+ */
+@Preview(widthDp = 320, fontScale = 1.3f)
+@Composable
+private fun GuidedRestingNarrowWorstCasePreview() {
+    GymTrackerTheme {
+        GuidedExerciseScreen(
+            running = previewRunning(exerciseName = WORST_CASE_NAME, weightKg = null),
+            unit = WeightUnit.LB,
+            restRemaining = Duration.ofSeconds(45),
+            onRepsChanged = {},
+            onRepsStepped = {},
+            onFinishSet = {},
+            onStartNext = {},
+            onStop = {},
+        )
+    }
+}
+
+private const val WORST_CASE_NAME = "Barbell Incline Bench Press - Medium Grip"
+
 @GymPreviews
 @Composable
 private fun GuidedCompletePreview() {
@@ -478,6 +503,8 @@ private fun GuidedCompletePreview() {
 private fun previewRunning(
     setsDone: Int = 1,
     isComplete: Boolean = false,
+    exerciseName: String = "Bench Press",
+    weightKg: Double? = 61.23,
 ): GuidedRunning {
     val row =
         SessionExerciseRow(
@@ -486,8 +513,8 @@ private fun previewRunning(
         )
     return GuidedRunning(
         row = row,
-        exerciseName = "Bench Press",
-        weightKg = 61.23,
+        exerciseName = exerciseName,
+        weightKg = weightKg,
         targetSets = 3,
         targetReps = 12,
         setsDone = setsDone,

@@ -386,3 +386,40 @@ private fun BrowsePreview() {
         )
     }
 }
+
+/**
+ * ADR-0011's Turn 4 amendment: the rule this pass adds to every changed composable's own
+ * previews — 320dp width, 130% font scale, and the longest exercise name in the bundled
+ * database. If the row still fits two lines and stays 80dp+ here, it survives a Pixel 4a with
+ * large text on, which is where the wraps this amendment fixes were actually measured.
+ */
+@Preview(widthDp = 320, fontScale = 1.3f)
+@Composable
+private fun BrowseNarrowWorstCasePreview() {
+    val worstCase =
+        Exercise(
+            id = ExerciseId("preview-worst-case"),
+            name = "Barbell Incline Bench Press - Medium Grip",
+            aliases = emptyList(),
+            primaryMuscles = emptyList(),
+            secondaryMuscles = emptyList(),
+            equipment = Equipment.BARBELL,
+            instructions = emptyList(),
+            mediaUrl = null,
+            mediaType = null,
+            youtubeUrl = null,
+            source = "free-exercise-db",
+        )
+    GymTrackerTheme {
+        BrowseScreen(
+            state = CatalogUiState(isLoading = false, results = listOf(worstCase)),
+            onQueryChanged = {},
+            onBodyPartToggled = {},
+            onEquipmentToggled = {},
+            onClearFilters = {},
+            onChosen = {},
+            onBack = {},
+            pickForSession = true,
+        )
+    }
+}

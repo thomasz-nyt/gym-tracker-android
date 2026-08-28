@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.Preview
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.GymLoadRow
 import com.gymtracker.core.designsystem.component.GymText
@@ -31,9 +32,16 @@ import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTextRoles
+import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementTarget
+import com.gymtracker.core.domain.model.SessionExercise
+import com.gymtracker.core.domain.model.SessionExerciseId
+import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SessionProgress
+import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -504,3 +512,44 @@ private fun logButtonDetail(
 /** The day a set happened, for the rest panel's comparison line. */
 private fun Instant.asDay(): String =
     DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault()).format(this)
+
+/**
+ * ADR-0011's Turn 4 amendment: 320dp, 130% font scale, the longest exercise name in the bundled
+ * database, and a bodyweight movement — the two worst cases frame `4c` names, together. Previews
+ * [RestingBody] directly rather than through the full `LoggingScreen`/`SessionUiState` stack:
+ * this is a layout check on the composable this pass actually changed, not a state-wiring one.
+ */
+@Preview(widthDp = 320, fontScale = 1.3f)
+@Composable
+private fun RestingBodyNarrowWorstCasePreview() {
+    val appearance =
+        SessionExercise(
+            id = SessionExerciseId("preview-worst-case"),
+            sessionId = SessionId("preview"),
+            exerciseId = ExerciseId("preview-worst-case"),
+            position = 1,
+            target = MovementTarget(sets = 5, reps = 12, weightKg = null),
+        )
+    GymTrackerTheme {
+        RestingBody(
+            remaining = Duration.ofSeconds(30),
+            total = Duration.ofSeconds(60),
+            upNext =
+                UpNextSet(
+                    sessionExerciseId = appearance.id,
+                    exerciseId = appearance.exerciseId,
+                    setNumber = 4,
+                    prefill = SetPrefill(weight = null, reps = 12),
+                    comparison = null,
+                ),
+            exerciseName = "Barbell Incline Bench Press - Medium Grip",
+            progress = null,
+            exercises = listOf(SessionExerciseRow(appearance, exercise = null, sets = emptyList())),
+            unit = WeightUnit.LB,
+            justSetRecord = null,
+            onSkipRest = {},
+            onLogNext = {},
+            onAdjust = {},
+        )
+    }
+}

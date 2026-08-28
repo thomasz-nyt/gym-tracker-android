@@ -550,6 +550,56 @@ private fun HistoryPreview() {
     }
 }
 
+/**
+ * ADR-0011's Turn 4 amendment: 320dp, 130% font scale, the longest exercise name and a
+ * bodyweight-only session — frame `4d`'s two worst cases, on the `TopLiftCard` and the one
+ * history row that carries every measurement `FlowRow` draws, including "bw".
+ */
+@Preview(widthDp = 320, fontScale = 1.3f)
+@Composable
+private fun HistoryNarrowWorstCasePreview() {
+    val started = Instant.parse("2026-08-01T17:10:00Z")
+    GymTrackerTheme {
+        HistoryScreen(
+            state =
+                HistoryState(
+                    isOpen = true,
+                    sessions =
+                        listOf(
+                            SessionSummary(
+                                session =
+                                    WorkoutSession(
+                                        id = SessionId("preview-worst-case"),
+                                        userId = UserId("preview"),
+                                        gymName = null,
+                                        startedAt = started,
+                                        endedAt = started.plus(Duration.ofMinutes(72)),
+                                        metrics = null,
+                                        routine = RoutineOrigin(id = "r1", name = "Barbell Incline Bench Press Day"),
+                                    ),
+                                exerciseCount = 5,
+                                setCount = 18,
+                                volumeKg = 4120.0,
+                                bodyweightSetCount = 3,
+                            ),
+                        ),
+                    canUndo = false,
+                    topLift =
+                        TopLift.Lift(
+                            exerciseId = ExerciseId("preview-worst-case"),
+                            exerciseName = "Barbell Incline Bench Press - Medium Grip",
+                            estimatedOneRepMaxKg = 56.2,
+                            deltaKg = 3.2,
+                        ),
+                    sessionsWithRecords = emptySet(),
+                ),
+            unit = WeightUnit.LB,
+            onDelete = {},
+            onUndo = {},
+        )
+    }
+}
+
 @Preview
 @Composable
 private fun HistoryEmptyTopSectionPreview() {

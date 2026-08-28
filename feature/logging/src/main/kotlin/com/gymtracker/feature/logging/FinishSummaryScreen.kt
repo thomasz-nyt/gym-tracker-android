@@ -208,7 +208,10 @@ private const val PREVIEW_WEIGHT_KG = 102.5
 private const val PREVIEW_REPS = 5
 private const val PREVIEW_VOLUME_KG = 512.5
 
-private fun previewDetail(metrics: SessionMetrics? = null): SessionDetail {
+private fun previewDetail(
+    metrics: SessionMetrics? = null,
+    routineName: String = "Upper A",
+): SessionDetail {
     val started = Instant.parse("2026-08-09T17:10:00Z")
     val session =
         WorkoutSession(
@@ -218,7 +221,7 @@ private fun previewDetail(metrics: SessionMetrics? = null): SessionDetail {
             startedAt = started,
             endedAt = started.plus(Duration.ofMinutes(PREVIEW_DURATION_MINUTES)),
             metrics = metrics,
-            routine = RoutineOrigin(id = "r1", name = "Upper A"),
+            routine = RoutineOrigin(id = "r1", name = routineName),
         )
     val appearance = SessionExercise(SessionExerciseId("se-1"), session.id, ExerciseId("bench"), 1)
     val sets = listOf(ExerciseSet("a", appearance.id, 1, PREVIEW_WEIGHT_KG, PREVIEW_REPS, null, started))
@@ -273,6 +276,25 @@ private fun FinishSummaryWithRecordsPreview() {
                         achievedOn = LocalDate.parse("2026-08-09"),
                     ),
                 ),
+            unit = WeightUnit.LB,
+            onDone = {},
+        )
+    }
+}
+
+/**
+ * ADR-0011's Turn 4 amendment: 320dp, 130% font scale, the longest routine name the editor
+ * permits stood in for by the longest exercise name in the bundled database — the same worst
+ * case frame `4d`'s history row uses, applied here since this screen carries the identical
+ * title.md-truncates / FlowRow-stats pair one step later in the same flow.
+ */
+@Preview(widthDp = 320, fontScale = 1.3f)
+@Composable
+private fun FinishSummaryNarrowWorstCasePreview() {
+    GymTrackerTheme {
+        FinishSummaryScreen(
+            detail = previewDetail(routineName = "Barbell Incline Bench Press - Medium Grip"),
+            records = emptyList(),
             unit = WeightUnit.LB,
             onDone = {},
         )
