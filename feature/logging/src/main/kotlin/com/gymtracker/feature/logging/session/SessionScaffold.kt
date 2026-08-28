@@ -213,9 +213,9 @@ private fun NoSession(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 RepMascot(modifier = Modifier.size(GymDimens.MascotHome))
-                Text(
+                GymText(
                     text = nextRoutine?.let { "${it.name} is next up" } ?: "No workout in progress",
-                    style = MaterialTheme.typography.titleLarge,
+                    role = GymTextRoles.TitleLg,
                     textAlign = TextAlign.Center,
                 )
             }

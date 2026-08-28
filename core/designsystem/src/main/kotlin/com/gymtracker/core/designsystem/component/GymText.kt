@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import com.gymtracker.core.designsystem.theme.GymTextRole
 
 /**
@@ -26,12 +27,14 @@ fun GymText(
     role: GymTextRole,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
+    textAlign: TextAlign? = null,
     semantics: (SemanticsPropertyReceiver.() -> Unit)? = null,
 ) {
     Text(
         text = text,
         style = role.style,
         color = color,
+        textAlign = textAlign,
         maxLines = role.maxLines,
         overflow = role.overflow,
         modifier = if (semantics != null) modifier.semantics(properties = semantics) else modifier,

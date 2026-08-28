@@ -2,6 +2,7 @@ package com.gymtracker.feature.logging
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,8 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
@@ -62,19 +65,34 @@ internal fun FinishSummaryScreen(
     val names = detail.exercises.associate { it.sessionExercise.exerciseId to it.exercise?.name }
 
     Column(
+        // No padding here — this screen's own KDoc is explicit that SessionBody already
+        // provides it; adding it here would double it.
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
     ) {
-        Text(text = "Workout complete", style = MaterialTheme.typography.titleLarge)
+        // ADR-0011's Turn 4 amendment: the same two causes HistoryScreen's row had — an
+        // unbounded title and a dot-joined stats sentence — fixed the same way here.
+        GymText(text = "Workout complete", role = GymTextRoles.TitleLg)
         // US-32 (ADR-0028): leads with the routine this session was started from, the same
         // way HistoryScreen's row does — falling back to "Freestyle" for an ordinary start.
-        Text(
+        GymText(
             text =
                 detail.summary.session.routine
                     ?.name ?: "Freestyle",
-            style = MaterialTheme.typography.titleMedium,
+            role = GymTextRoles.TitleMd,
         )
-        Text(text = detail.summary.describe(unit), style = MaterialTheme.typography.bodyMedium)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(GymDimens.MetricFlowRowGapHorizontal),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.MetricFlowRowGapVertical),
+        ) {
+            detail.summary.describe(unit).forEach { metric ->
+                GymText(
+                    text = metric,
+                    role = GymTextRoles.LabelCaps,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
         // US-22: absent entirely unless a health read actually ran (US-20's absence pattern) —
         // `metrics` is null both when the integration is off and when the device can't use it,
@@ -143,17 +161,20 @@ private fun PersonalRecord.describe(
  * session (`WorkoutHeader` in `WorkoutDetailScreen.kt`), copied rather than shared: it is ten
  * lines, and `PastLoggedSets`'s own doc comment already sets the precedent for duplicating a
  * short private UI text-builder over reaching across files for it. Kept in sync with
- * `HistoryScreen`'s `describe()` by hand — the bodyweight segment below is the one they had
- * drifted apart on before US-32.
+ * `HistoryScreen`'s `describe()` by hand — including, since ADR-0011's Turn 4 amendment, the
+ * return type: a list of separate measurements, not one joined sentence, drawn by the call site
+ * as a `FlowRow` with no separators — the fix for the same dot-joined wrap HistoryScreen's row
+ * had, applied here for the same reason rather than left inconsistent one screen later in the
+ * same flow. "bodyweight" shortens to "bw" to match.
  */
-private fun SessionSummary.describe(unit: WeightUnit): String =
-    buildString {
-        duration?.let { append("${it.asLength()}  ·  ") }
-        append("$exerciseCount ${"exercise".orPlural(exerciseCount)}")
-        append("  ·  $setCount ${"set".orPlural(setCount)}")
-        WeightFormatter.formatVolume(volumeKg, unit)?.let { append("  ·  $it") }
+private fun SessionSummary.describe(unit: WeightUnit): List<String> =
+    buildList {
+        duration?.let { add(it.asLength()) }
+        add("$exerciseCount ${"exercise".orPlural(exerciseCount)}")
+        add("$setCount ${"set".orPlural(setCount)}")
+        WeightFormatter.formatVolume(volumeKg, unit)?.let { add(it) }
         if (bodyweightSetCount > 0) {
-            append("  ·  $bodyweightSetCount bodyweight")
+            add("$bodyweightSetCount bw")
         }
     }
 
