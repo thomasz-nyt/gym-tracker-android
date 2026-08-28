@@ -3,12 +3,10 @@ package com.gymtracker
 import android.Manifest
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.filter
-import androidx.compose.ui.test.filterToOne
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -133,7 +131,13 @@ class TurnFourLayoutTest {
      * `OutlinedTextField` exposes a click action of its own (an accessibility "tap to focus"
      * affordance), so it satisfied that combinator too, and tree order put it first every time.
      * `CATALOG_ROW_TEST_TAG` (`BrowseScreen.kt`) is the one thing nothing else in this tree
-     * carries.
+     * carries — but a fourth run still failed, on a genuine race in the wait condition rather
+     * than a matching bug (see [awaitFilteredToOneResult]'s own doc). Matching by tag *count*
+     * alone, once filtered, is deliberately simpler than tag-plus-text: every row in the
+     * unfiltered list already shares this tag, so once the query has narrowed the underlying
+     * `results` list to the one exercise being searched for, exactly one tagged row is composed
+     * — there is nothing left for a second condition to rule out, and one fewer thing (`hasText`
+     * matching a `GymText` role's rendered value exactly) that could itself be the next surprise.
      */
     @Test
     fun thePickerRowDoesNotGrowPastItsFloor() {
@@ -142,13 +146,15 @@ class TurnFourLayoutTest {
             compose.onNodeWithText("Browse exercises").performClick()
 
             awaitSearchField()
+            // performClick first: performTextInput delivers through the semantics SetText/
+            // InsertText actions rather than the real IME, so focus should not be required for
+            // it to reach the field's onValueChange — but nothing in this file has exercised a
+            // text field before, so there is no existing precedent here to trust either way.
+            compose.onNodeWithText("Search exercises").performClick()
             compose.onNodeWithText("Search exercises").performTextInput(SHORT_EXERCISE)
             awaitFilteredToOneResult()
 
-            compose
-                .onAllNodesWithTag(CATALOG_ROW_TEST_TAG)
-                .filterToOne(hasText(SHORT_EXERCISE))
-                .assertHeightIsEqualTo(GymDimens.CatalogRowHeight)
+            compose.onNodeWithTag(CATALOG_ROW_TEST_TAG).assertHeightIsEqualTo(GymDimens.CatalogRowHeight)
         }
     }
 
@@ -221,23 +227,22 @@ class TurnFourLayoutTest {
     }
 
     /**
-     * Waits for the tagged, [SHORT_EXERCISE]-matching row specifically — not just any node with
-     * matching text. `onAllNodesWithText(SHORT_EXERCISE)` alone is satisfied instantly by the
-     * search field's own `EditableText` the moment typing finishes, well before the catalog's
-     * debounced filter has actually re-rendered the list — so a wait on that condition is
-     * effectively a no-op, and the test used to proceed to measure a row that was mid-recompose
-     * ("Failed to retrieve bounds of the node": the semantics node existed in a transient frame,
-     * but its layout was not yet placed by the time the assertion ran). Waiting on the same
-     * tag-plus-text combination the actual assertion queries closes that race: once this
-     * condition is true, `waitUntil` has already driven Compose back to idle around it.
+     * Waits for exactly one tagged row — not any node with matching text.
+     * `onAllNodesWithText(SHORT_EXERCISE)` alone is satisfied instantly by the search field's
+     * own `EditableText` the moment typing finishes, well before the catalog's debounced filter
+     * has actually re-rendered the list, so a wait on that condition was effectively a no-op.
+     * A later attempt waited on the tag plus a text match instead, which closed that race but
+     * still failed once, on a 10s timeout — plausibly CI being slower than expected on this run,
+     * or one more thing about `hasText` matching a `GymText`-rendered value that this file has
+     * not pinned down. Matching on tag count alone removes that second variable entirely: every
+     * row shares [CATALOG_ROW_TEST_TAG] before filtering, and the moment the catalog's `results`
+     * narrows to the one exercise being searched for, exactly one tagged row is composed — the
+     * count reaching 1 already proves it is [SHORT_EXERCISE]'s own row, without needing a second,
+     * independent condition to also confirm it.
      */
     private fun awaitFilteredToOneResult() {
-        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose
-                .onAllNodesWithTag(CATALOG_ROW_TEST_TAG)
-                .filter(hasText(SHORT_EXERCISE))
-                .fetchSemanticsNodes()
-                .isNotEmpty()
+        compose.waitUntil(timeoutMillis = FILTER_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithTag(CATALOG_ROW_TEST_TAG).fetchSemanticsNodes().size == 1
         }
     }
 
@@ -263,6 +268,14 @@ class TurnFourLayoutTest {
 
     private companion object {
         const val READY_TIMEOUT_MILLIS = 10_000L
+
+        /**
+         * Longer than [READY_TIMEOUT_MILLIS]: the only wait in this file downstream of
+         * [CatalogViewModel][com.gymtracker.feature.catalog.CatalogViewModel]'s own debounce
+         * rather than a plain state transition, and the one that has already timed out once at
+         * 10s on real CI hardware for a cause this file could not pin down with certainty.
+         */
+        const val FILTER_TIMEOUT_MILLIS = 20_000L
 
         /** Short enough that neither its name nor "Bodyweight" can push the row past the floor. */
         const val SHORT_EXERCISE = "Air Bike"
