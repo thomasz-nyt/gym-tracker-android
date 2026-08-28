@@ -3,6 +3,8 @@ package com.gymtracker
 import android.Manifest
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -118,6 +120,19 @@ class TurnFourLayoutTest {
      * ([TabNavigationTest] pins that distinction — irrelevant here, just the fastest way in) —
      * then filtered to one row via the search field, so this test does not depend on the
      * catalog's own sort order or on `LazyColumn` scrolling to find the target row.
+     *
+     * **Matches on text *and* a click action, not text alone.** `onNodeWithText`'s matcher
+     * checks a node's `Text`, `InputText` and `EditableText` semantics together (confirmed
+     * against the compose-ui-test bytecode), so a bare `hasText(SHORT_EXERCISE)` after
+     * `performTextInput(SHORT_EXERCISE)` also matches the search field itself — its own
+     * `EditableText` is exactly that string too — and the first version of this test measured
+     * the search field's height, not the row's, which is why it read the same 71dp whether the
+     * row was actually fixed or not: the query never reached the row at all. Anchoring on
+     * `SHORT_EXERCISE_EQUIPMENT` ("Bodyweight") instead of the name doesn't fix this either —
+     * the equipment filter chips row above the list renders its own "Bodyweight" chip
+     * regardless of the search query, which `hasText` matches just as readily. `hasClickAction()`
+     * is what's actually unique: the row is clickable (this screen's own `Box`), the search
+     * field and a `FilterChip` are not exposed with a plain click action the same way.
      */
     @Test
     fun thePickerRowDoesNotGrowPastItsFloor() {
@@ -129,7 +144,9 @@ class TurnFourLayoutTest {
             compose.onNodeWithText("Search exercises").performTextInput(SHORT_EXERCISE)
             awaitFilteredToOneResult()
 
-            compose.onNodeWithText(SHORT_EXERCISE).assertHeightIsEqualTo(GymDimens.CatalogRowHeight)
+            compose
+                .onNode(hasText(SHORT_EXERCISE) and hasClickAction())
+                .assertHeightIsEqualTo(GymDimens.CatalogRowHeight)
         }
     }
 
