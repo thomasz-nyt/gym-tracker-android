@@ -110,9 +110,7 @@ sentence in the first place.
 
 The ceiling belongs to the **role**, not the call site: `GymTextRole` (`:core:designsystem`)
 pairs a `TextStyle` with its `maxLines` and overflow, and a `GymText(text, role, …)` composable
-reads both, so a new screen names a role and cannot forget the ceiling. This is additive to,
-not a replacement for, `MaterialTheme.typography` — see "Mapping onto the existing
-`Typography` slots" below for why.
+reads both, so a new screen names a role and cannot forget the ceiling.
 
 | Role | sp | Line height | Weight | maxLines | Allowed for |
 | --- | --- | --- | --- | --- | --- |
@@ -135,31 +133,62 @@ Rules that go with the table:
   line with no autosizing and no measuring. It needs the number and the unit apart, which is
   why `WeightFormatter.WeightDisplay` gains `number` / `unit` / `isBodyweight` fields alongside
   its existing `primary` string (`:core:domain`, additive).
-- Gutter is **20dp on every screen** (`GymDimens.ScreenPadding`, 24 → 20). 20dp buys 8dp of
-  text column over 24dp without reading as tight.
+- Gutter is **20dp on the six migrated screens**, via a new `GymDimens.CompactScreenPadding`
+  (20dp) used only by them. `GymDimens.ScreenPadding` (24dp) is unchanged — it is read by
+  fourteen files, most of them untouched by this pass (Settings, both Progress screens,
+  ExerciseDetail, the routine editor, WorkoutDetail, SetSheets, GuidedExerciseScreen's own
+  non-migrated frames), and lowering it app-wide would silently reflow every one of them. See
+  "An additive scale, not a value change" below — the same reasoning applies to the gutter as
+  to the type roles themselves.
 
-### Where this table reverses rules this ADR and ADR-0029 already pinned
+### An additive scale, not a value change
 
-Three reversals, each a product decision restated in its pinning test rather than a silent
-value change:
+`GymTextRole` is a **new, parallel scale**, not a rewrite of `GymTypography`'s existing
+`Typography` slots. Nothing in `MaterialTheme.typography` changes value. This matters because
+those slots are shared: `titleMedium` alone is read by fourteen files, `bodySmall` by twelve,
+`titleLarge` by twelve — the great majority of them untouched by this pass (Settings, both
+Progress screens, the routine editor, Routines, WorkoutDetail, SetSheets, and
+`GuidedExerciseScreen`'s own non-migrated frames). Repointing a shared slot's *value* to a
+Turn-4 number would reflow every one of those screens as a side effect of a pass scoped to six.
 
-1. **The 16sp content floor this ADR names in its own "nothing the app renders is smaller than
-   sixteen sp" test is withdrawn for `body` (15sp).** That floor is the reason this ADR exists
-   — the completed-set line was a 12sp `bodySmall`. Its purpose now moves to role assignment
-   instead of a single floor: what a member reads under load is a numeral or title role, and
-   `body` is the prose that survives around it, one pixel under the old floor rather than at it.
-2. **`title.md` carries weight 800, which puts `NumeralText`'s digit-bolding to sleep on that
-   role.** This ADR's own class doc on `Type.kt`, and `GymTypographyTest`'s
-   `titleMedium stays off the ExtraBold hierarchy` test, hold `titleMedium` at Compose's default
-   weight *specifically* so `NumeralText`'s digit-only bolding still reads as contrast within a
-   mixed word/number line. The redesign's split baseline row replaces that mechanism on load
-   lines — digits and words are now separate `Text`s at separate roles, not one string with an
-   embedded span — but `NumeralText` stays in use elsewhere in the app (set rows, the rest
-   comparison line), so this is a role-scoped exception, not a repeal of the mechanism.
-3. **ADR-0029's `displayLarge` (104sp, the rest/warm-up countdown) drops to `display.timer`
-   at 88sp, and `headlineMedium` (44sp, the rest banner's readout) is retired in favour of
-   `numeral.lg` at 34sp.** Both were pinned in `GymTypographyTest` as "the design's exact pixel
-   values" — that test now pins the new values instead, with the same comment.
+The two slots this table might have been expected to touch — ADR-0029's `displayLarge` (104sp,
+"the rest/warm-up countdown") and `headlineMedium` (44sp, "the rest banner's weight readout") —
+turn out, on a full-repo grep, to be read by exactly two files: `RestPanel.kt`, which this pass
+migrates, and `GuidedExerciseScreen.kt`, which it does not (see "Frame `4b` is
+`GuidedExerciseScreen.kt`, not `RestPanel.kt`" below — that screen keeps its own rest countdown,
+at the old size, unmigrated). So both stay exactly where ADR-0029 pinned them: `RestPanel.kt`'s
+countdown and load readout move to the new `display.timer` (88sp) and `numeral.lg` (34sp) roles
+instead, and `GuidedExerciseScreen.kt` keeps reading `displayLarge`/`headlineMedium` at their
+original 104sp/44sp, exactly as before. `GymTypographyTest`'s "the design's exact pixel values"
+assertions are untouched.
+
+The same holds for the 16sp content floor and `titleMedium`'s ExtraBold exemption:
+`GymTypographyTest`'s "nothing the app renders is smaller than sixteen sp" test and its
+`titleMedium stays off the ExtraBold hierarchy` test both keep asserting against the *existing*
+roles, which are unchanged and still read everywhere they were before. The new scale simply
+isn't subject to either — it has its own floor (`tag.caps` at 11sp, which `4f`'s own text
+calls "the floor — nothing smaller ships" for it), the same way `labelMedium`/`labelSmall`
+(13sp/12sp) already sit under the 16sp floor as wayfinding labels rather than content, a
+distinction `Type.kt`'s own class doc already draws. `title.md`'s weight-800 base means
+`NumeralText`'s digit-bolding would draw nothing extra on that specific role — but `title.md`
+is a role the split baseline row replaces `NumeralText` with, not one `NumeralText` is used on,
+so nothing regresses; `NumeralText` keeps working exactly as before on every existing role that
+still uses it (the completed-set rows, the rest comparison line).
+
+### Frame `4b` is `GuidedExerciseScreen.kt`, not `RestPanel.kt`
+
+Section 2 of the redesign prompt files the `Target 12` string under "Rest panel," and frame
+`4b`'s own title is "Rest panel + set entry." Both read as `RestPanel.kt`. They are not: `4b`'s
+mockup vocabulary — the `Then` eyebrow, a `Reps` stepper with a `Target 12` hint beneath it, and
+a `Log set 2` / `Stop` button pair with no adjacent `SKIP REST` or `Add set` — matches
+`GuidedExerciseScreen.kt`'s `RunningRestBanner` and `GuidedControls` composables exactly, and
+matches nothing in `RestPanel.kt`. `RestPanel.kt`'s own vocabulary (`SKIP REST`, `Up next`,
+`LOG SET N — DON'T WAIT`, `Add set`) appears instead in frame `4c`, alongside `SessionScaffold`'s
+header (`FREESTYLE`, `4 min · 2 of 5 done`, `FINISH`) — `4c` is the composite main session
+screen with `RestPanel.kt`'s resting state nested inside it, and `4b` is the separate
+one-exercise-at-a-time guided flow (ADR-0033) reached by tapping "Start exercise." Both screens
+implement their own version of a rest countdown, independently, and the redesign fixes both —
+under the frame that actually depicts each one.
 
 ### Three points this amendment settles explicitly rather than leaving implicit
 
@@ -179,12 +208,16 @@ constraint for `Start warm-up` and `Done`. This amendment keeps those three labe
 case; the uppercase treatment applies only to genuinely new `label.caps`/`tag.caps` text (the
 log-button kicker, section labels, `Set N` badges) that no test matches today.
 
-**No manufactured totals.** Frame `4c` shows `Set 4 of 5`; `4b` shows `Set 2 of 3`. A freestyle
-session has no set total — `MovementTarget.sets` is only populated by copying a routine item at
-session start (ADR-0027), and `RestPanel.kt`'s existing `UpNext` composable already documents
-why it omits "of N": *"the app does not know how many sets are intended."* This amendment reads
-`"SET $index OF $total"` when `target.sets` is non-null and `"SET $index"` otherwise — display
-only, no data added, no comparison manufactured (constitution §2.4).
+**No manufactured totals — but only one of the two frames needs the guard.** Frame `4c` shows
+`Set 4 of 5`, rendered by `RestPanel.kt`'s `UpNext`. A freestyle session has no set total there
+— `MovementTarget.sets` is only populated by copying a routine item at session start (ADR-0027)
+— and `UpNext` already documents why it omits "of N": *"the app does not know how many sets are
+intended."* This amendment reads `"SET $index OF $total"` when `target.sets` is non-null and
+`"SET $index"` otherwise — display only, no data added, no comparison manufactured
+(constitution §2.4). Frame `4b`'s `Set 2 of 3`, by contrast, is `GuidedExerciseScreen.kt`'s
+`GuidedRunning.targetSets: Int` — non-nullable, always populated (defaulting to 3 when a
+movement carries no target, per that flow's own existing rule) — so it needs no guard at all;
+`"Set ${setsDone + 1} of $targetSets"` is already backed by real data today.
 
 ### Deferred, not implemented
 
