@@ -127,5 +127,7 @@ class GymDimensTest {
         // "nothing tappable is smaller than this, anywhere" rule.
         assertEquals(GymDimens.MinTouchTarget, GymDimens.WarmUpRowHeight)
         assertEquals(340.dp, GymDimens.StackedButtonsBreakpoint)
+        assertEquals(14.dp, GymDimens.MetricFlowRowGapHorizontal)
+        assertEquals(6.dp, GymDimens.MetricFlowRowGapVertical)
     }
 }

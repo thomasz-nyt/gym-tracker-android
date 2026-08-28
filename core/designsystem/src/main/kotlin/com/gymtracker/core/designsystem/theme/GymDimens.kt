@@ -177,4 +177,11 @@ object GymDimens {
 
     /** Below this width, the finish dialog's two buttons stack rather than shrink (frame `4e`). */
     val StackedButtonsBreakpoint = 340.dp
+
+    /**
+     * A history row's measurement `FlowRow` (frame `4d`): no separators at any width, so adding
+     * a sixth measurement can never invent a new wrap the way the old dot-joined sentence could.
+     */
+    val MetricFlowRowGapHorizontal = 14.dp
+    val MetricFlowRowGapVertical = 6.dp
 }

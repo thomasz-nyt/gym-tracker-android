@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,9 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,17 +27,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.em
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gymtracker.core.designsystem.R
 import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.RoutineOrigin
@@ -199,43 +201,45 @@ private fun TopSection(
     }
 }
 
-/** "Machine Bench Press · est. 1RM", the number, and how it has moved (US-16, US-33). */
+/**
+ * "Machine Bench Press · est. 1RM", the number, and how it has moved (US-16, US-33).
+ *
+ * ADR-0011's Turn 4 amendment (frame `4d`): the kicker over the name, not a dot-joined sentence
+ * ("Ab Crunch Machine · est. 1RM" used to wrap on one line at 20sp). kg stays here — ADR-0008's
+ * Turn 4 amendment keeps it on Progress and history rows specifically, this card being both.
+ */
 @Composable
 private fun TopLiftCard(
     lift: TopLift.Lift,
     unit: WeightUnit,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
-    ) {
-        Column(
-            modifier = Modifier.padding(GymDimens.Gap),
-            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-        ) {
-            Text("${lift.exerciseName} · est. 1RM", style = MaterialTheme.typography.titleSmall)
+    RuledBand(onClick = onClick) {
+        Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+            GymText(text = "EST. 1RM", role = GymTextRoles.TagCaps, color = MaterialTheme.colorScheme.primary)
+            GymText(text = lift.exerciseName, role = GymTextRoles.Body)
 
             val weight = WeightFormatter.format(lift.estimatedOneRepMaxKg, unit)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Text(weight.primary, style = MaterialTheme.typography.titleLarge)
-                weight.secondary?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            val number = weight.number
+            val displayUnit = weight.unit
+            // Not GymLoadRow: that component always draws a trailing "× reps", and a 1RM has
+            // no rep count to show — the load alone, drawn directly.
+            Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap), verticalAlignment = Alignment.Bottom) {
+                if (number != null && displayUnit != null) {
+                    GymText(text = number, role = GymTextRoles.NumeralLg)
+                    GymText(text = displayUnit, role = GymTextRoles.WordUnit)
+                } else {
+                    GymText(text = weight.primary, role = GymTextRoles.WordUnit)
                 }
+            }
+            weight.secondary?.let {
+                GymText(text = it, role = GymTextRoles.Meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             lift.deltaKg?.let { delta ->
-                Text(
+                GymText(
                     text = delta.asChangeOver8Weeks(unit),
-                    style = MaterialTheme.typography.bodyMedium,
+                    role = GymTextRoles.Meta,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -250,16 +254,32 @@ private fun TopLiftCard(
  */
 @Composable
 private fun WeeklyVolumeRow(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
-    ) {
-        Text(
-            text = "Weekly volume by muscle",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(GymDimens.Gap),
-        )
+    RuledBand(onClick = onClick) {
+        GymText(text = "Weekly volume by muscle", role = GymTextRoles.TitleMd)
+    }
+}
+
+/**
+ * A ruled band (ADR-0011's Turn 4 amendment, frame `4d`): 2px rules top and bottom on the bare
+ * ground, replacing the `surfaceContainerLow` fill both cards above used. Once the caps labels
+ * carry the hierarchy, a tinted box adds mud rather than structure — the same argument
+ * `SessionScaffold`'s ruled sheet already made for the session screen (ADR-0029).
+ */
+@Composable
+private fun RuledBand(
+    onClick: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column {
+        GymDivider()
+        Surface(
+            onClick = onClick,
+            color = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
+        ) {
+            Column(modifier = Modifier.padding(GymDimens.Gap), content = content)
+        }
+        GymDivider()
     }
 }
 
@@ -323,53 +343,67 @@ private fun WorkoutRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
-            Text(
-                text =
-                    buildAnnotatedString {
-                        // US-32 (ADR-0028): the routine this session was started from leads the
-                        // row, falling back to "Freestyle" for an ordinary "Start workout".
-                        // Never resolved through routine_id — this reads the name copied onto
-                        // the session at start, so a rename or delete afterward cannot change
-                        // it. One text node with two weights, not two rows — line one is the
-                        // whole point of this redesign: the name is what you remember it by.
-                        append(summary.session.routine?.name ?: "Freestyle")
-                        withStyle(
-                            SpanStyle(
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        ) {
-                            append(" · ${summary.session.startedAt.asRowDate()}")
-                        }
-                    },
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = summary.describe(unit),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // ADR-0011's Turn 4 amendment (frame 4d): two cells on one baseline rather than one
+            // AnnotatedString — the name (which truncates) and the date (which does not) no
+            // longer share a break point, so a long routine name can never push the date onto
+            // its own line the way the welded string could.
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                // US-32 (ADR-0028): the routine this session was started from leads the row,
+                // falling back to "Freestyle" for an ordinary "Start workout". Never resolved
+                // through routine_id — this reads the name copied onto the session at start, so
+                // a rename or delete afterward cannot change it.
+                GymText(
+                    text = summary.session.routine?.name ?: "Freestyle",
+                    role = GymTextRoles.TitleMd,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                GymText(
+                    text = summary.session.startedAt.asRowDate(),
+                    role = GymTextRoles.Meta,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // A FlowRow of measurements, not a joined string (cause 3 of Turn 4's wrapping bug):
+            // "5m · 2 exercises · 6 sets · 1,980 lb · 3 bodyweight" left an orphan "3 bodyweight"
+            // tail on its own line, with a dangling separator on the line above it. No separator
+            // at any width means adding a sixth measurement can never invent a new wrap.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.MetricFlowRowGapHorizontal),
+                verticalArrangement = Arrangement.spacedBy(GymDimens.MetricFlowRowGapVertical),
+            ) {
+                summary.describe(unit).forEach { metric ->
+                    GymText(
+                        text = metric,
+                        role = GymTextRoles.LabelCaps,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
 
         if (hasRecord) {
             PrBadge()
         }
 
-        // ADR-0019: a destructive control is outlined, never filled — this was a filled-looking
-        // TextButton until it was fixed here. The row's own tap target opens the workout, which
-        // is a navigation, not a save, so this does not "share a surface with a save" in the
-        // letter of that rule; it is outlined regardless, to read as destructive the same way
-        // SetEditSheet's and the routine editor's delete controls do. Kept on the row rather
-        // than moved (unlike Routines' delete): moving it to WorkoutDetailScreen would lose
-        // US-06a's five-second undo, since that window lives in this screen's HistoryViewModel
-        // instance and would not survive a navigation away from it.
-        OutlinedButton(
+        // ADR-0011's Turn 4 amendment (frame 4d): a 44dp neutral icon button, not a 96dp accent
+        // text button — the accent stays reserved for the one filled action elsewhere in the
+        // app, and the row's own title keeps its column instead of narrowing against "Delete".
+        // The frame's own 44dp is superseded by GymDimens.MinTouchTarget (48dp), the same
+        // accessibility-floor trade WarmUpRowHeight's own doc already made. Still outlined-in-
+        // spirit (ADR-0019: destructive is never filled) via the error-tinted icon alone, rather
+        // than an OutlinedButton's border, which an icon-only control has no room to draw.
+        IconButton(
             onClick = onDelete,
-            shape = MaterialTheme.shapes.large,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            modifier = Modifier.sizeIn(minWidth = GymDimens.MinTouchTarget, minHeight = GymDimens.MinTouchTarget),
         ) {
-            Text("Delete")
+            Icon(
+                painter = painterResource(R.drawable.ic_delete),
+                contentDescription = "Delete workout",
+                tint = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
@@ -420,19 +454,23 @@ private fun UndoBar(onUndo: () -> Unit) {
 }
 
 /**
- * The one-line summary under the date: duration, what was done, and how much was moved.
+ * The measurements under the date/title row, as separate items rather than one joined sentence
+ * (ADR-0011's Turn 4 amendment, frame `4d`) — a `FlowRow` at the call site draws them with no
+ * separator at any width, so a sixth measurement can never invent a new wrap the way
+ * "5m · 2 exercises · 6 sets · 1,980 lb · 3 bodyweight" used to.
  *
  * Bodyweight sets are named rather than folded into the volume, because their load was never
  * recorded and pretending it was zero would understate the workout (constitution §2).
+ * "bodyweight" shortens to "bw" (frame `4d`) — a label.caps row is not the format prose reads in.
  */
-private fun SessionSummary.describe(unit: WeightUnit): String =
-    buildString {
-        duration?.let { append("${it.asWorkoutLength()}  ·  ") }
-        append("$exerciseCount ${"exercise".plural(exerciseCount)}")
-        append("  ·  $setCount ${"set".plural(setCount)}")
-        WeightFormatter.formatVolume(volumeKg, unit)?.let { append("  ·  $it") }
+private fun SessionSummary.describe(unit: WeightUnit): List<String> =
+    buildList {
+        duration?.let { add(it.asWorkoutLength()) }
+        add("$exerciseCount ${"exercise".plural(exerciseCount)}")
+        add("$setCount ${"set".plural(setCount)}")
+        WeightFormatter.formatVolume(volumeKg, unit)?.let { add(it) }
         if (bodyweightSetCount > 0) {
-            append("  ·  $bodyweightSetCount bodyweight")
+            add("$bodyweightSetCount bw")
         }
     }
 
