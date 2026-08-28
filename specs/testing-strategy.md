@@ -39,13 +39,14 @@ test file — divergent fixtures are how chart bugs hide.
 ## Non-negotiable test suites
 
 ### 1. The optional-feature suite
-The full UI test suite runs a second time with `HealthMetricsSource` and
-`CoachingSource` bound to their no-op implementations. Both runs must pass. This
+The full UI test suite runs a second time with `HealthMetricsSource`,
+`LiveHeartRateSource`, `HeartRateBandScanner`, and (once M6 lands) `CoachingSource` bound to
+their no-op implementations. Both runs must pass. This
 enforces constitution §3 mechanically rather than by good intentions.
 
 Implemented (M5, ADR-0038) as a Gradle property, `-Pgymtracker.optionalFeatures=off`, which
 `app/build.gradle.kts` reads into a debug-only `BuildConfig.OPTIONAL_FEATURES_ENABLED` field;
-`:app`'s `HealthModule` binds `HealthMetricsSource` to the no-op implementation when it is
+`:app`'s optional-feature modules bind the health and live-band ports to no-op implementations when it is
 false. `.github/workflows/ci.yml`'s instrumented job runs `:app:connectedDebugAndroidTest`
 twice against the one emulator boot — once with the default (real bindings), once with the
 flag. A product flavor was rejected as overkill for one boolean, and `@TestInstallIn` was
@@ -100,6 +101,19 @@ the database. Use a `waitUntil` on the condition actually meant — `awaitSheetO
 
 Note what neither of these was: a product bug. Both times the app was correct and the test
 was asking the wrong question.
+
+### Instrumented persistence is per test, never the installed app's data
+
+The instrumented UI suite replaces the production persistence module with a fresh in-memory
+Room database and in-memory Preferences DataStore for every Hilt test component. It must not
+open `gym-tracker.db` or `gym-tracker.preferences_pb`: running a test on the maintainer's phone
+must never inspect, collide with, or delete a real workout.
+
+This also removes test-order coupling. Every method starts with no member-owned rows and default
+preferences; a fixture seeds exactly what it needs. `PersistenceIsolationTest` has two methods
+that each assert an empty store and then dirty both stores, so either method fails if a previous
+method's state leaks through. Catalog fixtures still seed explicitly because
+`HiltTestApplication` does not run the production application's seeder.
 
 ### 3. RLS isolation
 See `data-model.md`. Includes a test that enumerates `public` tables and fails on

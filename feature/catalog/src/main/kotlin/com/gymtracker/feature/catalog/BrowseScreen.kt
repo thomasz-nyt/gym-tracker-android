@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -252,7 +251,12 @@ private fun Results(
             ListItem(
                 headlineContent = { Text(exercise.name, style = MaterialTheme.typography.titleMedium) },
                 supportingContent = { Text(exercise.equipment.label()) },
-                leadingContent = { ExerciseThumbnail(exercise.imageAsset) },
+                // US-13's absence rule applies to layout too: without an image there is no
+                // leading slot, rather than a thumbnail-sized blank that narrows every row.
+                leadingContent =
+                    exercise.imageAsset?.let { imageAsset ->
+                        { ExerciseThumbnail(imageAsset) }
+                    },
                 trailingContent = {
                     // Counted, not just flagged: US-02 allows the same exercise twice, so
                     // tapping it again is a real action and the row should say so.
@@ -277,16 +281,11 @@ private fun Results(
 }
 
 /**
- * A bundled photo where one ships, and empty space where none does (ADR-0007, ADR-0014).
- * An image that says nothing is worse than no image.
+ * A bundled photo where one ships (ADR-0007, ADR-0014). The caller omits `leadingContent`
+ * entirely when none ships; an empty slot is still a placeholder, even when it has no pixels.
  */
 @Composable
-internal fun ExerciseThumbnail(imageAsset: String?) {
-    if (imageAsset == null) {
-        Box(modifier = Modifier.size(THUMBNAIL))
-        return
-    }
-
+internal fun ExerciseThumbnail(imageAsset: String) {
     GymPhoto(
         model = "file:///android_asset/exercise_images/$imageAsset",
         // The name is right beside it, so repeating it would only add noise for TalkBack.

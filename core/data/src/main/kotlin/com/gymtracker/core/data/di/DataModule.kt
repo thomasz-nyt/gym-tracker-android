@@ -1,10 +1,6 @@
 package com.gymtracker.core.data.di
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
-import androidx.room.Room
 import com.gymtracker.core.data.backup.AndroidAppVersion
 import com.gymtracker.core.data.backup.AndroidBackupFileReader
 import com.gymtracker.core.data.backup.AndroidBackupFileWriter
@@ -18,6 +14,9 @@ import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.guided.DataStoreGuidedPlanStore
 import com.gymtracker.core.data.health.DataStoreHealthIntegration
 import com.gymtracker.core.data.health.DataStoreHeartRateBandPreference
+import com.gymtracker.core.data.machineguide.AndroidMachineGuideAssetReader
+import com.gymtracker.core.data.machineguide.BundledMachineGuideRepository
+import com.gymtracker.core.data.machineguide.MachineGuideAssetReader
 import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
@@ -50,6 +49,7 @@ import com.gymtracker.core.domain.health.HealthMetricsSource
 import com.gymtracker.core.domain.health.HeartRateBandPreference
 import com.gymtracker.core.domain.health.RecordSessionMetrics
 import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
+import com.gymtracker.core.domain.machineguide.MachineGuideRepository
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.RoutineId
@@ -116,24 +116,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
-    @Provides
-    @Singleton
-    fun database(
-        @ApplicationContext context: Context,
-    ): GymTrackerDatabase =
-        Room
-            .databaseBuilder(context, GymTrackerDatabase::class.java, GymTrackerDatabase.NAME)
-            .addMigrations(
-                GymTrackerDatabase.MIGRATION_1_2,
-                GymTrackerDatabase.MIGRATION_2_3,
-                GymTrackerDatabase.MIGRATION_3_4,
-                GymTrackerDatabase.MIGRATION_4_5,
-                GymTrackerDatabase.MIGRATION_5_6,
-                GymTrackerDatabase.MIGRATION_6_7,
-                GymTrackerDatabase.MIGRATION_7_8,
-                GymTrackerDatabase.MIGRATION_8_9,
-            ).build()
-
     @Provides
     fun sessionDao(database: GymTrackerDatabase): SessionDao = database.sessionDao()
 
@@ -299,19 +281,6 @@ object DataModule {
         @ApplicationContext context: Context,
     ): CatalogAssetReader = AndroidCatalogAssetReader(context)
 
-    /**
-     * One DataStore per file per process, enforced by the delegate rather than by `@Singleton`.
-     *
-     * A Hilt singleton is per component, and components are recreated — between instrumented
-     * tests, for instance — which produces a second DataStore over the same file and throws.
-     * The property delegate is process-wide, so it cannot happen.
-     */
-    @Provides
-    @Singleton
-    fun preferences(
-        @ApplicationContext context: Context,
-    ): DataStore<Preferences> = context.gymTrackerPreferences
-
     @Provides
     @IoDispatcher
     fun ioDispatcher(): CoroutineDispatcher = Dispatchers.IO
@@ -449,6 +418,12 @@ object DataModule {
 @InstallIn(SingletonComponent::class)
 abstract class DataBindings {
     @Binds
+    abstract fun machineGuideAssetReader(impl: AndroidMachineGuideAssetReader): MachineGuideAssetReader
+
+    @Binds
+    abstract fun machineGuides(impl: BundledMachineGuideRepository): MachineGuideRepository
+
+    @Binds
     abstract fun sessionRepository(impl: RoomSessionRepository): SessionRepository
 
     @Binds
@@ -505,5 +480,3 @@ abstract class DataBindings {
     @Binds
     abstract fun backupFileReader(impl: AndroidBackupFileReader): BackupFileReader
 }
-
-private val Context.gymTrackerPreferences: DataStore<Preferences> by preferencesDataStore(name = "gym-tracker")

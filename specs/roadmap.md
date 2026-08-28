@@ -4,20 +4,21 @@ Milestones are sequential. **Do not start a milestone before the previous one's
 exit criteria are met.** Each milestone ends in something installable that a family
 member could actually use.
 
-M0, M1, M3, M3a, M3b, M3c, M4 and M4a are all complete as of 2026-08-16 — the last three closed
+M0, M1, M3, M3a, M3b, M3c, M4, M4a and M5 are complete as of 2026-08-20 — several closed
 in name only for a while, their checkboxes left unticked across the PRs that shipped them, until
 this entry reconciled the file against the code (see each section's own "Exit" note for what was
 verified and how). M2 is deliberately postponed so the offline core can be finished before
 accounts and sync arrive; M3a, M3b, M3c and M4a were all taken ahead of their sequential position
-for reasons argued in each one's own section below. Per the sequential rule at the top of this
-file, **M5 is next** — US-20, US-21 and US-22 are merged (#59, then #60/#62 — #60 initially
-merged into #59's now-dead head branch rather than `main` and had to be re-landed via #62,
-2026-08-18); only US-23 (revoke) remains open. **M5a is specced (ADR-0039, 2026-08-18) and now
-unblocked** — it runs alongside M5 on the same terms M3b and M3c ran alongside M4, and reuses
-M5's optional-feature scaffolding (`:feature:health`, the no-op default binding, the per-member
-toggle shape) now that it exists in `main`, rather than rebuilding it. Redesign-audit follow-up
-work (below) continues alongside as well, on the same terms: it touches no table any milestone
-reads.
+for reasons argued in each one's own section below. US-23, M5's last story, merged in PR #65;
+the opening status had not been updated with it. Per the sequential rule at the top of this file,
+**M2 is now next**.
+
+M5a's implementation is also shipped (ADR-0039, US-46 … US-49). Subsequent live use with a
+Fitbit Charge 6 proved the real pairing-to-readout path well enough to expose a legibility bug in
+the 12sp readout; it does not, by itself, record the exit criterion's value-by-value comparison
+against the band's own display, so that final hardware observation stays open in M5a's section
+rather than being inferred. Redesign-audit follow-up work (below) continues alongside on the same
+terms as before: it touches no table any milestone reads.
 
 M3b broke the "milestones are sequential" rule at the top of this file, and did so knowingly:
 it was routines work that touched no table M4 reads, so running it beside M4 risked nothing
@@ -502,6 +503,38 @@ he holds a pose instead of vanishing; the four unedited suites above stay green.
 
 ---
 
+## M4b — Exact-machine form guides
+
+Stories: US-50, US-51. See ADR-0041.
+
+Added 2026-08-23 after the product audit clarified that "line graph" means REP demonstrating
+movement as precise line art, not another progress chart. This runs beside M2 on the same narrow
+exception M4a used: bundled UI and pure geometry only, with no Room table, sync payload, backup
+field or network dependency. It never infers or logs a rep (ADR-0018).
+
+- [x] ADR-0041 and US-50/US-51 written before production code; exact UUID mapping, placement,
+      reduced-motion behavior and validation gate decided
+- [x] Non-packaged source/provenance intake directory and checklist
+- [ ] Receive the original `leg-press.svg`, exact make/model, manufacturer manual, side/front
+      photos and designated reviewer
+- [x] Pure guide model and exact-id bundled repository; unknown, malformed, duplicated and
+      unreviewed guides fail absent. The packaged manifest is deliberately empty until the pilot
+      source and reviews arrive; `PersistenceIsolationTest`'s test graph remains valid through
+      the new binding
+- [ ] Testable leg-press keyframes and Canvas renderer with Play/Pause/Replay and reduced-motion
+      start/end poses
+- [ ] Exercise-detail and guided-setup integration; no active-set placement and no logging-path
+      changes
+- [ ] Manual plus human sign-off and real session on the exact leg press
+- [ ] Expand one reviewed PR at a time to leg extension, chest press, shoulder press, seated row,
+      seated leg curl and wide-grip lat pulldown
+
+**Exit:** all seven exact machines have reviewed offline guides; every mapping, cue and geometry
+is traceable to its source; absence is honest for every other exercise; core logging tests stay
+unedited. The leg-press pilot must pass its real-machine exit before work begins on the other six.
+
+---
+
 ## M5 — Health Connect (optional)
 
 Stories: US-20 … US-23. Read `specs/health-connect.md` first. Split into three PRs per
@@ -674,8 +707,13 @@ the pairing infrastructure (US-46) below; PR B wires it into a visible reading
       0 failed, both running and passing). One flake surfaced and was chased down
       before trusting it: `OneTapSetLoggingTest` failed once on a full-suite run
       with a `SQLiteConstraintException`, passed in isolation, then passed again
-      on a full clean re-run — pre-existing cross-test contamination in the shared
-      Room instance, unrelated to this change (confirmed, not assumed)
+      on a full clean re-run — cross-test contamination in the shared persistent
+      Room/DataStore bindings, unrelated to this change (confirmed, not assumed).
+      **Resolved 2026-08-23:** the instrumented graph now replaces only
+      `PersistenceModule` with fresh in-memory stores per Hilt test component;
+      `PersistenceIsolationTest` dirties both stores in each of two methods so a
+      shared binding fails mechanically, and running tests can no longer touch a
+      real workout database on the connected device
 
 **Exit — partially reached.** Verified: installing with `-Pgymtracker.optionalFeatures=off`
 (the no-Bluetooth/below-API-31 case's mechanical proxy, since CI's own emulator has

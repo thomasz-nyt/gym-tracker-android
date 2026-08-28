@@ -61,6 +61,13 @@ internal fun LiveHeartRateChipContent(
  * `onSurfaceVariant`/`onSurface` rather than reaching for the accent, and no new color token is
  * introduced (every token in the scheme is asserted for WCAG AA and achromatic saturation by
  * `GymColorSchemeTest`).
+ *
+ * Sized with the design system's `displaySmall` vital-reading role rather than a bare
+ * `labelSmall` (12sp) — legible from arm's length mid-set, chosen from a side-by-side render of
+ * 12/24/36/48sp on device rather than by formula. Deliberately short of `headlineMedium` (44sp,
+ * the rest timer's own weight): a persistent element visible on every screen, the whole workout,
+ * competing with page content at headline weight would be the same overreach ADR-0036 argues
+ * against for colour.
  */
 @Composable
 private fun RowScope.HeartRateReading(state: LiveHeartRate) {
@@ -69,7 +76,7 @@ private fun RowScope.HeartRateReading(state: LiveHeartRate) {
         LiveHeartRate.Searching ->
             Text(
                 text = "Heart rate: searching…",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f),
@@ -77,7 +84,7 @@ private fun RowScope.HeartRateReading(state: LiveHeartRate) {
         LiveHeartRate.Lost ->
             Text(
                 text = "Heart rate: lost",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f),
@@ -85,7 +92,7 @@ private fun RowScope.HeartRateReading(state: LiveHeartRate) {
         is LiveHeartRate.Beating ->
             NumeralText(
                 text = "${state.bpm} bpm",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f),
