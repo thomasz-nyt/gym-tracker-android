@@ -21,14 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import com.gymtracker.core.designsystem.component.GymLoadRow
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExercise
@@ -88,7 +90,7 @@ internal fun GuidedExerciseScreen(
                         MidSetHeader(running, unit)
                     }
                 }
-                item { GuidedControls(running, onRepsChanged, onRepsStepped, onFinishSet, onStop) }
+                item { GuidedControls(running, unit, onRepsChanged, onRepsStepped, onFinishSet, onStop) }
             }
         }
     }
@@ -105,32 +107,33 @@ private fun MidSetHeader(
     unit: WeightUnit,
 ) {
     Column(
-        modifier = Modifier.padding(GymDimens.ScreenPadding),
+        modifier = Modifier.padding(GymDimens.CompactScreenPadding),
         verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
     ) {
         EyebrowLabel(
             text = "Set ${running.setsDone + 1} of ${running.targetSets}",
             color = MaterialTheme.colorScheme.primary,
         )
-        Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
+        GymText(text = running.exerciseName, role = GymTextRoles.TitleLg)
         HorizontalDivider(
             thickness = GymDimens.StructuralRuleThickness,
             color = MaterialTheme.colorScheme.onSurface,
         )
         val weight = WeightFormatter.format(running.weightKg, unit)
-        // A mid-typing empty field would otherwise draw "135 lb × " — onFinishSet is already
-        // disabled in that state, so this is display-only, not a second validation.
-        NumeralText(
-            text = "${weight.primary} × ${running.reps.ifBlank { "—" }}",
-            style = MaterialTheme.typography.headlineMedium,
+        // ADR-0011's Turn 4 amendment: the split baseline row from GymLoadRow, not one
+        // formatted string — the fix for the same "Bodyweight" wrap RestPanel.kt's UpNext had.
+        // A mid-typing empty field would otherwise draw "135 lb ×" with no reps — onFinishSet is
+        // already disabled in that state, so the "—" fallback is display-only, not validation.
+        GymLoadRow(
+            number = weight.number,
+            unit = weight.unit,
+            wordFallback = weight.primary,
+            reps = running.reps.ifBlank { "—" },
+            numeralRole = GymTextRoles.NumeralLg,
+            wordRole = GymTextRoles.WordUnit,
         )
-        weight.secondary?.let {
-            NumeralText(
-                text = it,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // ADR-0008's Turn 4 amendment: the kg conversion is withdrawn from this surface —
+        // weight.secondary is no longer read here.
     }
 }
 
@@ -161,7 +164,7 @@ private fun RestHero(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.CompactScreenPadding),
             verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
         ) {
             Row(
@@ -172,53 +175,53 @@ private fun RestHero(
                 EyebrowLabel(text = "Rest", color = MaterialTheme.colorScheme.onPrimary)
                 RepMascot(modifier = Modifier.height(GymDimens.MascotInline), monochrome = true)
             }
-            Text(
+            GymText(
                 text = remaining.asMinutesSeconds(),
-                style = MaterialTheme.typography.displayLarge,
-                modifier =
-                    Modifier.semantics {
-                        contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining"
-                    },
+                role = GymTextRoles.DisplayTimer,
+                semantics = { contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining" },
             )
             HorizontalDivider(
                 thickness = GymDimens.StructuralRuleThickness,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
             EyebrowLabel(text = "Then", color = MaterialTheme.colorScheme.onPrimary)
-            Text(text = running.exerciseName, style = MaterialTheme.typography.headlineSmall)
+            GymText(text = running.exerciseName, role = GymTextRoles.TitleLg)
+            // ADR-0011's Turn 4 amendment: the "55 lb × 12 · 25 kg · set 2 of 3" sentence — set
+            // at the same weight as the exercise name above it — becomes two rows: the load as
+            // a split baseline row, then the set position as its own label.caps line. The kg
+            // conversion is dropped (ADR-0008's Turn 4 amendment).
             val weight = WeightFormatter.format(running.weightKg, unit)
-            Text(
-                text = restHeroLine(weight, running),
-                // Deliberately a plain Text, not NumeralText: titleLarge's base weight is
-                // already ExtraBold, so NumeralText's digit-bolding span would draw nothing —
-                // the same reasoning Type.kt documents for why titleMedium stays unbolded.
-                style = MaterialTheme.typography.titleLarge,
+            GymLoadRow(
+                number = weight.number,
+                unit = weight.unit,
+                wordFallback = weight.primary,
+                reps = running.reps,
+                numeralRole = GymTextRoles.NumeralLg,
+                wordRole = GymTextRoles.WordUnit,
+            )
+            // GuidedRunning.targetSets is a non-nullable Int (a fixed 3-set default backs a
+            // movement with no target), so this never needs UpNext's "no total on record" guard.
+            GymText(
+                text = "SET ${running.setsDone + 1} OF ${running.targetSets}",
+                role = GymTextRoles.LabelCaps,
             )
         }
     }
 }
 
-private fun restHeroLine(
-    weight: WeightDisplay,
-    running: GuidedRunning,
-): String =
-    buildString {
-        append("${weight.primary} × ${running.reps}")
-        weight.secondary?.let { append("  ·  $it") }
-        append("  ·  set ${running.setsDone + 1} of ${running.targetSets}")
-    }
-
 /** The set-progress dots, the rep stepper, and the log/stop row — shared by both non-complete states. */
 @Composable
 private fun GuidedControls(
     running: GuidedRunning,
+    unit: WeightUnit,
     onRepsChanged: (String) -> Unit,
     onRepsStepped: (Int) -> Unit,
     onFinishSet: () -> Unit,
     onStop: () -> Unit,
 ) {
+    val weight = WeightFormatter.format(running.weightKg, unit)
     Column(
-        modifier = Modifier.padding(GymDimens.ScreenPadding),
+        modifier = Modifier.padding(GymDimens.CompactScreenPadding),
         verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
     ) {
         SegmentBar(total = running.targetSets, done = running.setsDone)
@@ -228,14 +231,21 @@ private fun GuidedControls(
             value = running.reps,
             onValueChange = onRepsChanged,
             onStep = onRepsStepped,
-            supporting = "Target ${running.targetReps} — change it if you managed a different number.",
+            // ADR-0011's Turn 4 amendment (frame 4b): "Target 12 — change it if you managed a
+            // different number." used to cost a second line under every stepper. The steppers
+            // already explain themselves; "Target 12" was the only part that was information,
+            // so it moves onto the label's own row, right-aligned, one line, always.
+            trailingLabel = "Target ${running.targetReps}",
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
-            // The single-string overload, not eyebrow/detail: the hero above already shows the
-            // numbers, so the two-line overload the session screen uses would repeat them.
+            // Eyebrow/detail, not the single-string overload: the frame's AFTER always states
+            // what LOG SET will record, matching RestPanel.kt's log button (frame 4c) — the
+            // "hero already shows the numbers" reasoning this comment used to give no longer
+            // holds once the hero is a compact baseline row rather than a full sentence.
             PrimaryActionButton(
-                text = "Log set ${running.setsDone + 1}",
+                eyebrow = "LOG SET ${running.setsDone + 1}",
+                detail = logButtonDetail(weight, running.reps),
                 onClick = onFinishSet,
                 enabled = running.reps.toIntOrNull()?.let { it >= 1 } == true,
                 modifier = Modifier.weight(1f),
@@ -250,6 +260,12 @@ private fun GuidedControls(
         }
     }
 }
+
+/** "LOG SET n" button's detail line — the reading unit only, matching `RestPanel.kt`'s. */
+private fun logButtonDetail(
+    weight: WeightDisplay,
+    reps: String,
+): String = "${weight.primary} × $reps"
 
 /**
  * What the exercise came to, and what is next if anything is (US-05a).

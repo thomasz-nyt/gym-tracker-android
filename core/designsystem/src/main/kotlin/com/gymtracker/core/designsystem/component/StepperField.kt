@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 
 /**
  * A number with a big [−] and [+] either side of it (ADR-0016).
@@ -30,6 +31,12 @@ import com.gymtracker.core.designsystem.theme.GymDimens
  *
  * @param onStep called with -1 or +1. What a step *means* — 2.5 kg, 5 lb, one rep — belongs to
  *   the caller's domain logic, not to a widget.
+ * @param trailingLabel ADR-0011's Turn 4 amendment (frame `4b`): a short `meta` string on the
+ *   same baseline as [label] rather than its own sentence beneath the whole field — the guided
+ *   flow's "Target 12" moved here from [supporting], which used to read "Target 12 — change it
+ *   if you managed a different number." as a second line every stepper paid for. Additive: null
+ *   changes nothing for an existing caller, so `SetSheets.kt`'s own uses of [supporting] (the
+ *   kg conversion, "Records this many identical sets.") are unaffected.
  */
 @Composable
 fun StepperField(
@@ -40,10 +47,14 @@ fun StepperField(
     modifier: Modifier = Modifier,
     placeholder: String? = null,
     supporting: String? = null,
+    trailingLabel: String? = null,
     keyboardType: KeyboardType = KeyboardType.Number,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-        Text(label, style = MaterialTheme.typography.titleSmall)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            trailingLabel?.let { GymText(text = it, role = GymTextRoles.Meta) }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
