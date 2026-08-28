@@ -3,6 +3,7 @@ package com.gymtracker
 import android.Manifest
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -219,9 +220,24 @@ class TurnFourLayoutTest {
         }
     }
 
+    /**
+     * Waits for the tagged, [SHORT_EXERCISE]-matching row specifically — not just any node with
+     * matching text. `onAllNodesWithText(SHORT_EXERCISE)` alone is satisfied instantly by the
+     * search field's own `EditableText` the moment typing finishes, well before the catalog's
+     * debounced filter has actually re-rendered the list — so a wait on that condition is
+     * effectively a no-op, and the test used to proceed to measure a row that was mid-recompose
+     * ("Failed to retrieve bounds of the node": the semantics node existed in a transient frame,
+     * but its layout was not yet placed by the time the assertion ran). Waiting on the same
+     * tag-plus-text combination the actual assertion queries closes that race: once this
+     * condition is true, `waitUntil` has already driven Compose back to idle around it.
+     */
     private fun awaitFilteredToOneResult() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText(SHORT_EXERCISE).fetchSemanticsNodes().isNotEmpty()
+            compose
+                .onAllNodesWithTag(CATALOG_ROW_TEST_TAG)
+                .filter(hasText(SHORT_EXERCISE))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
     }
 
