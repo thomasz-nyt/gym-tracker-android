@@ -58,3 +58,36 @@ created server-side at M2 gets the same default as one created on device today.
 - **Revisit if** a household member finds the secondary number noisy — the natural
   escape hatch is a "show both" toggle defaulting to on, which is a settings change,
   not a data change.
+
+## Amendment (2026-08-28): kilograms leave the session surfaces
+
+The revisit clause above fired for a reason this ADR didn't anticipate: the secondary number
+wasn't just noisy, it was structural. The rest panel's `55 lb × 12 · 25 kg · set 2 of 3` line
+wrapped at 320dp because it was carrying three facts — a load, a conversion, and a set
+position — welded into one sentence at display weight. See
+[ADR-0011's Turn 4 amendment](0011-gym-readable-type-scale.md) for the full type-and-layout
+diagnosis; this amendment covers only the unit-policy half of that fix.
+
+**Kilograms appear only on Progress and in history rows.** They leave the rest panel, the set
+display, the stepper sheet and the primary action button entirely. The unit is already
+established by the screen a member is looking at — a set of `55 lb × 12` on the session screen
+does not need `25 kg` beside it for the number to be legible — and the conversion was the
+extra length that produced the wrap in the first place.
+
+Where kg still appears (Progress, history rows), it stays subordinate exactly as this ADR
+originally specified, restated at the new type scale: `meta` role, ~0.4× the size of the
+numeral it follows, weight 600, muted. The ~0.5× figure some drafts of the redesign prompt
+carried does not match `4f`'s table (`numeral.lg` 34sp against `meta` 13sp is closer to 0.38×);
+this ADR's own number is the one that governs.
+
+This narrows, but does not reverse, the original decision: a member still never has to convert
+in their head, because both numbers are still available — just on the screen built for reading
+them (Progress, history) rather than on every screen that shows a weight. `WeightFormatter`
+still computes and returns both (`WeightDisplay.secondary` is unchanged); what changes is which
+call sites choose to render it.
+
+**Consequence for `UnitConverter` call sites removed by this amendment:** none. The formatter's
+public contract is unchanged — see `WeightDisplay`'s additive `number`/`unit`/`isBodyweight`
+fields in ADR-0011's amendment, which exist for the split baseline row, not for this change.
+Only the composables that used to read `.secondary` on the session/rest/stepper surfaces stop
+doing so.

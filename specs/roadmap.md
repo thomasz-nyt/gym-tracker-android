@@ -985,9 +985,27 @@ never switches exercises are unchanged, and `TwoTapSetLoggingTest`/`OneTapSetLog
 unedited. Explicitly not this story: swapping a movement for a *substitute* exercise, which stays
 where it already was, below, needing its own design.
 
-**In progress:** nothing, as of 2026-08-17. The one entry this heading used to carry — "Finish
-as a summary rather than a confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is
-already ticked `[x]` in M4 above; the heading itself had gone stale rather than the work.
+**In progress: Turn 4 — stop the wrapping (ADR-0011 and ADR-0008 amendments, 2026-08-28).**
+`Redesign.dc.html` synced a fourth turn, diagnosing the wrapping visible on a real device —
+three-line picker rows, a rest panel where metadata set at display weight cost 74dp, a session
+load line that breaks at 320dp × 130% font scale, and dot-joined history sentences with an
+orphan tail — as four missing rules rather than a font problem: no `maxLines` anywhere (205
+`Text(` calls in `feature/*/src/main`, zero passing it), metadata sentences set as display type,
+dot-joined strings in a narrow column, and words sized as if they were digits. A
+type-and-layout pass only, no behaviour or data-model change. `ADR-0011` gains a ten-role table
+(`GymTextRole`, each role carrying its own line ceiling) and the amendment recording where it
+reverses this repo's own prior rules (the 16sp content floor, `titleMedium`'s ExtraBold
+exemption, ADR-0029's 104sp/44sp pinned values); `ADR-0008` gains the amendment withdrawing kg
+from every surface but Progress and history. Frame `4f`'s "412 movements" counts, session-length
+footers, a warm-up preset duration, muscle chips and a "sessions this week" section are read and
+deliberately deferred, listed in ADR-0011's amendment, pending their own story. Landing in commit
+order: the two ADR amendments (this entry); `Type.kt` + `GymDimens.kt` + `GymTextRole`;
+`WeightFormatter`'s additive `number`/`unit`/`isBodyweight` split; the `maxLines` enforcement
+test; one screen per commit for `4a`–`4e`; previews and the two layout assertions.
+
+The one entry this heading used to carry as "in progress" — "Finish as a summary rather than a
+confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is already ticked `[x]` in M4 above;
+the heading itself had gone stale rather than the work.
 
 **Designed, not built, and needing a user story first:**
 
