@@ -3,9 +3,10 @@ package com.gymtracker
 import android.Manifest
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -121,18 +122,17 @@ class TurnFourLayoutTest {
      * then filtered to one row via the search field, so this test does not depend on the
      * catalog's own sort order or on `LazyColumn` scrolling to find the target row.
      *
-     * **Matches on text *and* a click action, not text alone.** `onNodeWithText`'s matcher
-     * checks a node's `Text`, `InputText` and `EditableText` semantics together (confirmed
-     * against the compose-ui-test bytecode), so a bare `hasText(SHORT_EXERCISE)` after
-     * `performTextInput(SHORT_EXERCISE)` also matches the search field itself — its own
-     * `EditableText` is exactly that string too — and the first version of this test measured
-     * the search field's height, not the row's, which is why it read the same 71dp whether the
-     * row was actually fixed or not: the query never reached the row at all. Anchoring on
-     * `SHORT_EXERCISE_EQUIPMENT` ("Bodyweight") instead of the name doesn't fix this either —
-     * the equipment filter chips row above the list renders its own "Bodyweight" chip
-     * regardless of the search query, which `hasText` matches just as readily. `hasClickAction()`
-     * is what's actually unique: the row is clickable (this screen's own `Box`), the search
-     * field and a `FilterChip` are not exposed with a plain click action the same way.
+     * **Matched by a test tag, not by text.** Three text-based attempts in a row measured the
+     * exact same wrong 71dp, which is what exposed why: `onNodeWithText`'s matcher checks a
+     * node's `Text`, `InputText` and `EditableText` semantics together (confirmed against the
+     * compose-ui-test bytecode), so after `performTextInput(SHORT_EXERCISE)` the search field's
+     * own `EditableText` matches [SHORT_EXERCISE] too. Anchoring on the equipment label instead
+     * doesn't help — the filter chips row above the list renders its own "Bodyweight"-labelled
+     * chip regardless of the query. Adding `hasClickAction()` didn't disambiguate either:
+     * `OutlinedTextField` exposes a click action of its own (an accessibility "tap to focus"
+     * affordance), so it satisfied that combinator too, and tree order put it first every time.
+     * `CATALOG_ROW_TEST_TAG` (`BrowseScreen.kt`) is the one thing nothing else in this tree
+     * carries.
      */
     @Test
     fun thePickerRowDoesNotGrowPastItsFloor() {
@@ -145,7 +145,8 @@ class TurnFourLayoutTest {
             awaitFilteredToOneResult()
 
             compose
-                .onNode(hasText(SHORT_EXERCISE) and hasClickAction())
+                .onAllNodesWithTag(CATALOG_ROW_TEST_TAG)
+                .filterToOne(hasText(SHORT_EXERCISE))
                 .assertHeightIsEqualTo(GymDimens.CatalogRowHeight)
         }
     }
@@ -249,6 +250,13 @@ class TurnFourLayoutTest {
 
         /** Short enough that neither its name nor "Bodyweight" can push the row past the floor. */
         const val SHORT_EXERCISE = "Air Bike"
+
+        /**
+         * Matches `BrowseScreen.kt`'s private `CATALOG_ROW_TEST_TAG` literally — a compiled
+         * cross-module dependency can't share a `private`/`internal` constant, so this repeats
+         * the string rather than importing it. Both sides carry a comment pointing at the other.
+         */
+        const val CATALOG_ROW_TEST_TAG = "catalog-row"
         const val REST_EXERCISE = "Bench Dips"
         val TODAY_SESSION = SessionId("today-turn4-layout")
         val LAST_WEEK = SessionId("last-week-turn4-layout")

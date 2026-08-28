@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -262,12 +263,20 @@ private fun Results(
             // modifier — ListItem caps its height to its internal one/two/three-line spec
             // regardless of a looser external minHeight, so the floor has to be enforced by an
             // outer container ListItem sizes itself within, not by ListItem's own modifier.
+            //
+            // CATALOG_ROW_TEST_TAG: OutlinedTextField also exposes a click semantics action (so
+            // an accessibility service can "tap to focus" it), so hasText(name) and
+            // hasClickAction() together still matched the search field ahead of this row in
+            // tree order once a query had been typed into it — a text/click-action combinator
+            // could never disambiguate the two, however it was built. A test tag sidesteps that
+            // entirely: nothing else in this screen's tree carries it.
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .sizeIn(minHeight = GymDimens.CatalogRowHeight)
-                        .clickable { onChosen(exercise.id) },
+                        .clickable { onChosen(exercise.id) }
+                        .testTag(CATALOG_ROW_TEST_TAG),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 ListItem(
@@ -379,6 +388,15 @@ private val SCREEN_PADDING = GymDimens.CompactScreenPadding
 private val GAP = GymDimens.Gap
 private val CHIP_GAP = GymDimens.TightGap
 private val MIN_TOUCH_TARGET = GymDimens.MinTouchTarget
+
+/**
+ * A plain literal, not a shared constant: `app`'s instrumented tests consume this module as a
+ * compiled dependency, not source, so a `private`/`internal` constant here would not be visible
+ * to them regardless — the test file matches this exact string directly, with a comment pointing
+ * back to this declaration. See the test-tag comment above [Results]'s `Box` for why a test tag
+ * exists here at all rather than matching on text and a click action.
+ */
+private const val CATALOG_ROW_TEST_TAG = "catalog-row"
 
 @Preview
 @Composable
