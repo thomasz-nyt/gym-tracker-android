@@ -257,38 +257,47 @@ private fun Results(
     ) {
         items(results, key = { it.id.value }) { exercise ->
             val added = timesAdded(exercise.id)
-            ListItem(
-                headlineContent = {
-                    GymText(
-                        text = exercise.name,
-                        role = GymTextRoles.TitleMd,
-                    )
-                },
-                supportingContent = {
-                    GymText(
-                        text = exercise.equipment.label(),
-                        role = GymTextRoles.LabelCaps,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                // US-13's absence rule applies to layout too: without an image there is no
-                // leading slot, rather than a thumbnail-sized blank that narrows every row.
-                leadingContent =
-                    exercise.imageAsset?.let { imageAsset ->
-                        { ExerciseThumbnail(imageAsset) }
-                    },
-                // A fixed-width cell (frame 4a) — an "ADDED" tag or a "+" invitation, always
-                // the same width either way, so adding an exercise never changes the name
-                // column's width and never reflows the row the way a variable-width label did.
-                trailingContent = { AddedCell(added) },
-                // A whole row is the target, and it is a comfortable one: this list is scrolled
-                // and tapped one-handed, standing in front of a machine (ADR-0016).
+            // CI's real device measured this row at 71dp (Material3's own two-line ListItem
+            // spec, ~72dp) even with sizeIn(minHeight = 80.dp) passed as ListItem's own
+            // modifier — ListItem caps its height to its internal one/two/three-line spec
+            // regardless of a looser external minHeight, so the floor has to be enforced by an
+            // outer container ListItem sizes itself within, not by ListItem's own modifier.
+            Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .sizeIn(minHeight = GymDimens.CatalogRowHeight)
                         .clickable { onChosen(exercise.id) },
-            )
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                ListItem(
+                    headlineContent = {
+                        GymText(
+                            text = exercise.name,
+                            role = GymTextRoles.TitleMd,
+                        )
+                    },
+                    supportingContent = {
+                        GymText(
+                            text = exercise.equipment.label(),
+                            role = GymTextRoles.LabelCaps,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    // US-13's absence rule applies to layout too: without an image there is no
+                    // leading slot, rather than a thumbnail-sized blank that narrows every row.
+                    leadingContent =
+                        exercise.imageAsset?.let { imageAsset ->
+                            { ExerciseThumbnail(imageAsset) }
+                        },
+                    // A fixed-width cell (frame 4a) — an "ADDED" tag or a "+" invitation, always
+                    // the same width either way, so adding an exercise never changes the name
+                    // column's width and never reflows the row the way a variable-width label
+                    // did.
+                    trailingContent = { AddedCell(added) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             GymDivider()
         }
     }
