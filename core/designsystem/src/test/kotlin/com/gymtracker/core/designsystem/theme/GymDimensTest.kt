@@ -123,7 +123,9 @@ class GymDimensTest {
         assertTrue(GymDimens.AddExerciseButtonHeight < GymDimens.AddExerciseCellWidth)
         assertEquals(64.dp, GymDimens.LogRowHeight)
         assertTrue(GymDimens.LogRowHeight < GymDimens.PrimaryAction)
-        assertEquals(44.dp, GymDimens.WarmUpRowHeight)
+        // The frame's own number is 44dp; MinTouchTarget (48dp) wins, per this file's own
+        // "nothing tappable is smaller than this, anywhere" rule.
+        assertEquals(GymDimens.MinTouchTarget, GymDimens.WarmUpRowHeight)
         assertEquals(340.dp, GymDimens.StackedButtonsBreakpoint)
     }
 }

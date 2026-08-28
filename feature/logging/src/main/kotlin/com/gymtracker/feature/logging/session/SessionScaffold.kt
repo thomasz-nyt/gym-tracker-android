@@ -27,12 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.component.SecondaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
@@ -454,24 +455,23 @@ private fun SessionHeader(
     val elapsed = rememberElapsed(session.startedAt)
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
+        modifier = Modifier.fillMaxWidth().padding(GymDimens.CompactScreenPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text(
-                // Uppercased for display only (ADR-0029) — the session's own routine.name is
-                // never mutated, matching History and the finish summary's typed-case rendering.
-                text = (session.routine?.name ?: "Freestyle").uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                modifier =
-                    Modifier.semantics {
-                        contentDescription = "Session for ${session.routine?.name ?: "Freestyle"}"
-                    },
+            GymText(
+                // ADR-0011's Turn 4 amendment (frame 4c): sentence case, not the uppercase
+                // ADR-0029 originally drew this in — title.lg carries its own weight (800) and
+                // tracking for hierarchy, so the string transform is no longer needed for it to
+                // read as a title. The session's own routine.name is still never mutated.
+                text = session.routine?.name ?: "Freestyle",
+                role = GymTextRoles.TitleLg,
+                semantics = { contentDescription = "Session for ${session.routine?.name ?: "Freestyle"}" },
             )
-            Text(
+            GymText(
                 text = headerMeta(elapsed, progress),
-                style = MaterialTheme.typography.bodySmall,
+                role = GymTextRoles.Meta,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -501,7 +501,12 @@ private fun rememberElapsed(startedAt: Instant): Duration {
     return elapsed
 }
 
-/** "24 min · 2 of 6 done", or just the elapsed time before movements are known. */
+/**
+ * "24 min · 2 of 6", or just the elapsed time before movements are known.
+ *
+ * "done" was cut by ADR-0011's Turn 4 amendment (frame 4c) — "n of m" reads as progress on its
+ * own, and the word was the difference between fitting on one line and not.
+ */
 private fun headerMeta(
     elapsed: Duration,
     progress: SessionProgress?,
@@ -509,7 +514,7 @@ private fun headerMeta(
     buildString {
         append(elapsed.asElapsedMinutes())
         if (progress != null && progress.movementsTotal > 0) {
-            append("  ·  ${progress.movementsDone} of ${progress.movementsTotal} done")
+            append("  ·  ${progress.movementsDone} of ${progress.movementsTotal}")
         }
     }
 

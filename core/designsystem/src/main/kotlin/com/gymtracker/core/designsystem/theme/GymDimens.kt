@@ -164,8 +164,16 @@ object GymDimens {
      */
     val LogRowHeight = 64.dp
 
-    /** The warm-up row, once it stops floating as loose text (frame `4c`). */
-    val WarmUpRowHeight = 44.dp
+    /**
+     * The warm-up row, once it stops floating as loose text (frame `4c`).
+     *
+     * The frame's own number is 44dp; [MinTouchTarget] (48dp) wins here instead, per this
+     * file's own class doc ("nothing tappable is smaller than this, anywhere") — the same
+     * accessibility floor over frame-literal-value trade [PrimaryAction]'s doc already made
+     * once. Same value as [MinTouchTarget], own name for readability at the call site, the
+     * [StructuralRuleThickness] precedent below.
+     */
+    val WarmUpRowHeight = MinTouchTarget
 
     /** Below this width, the finish dialog's two buttons stack rather than shrink (frame `4e`). */
     val StackedButtonsBreakpoint = 340.dp

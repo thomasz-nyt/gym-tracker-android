@@ -24,10 +24,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.GymLoadRow
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SessionProgress
@@ -71,12 +74,27 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
     val elapsed = warmUp.elapsed
 
     if (elapsed == null) {
+        // ADR-0011's Turn 4 amendment (frame 4c): a 44dp row between 2px rules, replacing the
+        // floating 17sp red sentence this used to be — label.caps in the accent, matching the
+        // "secondary buttons" row this role is named for. The string itself stays exactly
+        // "Start warm-up", sentence case: WarmUpPanelScreenTest matches it literally, the same
+        // tripwire the amendment's "frames vs. this repo's own tripwires" note names.
+        GymDivider()
         TextButton(
             onClick = warmUp.onStart,
-            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            contentPadding = ButtonDefaults.TextButtonContentPadding,
+            modifier = Modifier.fillMaxWidth().height(GymDimens.WarmUpRowHeight),
         ) {
-            Text("Start warm-up")
+            Box(modifier = Modifier.fillMaxWidth()) {
+                GymText(
+                    text = "Start warm-up",
+                    role = GymTextRoles.LabelCaps,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+            }
         }
+        GymDivider()
         return
     }
 
@@ -92,13 +110,10 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
             // ADR-0021's "not recorded" rule used to live only in the contentDescription below;
             // Turn 3 puts it on screen where it can be read, not just announced.
             EyebrowLabel(text = "Warm-up · not recorded", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
+            GymText(
                 text = elapsed.asMinutesSeconds(),
-                style = MaterialTheme.typography.displayLarge,
-                modifier =
-                    Modifier.semantics {
-                        contentDescription = "Warm-up ${elapsed.asMinutesSeconds()} elapsed, not recorded"
-                    },
+                role = GymTextRoles.DisplayTimer,
+                semantics = { contentDescription = "Warm-up ${elapsed.asMinutesSeconds()} elapsed, not recorded" },
             )
             GymDivider()
             Row(
@@ -188,12 +203,22 @@ internal fun RestingBody(
         RestCountdownBanner(remaining = remaining, total = total, onSkipRest = onSkipRest)
 
         if (upNext != null) {
+            // A display refinement, not a promise: read back from the SessionExercise's own
+            // copied-at-start target (ADR-0027), never invented here — see UpNext's own KDoc.
+            val targetSets =
+                exercises
+                    .firstOrNull { it.sessionExercise.id == upNext.sessionExerciseId }
+                    ?.sessionExercise
+                    ?.target
+                    ?.sets
+
             UpNext(
                 upNext = upNext,
                 exerciseName = exerciseName,
                 nextMovementName = nextMovementName(progress, exercises),
+                targetSets = targetSets,
                 unit = unit,
-                modifier = Modifier.padding(GymDimens.ScreenPadding).weight(1f, fill = false),
+                modifier = Modifier.padding(GymDimens.CompactScreenPadding).weight(1f, fill = false),
             )
 
             // Deliberately *not* wrapped in Modifier.verticalScroll to give performScrollTo() a
@@ -204,10 +229,14 @@ internal fun RestingBody(
             // SessionPlan's log bar is now), not a bare verticalScroll on an already-fitting Row.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
-                modifier = Modifier.padding(horizontal = GymDimens.ScreenPadding, vertical = GymDimens.Gap),
+                modifier = Modifier.padding(horizontal = GymDimens.CompactScreenPadding, vertical = GymDimens.Gap),
             ) {
                 PrimaryActionButton(
-                    eyebrow = "LOG SET ${upNext.setNumber} — DON'T WAIT",
+                    // "— DON'T WAIT" is cut (ADR-0011's Turn 4 amendment, frame 4c): it was the
+                    // longest string on the screen, and the value line beneath already says
+                    // what tapping it will do — ADR-0023's "resting never blocks logging" rule
+                    // is unchanged, it just no longer needs restating in the button's own label.
+                    eyebrow = "LOG SET ${upNext.setNumber}",
                     detail = logButtonDetail(upNext, unit),
                     onClick = onLogNext,
                     // ADR-0036: steps back to outlined for exactly the seconds the countdown
@@ -293,23 +322,21 @@ private fun RestCountdownBanner(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(GymDimens.ScreenPadding),
+            modifier = Modifier.fillMaxWidth().padding(GymDimens.CompactScreenPadding),
             verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
         ) {
             EyebrowLabel(text = "Rest", color = contentColor)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-                Text(
+                GymText(
                     text = remaining.asMinutesSeconds(),
-                    style = MaterialTheme.typography.displayLarge,
-                    modifier =
-                        Modifier.semantics {
-                            contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining"
-                        },
+                    role = GymTextRoles.DisplayTimer,
+                    color = contentColor,
+                    semantics = { contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining" },
                 )
                 if (total != null) {
-                    Text(
+                    GymText(
                         text = "of ${total.asMinutesSeconds()}",
-                        style = MaterialTheme.typography.bodySmall,
+                        role = GymTextRoles.Meta,
                         color = contentColor.copy(alpha = MUTED_ALPHA),
                     )
                 }
@@ -393,49 +420,51 @@ private const val REST_BAR_TRACK_ALPHA = 0.3f
  * started from a routine ([SessionProgress.orderIsAPlan]), the same rule the segment bar in
  * [SessionScaffold] follows: a freestyle session's order is add-order, not a plan, and this
  * screen does not claim otherwise.
+ *
+ * [targetSets] is a *display* refinement (ADR-0011's Turn 4 amendment, frame `4c`): the routine
+ * target copied onto this movement's [com.gymtracker.core.domain.model.SessionExercise] at
+ * session start (ADR-0027), read by [RestingBody] from the matching [SessionExerciseRow] rather
+ * than invented here. Still null for a freestyle movement with no target — `UpNextSet`'s own
+ * KDoc is explicit that [UpNextSet.setNumber] alone carries no total to render ("the 3 does not
+ * exist to render"), so "SET n OF m" only ever appears when a real target backs the m.
  */
 @Composable
 private fun UpNext(
     upNext: UpNextSet,
     exerciseName: String?,
     nextMovementName: String?,
+    targetSets: Int?,
     unit: WeightUnit,
     modifier: Modifier = Modifier,
 ) {
     val next = WeightFormatter.format(upNext.prefill.weight?.let { UnitConverter.toKilograms(it, unit) }, unit)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
         EyebrowLabel(text = "Up next", color = MaterialTheme.colorScheme.primary)
-        Text(
-            text = exerciseName ?: upNext.exerciseId.value,
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        NumeralText(
-            text =
-                buildString {
-                    // No "of N": UpNextSet's own doc is explicit that the app does not know how
-                    // many sets are intended, so there is no total here to render (ADR-0023).
-                    append("Set ${upNext.setNumber}")
-                    nextMovementName?.let { append("  ·  then $it") }
-                },
-            style = MaterialTheme.typography.bodySmall,
+        GymText(text = exerciseName ?: upNext.exerciseId.value, role = GymTextRoles.TitleLg)
+        GymText(
+            text = if (targetSets != null) "SET ${upNext.setNumber} OF $targetSets" else "SET ${upNext.setNumber}",
+            role = GymTextRoles.LabelCaps,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        GymDivider()
-        // The reading unit alone at 44sp, and the conversion on its own quieter line beneath.
-        // Both on one line is 20-odd characters at that size: it wrapped, and the wrap pushed
-        // the comparison below it off the panel. ADR-0008 wants both units present, not both
-        // equally loud — this is the same primary/secondary split the set rows already use.
-        NumeralText(
-            text = "${next.primary} × ${upNext.prefill.reps}",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        next.secondary?.let { secondary ->
-            NumeralText(
-                text = secondary,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        // Its own line rather than dot-joined onto "Set n" (ADR-0011's Turn 4 amendment, cause
+        // 3): a `·` sentence breaks at any point in a 320dp column, which is what left an
+        // orphan "then Seated Cable Rows" tail on its own line above.
+        nextMovementName?.let {
+            GymText(text = "Then $it", role = GymTextRoles.Meta, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        GymDivider()
+        // The split baseline row (GymLoadRow), not one formatted string — the fix for the
+        // "Bodyweight × 12" wrap this exact line produced (ADR-0011's Turn 4 amendment, cause
+        // 4). The kg conversion (next.secondary) is dropped here entirely (ADR-0008's Turn 4
+        // amendment) rather than kept on its own quieter line.
+        GymLoadRow(
+            number = next.number,
+            unit = next.unit,
+            wordFallback = next.primary,
+            reps = upNext.prefill.reps.toString(),
+            numeralRole = GymTextRoles.NumeralLg,
+            wordRole = GymTextRoles.WordUnit,
+        )
         upNext.comparison?.let { last ->
             val previous = WeightFormatter.format(last.weightKg, unit)
             NumeralText(
