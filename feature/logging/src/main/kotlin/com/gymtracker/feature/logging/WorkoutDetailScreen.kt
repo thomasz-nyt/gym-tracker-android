@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,8 +31,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.DrillDownTopBar
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.GymPhoto
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymPreviews
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.model.BodyPart
 import com.gymtracker.core.domain.model.Equipment
@@ -165,26 +168,26 @@ private fun WorkoutHeader(
         verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
         modifier = Modifier.padding(top = GymDimens.ScreenPadding),
     ) {
-        Text(
+        GymText(
             text = summary.session.startedAt.asDetailDate(),
-            style = MaterialTheme.typography.titleLarge,
+            role = GymTextRoles.TitleLg,
         )
-        Text(
-            text =
-                buildString {
-                    summary.duration?.let { append("${it.asLength()}  ·  ") }
-                    append("${summary.exerciseCount} ${"exercise".orPlural(summary.exerciseCount)}")
-                    append("  ·  ${summary.setCount} ${"set".orPlural(summary.setCount)}")
-                    WeightFormatter.formatVolume(summary.volumeKg, unit)?.let { append("  ·  $it") }
-                    // Matches HistoryScreen's describe(), which this duplicates on purpose
-                    // (see this file's own doc comment on why) — the two had drifted apart
-                    // on exactly this segment before US-32.
-                    if (summary.bodyweightSetCount > 0) {
-                        append("  ·  ${summary.bodyweightSetCount} bodyweight")
-                    }
-                },
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        // ADR-0011's Turn 4 amendment: the same dot-joined-sentence bug HistoryScreen's row and
+        // FinishSummaryScreen both had — flagged here at the time as the identical pattern, not
+        // fixed until now. A FlowRow with no separators, same as those two, so a sixth
+        // measurement can never invent a new wrap. "bodyweight" shortens to "bw" to match.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(GymDimens.MetricFlowRowGapHorizontal),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.MetricFlowRowGapVertical),
+        ) {
+            summary.describe(unit).forEach { metric ->
+                GymText(
+                    text = metric,
+                    role = GymTextRoles.LabelCaps,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         // US-22: absent entirely unless a health read actually ran — the same absence pattern
         // `FinishSummaryScreen`'s own health line uses, since this renders the same session
         // once it becomes history. A field that was read for and found nothing shows as "not
@@ -280,6 +283,27 @@ private fun PastLoggedSets(
         }
     }
 }
+
+/**
+ * The measurements under the date, as separate items rather than one joined sentence
+ * (ADR-0011's Turn 4 amendment) — the same fix `HistoryScreen`'s row and `FinishSummaryScreen`
+ * both got, applied here for the identical dot-joined-sentence bug this file carried alongside
+ * them, flagged at the time and left for later rather than fixed in the same pass.
+ *
+ * Matches `HistoryScreen`'s `describe()` by hand, per this file's own doc comment on why the two
+ * duplicate rather than share — including, since that fix, the return type: a list of
+ * measurements, not one sentence. "bodyweight" shortens to "bw" to match.
+ */
+private fun SessionSummary.describe(unit: WeightUnit): List<String> =
+    buildList {
+        duration?.let { add(it.asLength()) }
+        add("$exerciseCount ${"exercise".orPlural(exerciseCount)}")
+        add("$setCount ${"set".orPlural(setCount)}")
+        WeightFormatter.formatVolume(volumeKg, unit)?.let { add(it) }
+        if (bodyweightSetCount > 0) {
+            add("$bodyweightSetCount bw")
+        }
+    }
 
 /**
  * "Barbell  ·  Chest, Triceps" — the catalog metadata the app already stores and has never

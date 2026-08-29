@@ -2,10 +2,12 @@ package com.gymtracker.core.designsystem.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.gymtracker.core.designsystem.R
@@ -219,3 +221,172 @@ val GymTypography: Typography =
                 ),
         )
     }
+
+/**
+ * ADR-0011's Turn 4 amendment: a role that carries its own line ceiling, so a call site names a
+ * role and cannot forget `maxLines` the way 205 raw `Text()` calls across the feature modules
+ * did before this existed — see [GymTextRoles] for the ten roles and
+ * [com.gymtracker.core.designsystem.component.GymText] for the composable that reads both.
+ *
+ * **Additive to [GymTypography], not a replacement for it.** Nothing in `MaterialTheme.typography`
+ * changes value here — see the amendment's "An additive scale, not a value change" for why: those
+ * slots are shared across every screen in the app, most of them untouched by this pass, and
+ * repointing a shared slot's value to a Turn-4 number would reflow every reader as a side effect
+ * of a change scoped to six screens.
+ *
+ * @property overflow [TextOverflow.Clip] for the numeral/word roles — an ellipsis mid-digit or
+ *   mid-unit-word reads as broken, and the whole point of the split baseline row (a load line as
+ *   separate `Text`s rather than one formatted string) is that each piece is short enough it
+ *   should never need to truncate in the first place.
+ */
+data class GymTextRole(
+    val style: TextStyle,
+    val maxLines: Int,
+    val overflow: TextOverflow = TextOverflow.Ellipsis,
+)
+
+/**
+ * The ten roles from `Redesign.dc.html` Turn 4, frame `4f` (ADR-0011's amendment). Every size
+ * on the six migrated screens comes from here; feature code never names a raw `sp`, the same
+ * rule [GymTypography]'s own class doc states for the original scale.
+ */
+object GymTextRoles {
+    /** The rest and warm-up countdown. Nowhere else. Tabular figures. */
+    val DisplayTimer =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 88.sp,
+                    // Deliberately tighter than the font size — the same sub-1 line-height ratio
+                    // Redesign.dc.html's own display type uses throughout. A single-line tabular
+                    // countdown, not body copy: there is no second line for a tight box to crowd.
+                    lineHeight = 75.68.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+        )
+
+    /** Target load, rep count, est. 1RM. Digits only. */
+    val NumeralLg =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 34.sp,
+                    lineHeight = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+        )
+
+    /** A stepper's value. */
+    val NumeralMd =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 24.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+        )
+
+    /** Screen titles, an exercise name in rest / up next, a dialog question. */
+    val TitleLg =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 22.sp,
+                    lineHeight = 23.76.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            maxLines = 2,
+        )
+
+    /** List row names, history titles, a log button's value line. */
+    val TitleMd =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 17.sp,
+                    lineHeight = 20.4.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            maxLines = 2,
+        )
+
+    /** A word standing where a numeral would (`Bodyweight`), and unit suffixes (`lb`, `kg`). */
+    val WordUnit =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 20.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                ),
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+        )
+
+    /** Card names, the little prose that survives. */
+    val Body =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 15.sp,
+                    lineHeight = 20.25.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+            maxLines = 2,
+        )
+
+    /** Set counts, dates, targets, secondary units, `of 1:00`. */
+    val Meta =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 13.sp,
+                    lineHeight = 16.9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+            maxLines = 1,
+        )
+
+    /** `REST`, `THEN`, `UP NEXT`, section labels, stat rows, secondary buttons. */
+    val LabelCaps =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 12.sp,
+                    lineHeight = 13.2.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.12.em,
+                ),
+            maxLines = 1,
+        )
+
+    /** The `ADDED` tag, kickers inside filled buttons. The floor — nothing smaller ships. */
+    val TagCaps =
+        GymTextRole(
+            style =
+                TextStyle(
+                    fontFamily = ArchivoFamily,
+                    fontSize = 11.sp,
+                    lineHeight = 12.1.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.06.em,
+                ),
+            maxLines = 1,
+        )
+}

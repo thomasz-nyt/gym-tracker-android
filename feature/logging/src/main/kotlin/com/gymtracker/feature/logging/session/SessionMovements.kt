@@ -22,9 +22,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.gymtracker.core.designsystem.component.GymDivider
+import com.gymtracker.core.designsystem.component.GymLoadRow
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -304,10 +307,17 @@ private fun CurrentMovement(
 }
 
 /**
- * The sets already logged against the current movement, each in both units (ADR-0008), each its
- * own tap target (ADR-0022) — ruled rows, not a collapsed line (ADR-0009 already explained why:
- * one line for three sets was unreadable to correct). Every row runs through [NumeralText] so
- * its numbers carry the weight ADR-0019 asks for.
+ * The sets already logged against the current movement, each its own tap target (ADR-0022) —
+ * ruled rows, not a collapsed line (ADR-0009 already explained why: one line for three sets was
+ * unreadable to correct).
+ *
+ * **The load is a split baseline row ([GymLoadRow]), not one formatted string carrying both
+ * units (ADR-0011's Turn 4 amendment).** This is the same wrap `RestPanel.kt`'s `UpNext` and
+ * `GuidedExerciseScreen`'s hero lines had — a bodyweight set's `"Bodyweight × 12"` breaking a
+ * numeral-sized role that had no width budget for an eleven-character word — flagged here at
+ * the time as the identical bug and left for later rather than fixed in the same pass. The kg
+ * conversion is dropped entirely (ADR-0008's Turn 4 amendment: kg stays on Progress and history
+ * rows only, and this is neither), where it used to hang off the end via `weight.secondary`.
  *
  * **The trailing slot carries the set-to-set interval, not a checkmark (US-44, ADR-0036).** A
  * row already showing a real weight × reps number does not need a second symbol to confirm it
@@ -336,24 +346,24 @@ private fun LoggedSets(
                         .padding(vertical = GymDimens.HairGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
+                GymText(
                     text = "SET ${set.setIndex}",
-                    style = MaterialTheme.typography.labelMedium,
+                    role = GymTextRoles.LabelCaps,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(GymDimens.RowLabelWidth),
                 )
-                NumeralText(
-                    text =
-                        buildString {
-                            append("${weight.primary} × ${set.reps}")
-                            weight.secondary?.let { append("  ·  $it") }
-                        },
-                    style = MaterialTheme.typography.titleMedium,
+                GymLoadRow(
+                    number = weight.number,
+                    unit = weight.unit,
+                    wordFallback = weight.primary,
+                    reps = set.reps.toString(),
+                    numeralRole = GymTextRoles.NumeralMd,
+                    wordRole = GymTextRoles.WordUnit,
                     modifier = Modifier.weight(1f),
                 )
-                NumeralText(
+                GymText(
                     text = intervals[set.id]?.let { "+${it.asMinutesSeconds()}" } ?: "—",
-                    style = MaterialTheme.typography.bodySmall,
+                    role = GymTextRoles.Meta,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

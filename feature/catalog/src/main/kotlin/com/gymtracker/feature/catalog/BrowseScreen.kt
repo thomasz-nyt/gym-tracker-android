@@ -1,17 +1,22 @@
 package com.gymtracker.feature.catalog
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -25,14 +30,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.GymPhoto
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.exercise.CatalogFilter
 import com.gymtracker.core.domain.model.BodyPart
@@ -248,34 +258,97 @@ private fun Results(
     ) {
         items(results, key = { it.id.value }) { exercise ->
             val added = timesAdded(exercise.id)
-            ListItem(
-                headlineContent = { Text(exercise.name, style = MaterialTheme.typography.titleMedium) },
-                supportingContent = { Text(exercise.equipment.label()) },
-                // US-13's absence rule applies to layout too: without an image there is no
-                // leading slot, rather than a thumbnail-sized blank that narrows every row.
-                leadingContent =
-                    exercise.imageAsset?.let { imageAsset ->
-                        { ExerciseThumbnail(imageAsset) }
-                    },
-                trailingContent = {
-                    // Counted, not just flagged: US-02 allows the same exercise twice, so
-                    // tapping it again is a real action and the row should say so.
-                    if (added > 0) {
-                        Text(
-                            text = if (added == 1) "Added" else "Added $added×",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                },
-                // A whole row is the target, and it is a comfortable one: this list is scrolled
-                // and tapped one-handed, standing in front of a machine (ADR-0016).
+            // CI's real device measured this row at 71dp (Material3's own two-line ListItem
+            // spec, ~72dp) even with sizeIn(minHeight = 80.dp) passed as ListItem's own
+            // modifier — ListItem caps its height to its internal one/two/three-line spec
+            // regardless of a looser external minHeight, so the floor has to be enforced by an
+            // outer container ListItem sizes itself within, not by ListItem's own modifier.
+            //
+            // CATALOG_ROW_TEST_TAG: OutlinedTextField also exposes a click semantics action (so
+            // an accessibility service can "tap to focus" it), so hasText(name) and
+            // hasClickAction() together still matched the search field ahead of this row in
+            // tree order once a query had been typed into it — a text/click-action combinator
+            // could never disambiguate the two, however it was built. A test tag sidesteps that
+            // entirely: nothing else in this screen's tree carries it.
+            Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .sizeIn(minHeight = GymDimens.CatalogRowHeight)
-                        .clickable { onChosen(exercise.id) },
-            )
+                        .clickable { onChosen(exercise.id) }
+                        .testTag(CATALOG_ROW_TEST_TAG),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                ListItem(
+                    headlineContent = {
+                        GymText(
+                            text = exercise.name,
+                            role = GymTextRoles.TitleMd,
+                        )
+                    },
+                    supportingContent = {
+                        GymText(
+                            text = exercise.equipment.label(),
+                            role = GymTextRoles.LabelCaps,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    // US-13's absence rule applies to layout too: without an image there is no
+                    // leading slot, rather than a thumbnail-sized blank that narrows every row.
+                    leadingContent =
+                        exercise.imageAsset?.let { imageAsset ->
+                            { ExerciseThumbnail(imageAsset) }
+                        },
+                    // A fixed-width cell (frame 4a) — an "ADDED" tag or a "+" invitation, always
+                    // the same width either way, so adding an exercise never changes the name
+                    // column's width and never reflows the row the way a variable-width label
+                    // did.
+                    trailingContent = { AddedCell(added) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             GymDivider()
+        }
+    }
+}
+
+/**
+ * The picker row's trailing cell (frame `4a`): [GymDimens.AddExerciseCellWidth] wide regardless
+ * of state, holding a `tag.caps` "ADDED" label once tapped or a visual `+` invitation before —
+ * the fixed width is what stops adding an exercise from narrowing the name column next to it.
+ *
+ * The `+` is decorative, not a second tap target: the row itself is already the full clickable
+ * area (US-02's "tap again to add a second time" reads the same either way), so this box carries
+ * no semantics of its own rather than duplicating what TalkBack already announces for the row.
+ */
+@Composable
+private fun AddedCell(added: Int) {
+    Box(
+        modifier = Modifier.width(GymDimens.AddExerciseCellWidth),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (added > 0) {
+            // Counted, not just flagged: US-02 allows the same exercise twice, so tapping it
+            // again is a real action and the row should say so.
+            GymText(
+                text = if (added == 1) "ADDED" else "ADDED $added×",
+                role = GymTextRoles.TagCaps,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(GymDimens.AddExerciseButtonHeight)
+                        .border(
+                            BorderStroke(GymDimens.DividerThickness, MaterialTheme.colorScheme.outline),
+                            MaterialTheme.shapes.large,
+                        ).clearAndSetSemantics {},
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("+", style = MaterialTheme.typography.titleLarge, maxLines = 1)
+            }
         }
     }
 }
@@ -292,7 +365,7 @@ internal fun ExerciseThumbnail(imageAsset: String) {
         contentDescription = null,
         modifier =
             Modifier
-                .size(THUMBNAIL)
+                .size(GymDimens.CatalogThumbnail)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
@@ -308,11 +381,22 @@ internal fun Equipment.label(): String =
         name.lowercase().replaceFirstChar { it.uppercase() }
     }
 
-private val SCREEN_PADDING = GymDimens.ScreenPadding
+// ADR-0011's Turn 4 amendment: 20dp, not ScreenPadding's 24 — this screen's own gutter now,
+// not the app-wide one, since ScreenPadding is still read by thirteen other files this pass
+// does not touch.
+private val SCREEN_PADDING = GymDimens.CompactScreenPadding
 private val GAP = GymDimens.Gap
 private val CHIP_GAP = GymDimens.TightGap
 private val MIN_TOUCH_TARGET = GymDimens.MinTouchTarget
-private val THUMBNAIL = GymDimens.Thumbnail
+
+/**
+ * A plain literal, not a shared constant: `app`'s instrumented tests consume this module as a
+ * compiled dependency, not source, so a `private`/`internal` constant here would not be visible
+ * to them regardless — the test file matches this exact string directly, with a comment pointing
+ * back to this declaration. See the test-tag comment above [Results]'s `Box` for why a test tag
+ * exists here at all rather than matching on text and a click action.
+ */
+private const val CATALOG_ROW_TEST_TAG = "catalog-row"
 
 @Preview
 @Composable
@@ -326,6 +410,43 @@ private fun BrowsePreview() {
             onClearFilters = {},
             onChosen = {},
             onBack = {},
+        )
+    }
+}
+
+/**
+ * ADR-0011's Turn 4 amendment: the rule this pass adds to every changed composable's own
+ * previews — 320dp width, 130% font scale, and the longest exercise name in the bundled
+ * database. If the row still fits two lines and stays 80dp+ here, it survives a Pixel 4a with
+ * large text on, which is where the wraps this amendment fixes were actually measured.
+ */
+@Preview(widthDp = 320, fontScale = 1.3f)
+@Composable
+private fun BrowseNarrowWorstCasePreview() {
+    val worstCase =
+        Exercise(
+            id = ExerciseId("preview-worst-case"),
+            name = "Barbell Incline Bench Press - Medium Grip",
+            aliases = emptyList(),
+            primaryMuscles = emptyList(),
+            secondaryMuscles = emptyList(),
+            equipment = Equipment.BARBELL,
+            instructions = emptyList(),
+            mediaUrl = null,
+            mediaType = null,
+            youtubeUrl = null,
+            source = "free-exercise-db",
+        )
+    GymTrackerTheme {
+        BrowseScreen(
+            state = CatalogUiState(isLoading = false, results = listOf(worstCase)),
+            onQueryChanged = {},
+            onBodyPartToggled = {},
+            onEquipmentToggled = {},
+            onClearFilters = {},
+            onChosen = {},
+            onBack = {},
+            pickForSession = true,
         )
     }
 }

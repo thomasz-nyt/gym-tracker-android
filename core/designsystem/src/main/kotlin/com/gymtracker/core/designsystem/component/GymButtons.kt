@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 
 /**
  * The one action a screen exists for (ADR-0016): full width, [GymDimens.PrimaryAction] tall,
@@ -51,16 +52,15 @@ fun PrimaryActionButton(
  * "at most one per screen" primary action as the single-string overload above, just stating
  * what it will do before doing it (US-35).
  *
- * The detail line reads through `titleMedium` — the design's own 21px for this line rounds to
- * 22sp, the size ADR-0011 already names "the logged-set line", and reusing it rather than
- * adding a sixth ADR-0029 role for a 1px difference keeps the role count down. `titleMedium`
- * stays at its deliberately-unbolded base weight (see `Type.kt`'s class doc) so [NumeralText]'s
- * digit-only bolding still creates contrast within the line, the same mechanism the set rows use.
- *
- * The design also dims the unit suffix within the detail line (`lb`, `· 45.4 kg`) to a smaller,
- * lower-opacity span; this button keeps the whole line at one size and colour instead — matching
- * every micro-span in a design is a much larger, easily-regressed surface than the digit-weight
- * contrast the design actually calls out as the priority.
+ * **Retuned by ADR-0011's Turn 4 amendment.** [eyebrow] and [detail] now read through
+ * [GymTextRoles.TagCaps] and [GymTextRoles.TitleMd] rather than `labelSmall`/`titleMedium` —
+ * `title.md` is weight 800 (frame `4f`'s own table names it for exactly this line), so
+ * [NumeralText]'s digit-only bolding, which this KDoc used to describe here, would draw nothing
+ * extra on it; that mechanism is what the amendment's split baseline row (`GymLoadRow`) replaces
+ * on load lines generally, and [detail] is always a single already-composed string like
+ * `"135 lb × 8"`, never itself drawn as separate baseline pieces. The kg conversion this KDoc
+ * used to mention dimming inline (`"· 45.4 kg"`) is withdrawn from this surface entirely
+ * (ADR-0008's Turn 4 amendment), so there is no longer a secondary span to dim.
  *
  * **[outlined] (ADR-0036).** The rest countdown's final-ten-seconds swap needs this exact button
  * built two ways: filled while the countdown is calm, stepped back to outlined the moment the
@@ -68,6 +68,12 @@ fun PrimaryActionButton(
  * through the swap, not just around it. Outlined reuses the same unstyled `OutlinedButton` idiom
  * every other outlined control in this codebase already uses (`Done`, `Add set`, `SKIP REST`)
  * rather than hand-matching the design's literal ink-coloured border.
+ *
+ * **Floor retuned 72dp → [GymDimens.LogRowHeight] (64dp) by ADR-0011's Turn 4 amendment.** The
+ * amendment's split baseline row and dropped kg conversion mean [detail] is now always exactly
+ * "`135 lb × 8`" — a fixed two lines with [eyebrow], never the three-unit sentence that used to
+ * need extra room. [GymDimens.PrimaryAction] (72dp) is unchanged and still the floor for the
+ * single-string overload above, and for every other primary button in the app.
  */
 @Composable
 fun PrimaryActionButton(
@@ -78,11 +84,9 @@ fun PrimaryActionButton(
     enabled: Boolean = true,
     outlined: Boolean = false,
 ) {
-    // sizeIn, not a fixed height, on both branches: the detail line carries both units
-    // ("135 lb × 8 · 61.2 kg") and wraps to two lines on a narrow screen or at a large font
-    // scale. A fixed height clipped the second line mid-glyph — the button grows instead, since
-    // 72dp is the floor the sweaty-hands constraint asks for, not a ceiling.
-    val buttonModifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.PrimaryAction)
+    // sizeIn, not a fixed height: a large font scale can still push two short lines past 64dp,
+    // and the button should grow rather than clip — 64dp is the floor, not a ceiling.
+    val buttonModifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.LogRowHeight)
     val label: @Composable RowScope.() -> Unit = {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -91,18 +95,12 @@ fun PrimaryActionButton(
             // system's raw values live, not feature code — see GymDimens's own doc comment.
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
+            GymText(
                 text = eyebrow,
-                style =
-                    MaterialTheme.typography.labelSmall.copy(
-                        color = LocalContentColor.current.copy(alpha = EYEBROW_ALPHA),
-                    ),
+                role = GymTextRoles.TagCaps,
+                color = LocalContentColor.current.copy(alpha = EYEBROW_ALPHA),
             )
-            NumeralText(
-                text = detail,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            GymText(text = detail, role = GymTextRoles.TitleMd, modifier = Modifier.fillMaxWidth())
         }
     }
 

@@ -147,7 +147,7 @@ class GuidedFlowScreenTest {
             compose.onNodeWithText("Start").performClick()
             awaitRunningScreen()
 
-            compose.onNodeWithText("Log set 1", substring = true).performScrollTo().performClick()
+            compose.onNodeWithText("LOG SET 1", substring = true).performScrollTo().performClick()
             awaitResting()
 
             val logged = sets.observeForSessionExercise(TODAY).first()
@@ -174,7 +174,7 @@ class GuidedFlowScreenTest {
     private fun awaitRunningScreen() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose
-                .onAllNodesWithText("Log set 1", substring = true, useUnmergedTree = true)
+                .onAllNodesWithText("LOG SET 1", substring = true, useUnmergedTree = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }

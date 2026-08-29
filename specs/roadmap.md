@@ -985,9 +985,44 @@ never switches exercises are unchanged, and `TwoTapSetLoggingTest`/`OneTapSetLog
 unedited. Explicitly not this story: swapping a movement for a *substitute* exercise, which stays
 where it already was, below, needing its own design.
 
-**In progress:** nothing, as of 2026-08-17. The one entry this heading used to carry — "Finish
-as a summary rather than a confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is
-already ticked `[x]` in M4 above; the heading itself had gone stale rather than the work.
+**Closed 2026-08-28: Turn 4 — stop the wrapping (ADR-0011 and ADR-0008 amendments).**
+`Redesign.dc.html` synced a fourth turn, diagnosing the wrapping visible on a real device —
+three-line picker rows, a rest panel where metadata set at display weight cost 74dp, a session
+load line that breaks at 320dp × 130% font scale, and dot-joined history sentences with an
+orphan tail — as four missing rules rather than a font problem: no `maxLines` anywhere (205
+`Text(` calls in `feature/*/src/main`, zero passing it), metadata sentences set as display type,
+dot-joined strings in a narrow column, and words sized as if they were digits. A
+type-and-layout pass only, no behaviour or data-model change.
+
+`ADR-0011` gains a ten-role table (`GymTextRole`, each role carrying its own line ceiling via a
+new `GymText` composable) as an **additive** scale — `MaterialTheme.typography`'s existing
+slots keep every value they had; nothing they carry today changes, confirmed by grepping every
+slot this pass touches before landing it, since two of them (`displayLarge`, `headlineMedium`)
+turned out to be read only by `RestPanel.kt` (migrated) and `GuidedExerciseScreen.kt`'s own
+non-migrated frames (not migrated), and repointing either would have reflowed a screen this pass
+never intended to touch. `ADR-0008` gains the amendment withdrawing kg from every surface but
+Progress and history. Frame `4f`'s "412 movements" counts, session-length footers, a warm-up
+preset duration, muscle chips and a "sessions this week" section are read and deliberately
+deferred, listed in ADR-0011's amendment, pending their own story.
+
+Landed in commit order: the two ADR amendments; a same-day correction to ADR-0011's amendment
+(the additive-scale framing above, and a frame-to-file correction — `4b`'s vocabulary matches
+`GuidedExerciseScreen.kt`, not `RestPanel.kt`, despite section 2's own filing and the frame's own
+title both suggesting the latter); `Type.kt` + `GymDimens.kt` + `GymTextRole`; `WeightFormatter`'s
+additive `number`/`unit`/`isBodyweight` split; the `maxLines` enforcement test
+(`NoTextWithoutMaxLinesTest`, a source-tree walk with a shrinking allowlist); one screen per
+commit for `4a`–`4e`; narrow/worst-case previews plus `TurnFourLayoutTest`, the two instrumented
+layout assertions section 3 of the redesign prompt calls "the part that stops it coming back."
+11 commits total. All four CI gates green on the full, unscoped repo
+(`ktlintCheck detekt :core:domain:test testDebugUnitTest :app:lintDebug`).
+
+**Not yet done:** the two new instrumented assertions compile against the real classpath but have
+not run on a device or emulator — none was available in the environment this landed from. Needs
+that pass, and the PR itself, before this can be called verified rather than merely built.
+
+The one entry this heading used to carry as "in progress" — "Finish as a summary rather than a
+confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is already ticked `[x]` in M4 above;
+the heading itself had gone stale rather than the work.
 
 **Designed, not built, and needing a user story first:**
 

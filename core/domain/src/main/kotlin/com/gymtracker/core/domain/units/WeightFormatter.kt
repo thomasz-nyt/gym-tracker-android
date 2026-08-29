@@ -7,10 +7,26 @@ import kotlin.math.roundToLong
  * A weight as it appears on screen: the member's unit first, the other alongside.
  *
  * @property secondary null when there is nothing to convert — a bodyweight movement.
+ * @property number the bare number behind [primary] — e.g. `"135"` where [primary] is
+ *   `"135 lb"` — for a call site that draws digits and unit separately (ADR-0011's Turn 4
+ *   amendment: a load line as a baseline `Row` of separate `Text`s, a numeral role for the
+ *   number and a word role for the unit, rather than one formatted string measured as a whole).
+ *   Null exactly when [isBodyweight] is true — there is no number to split out of the word
+ *   "Bodyweight". Always the *primary* unit's number, matching [primary] itself, never the
+ *   secondary conversion.
+ * @property unit the unit suffix behind [primary] — e.g. `"lb"` — for the same split. Null
+ *   exactly when [number] is null.
+ * @property isBodyweight true when there is no weight recorded (constitution §2: absent is a
+ *   first-class state, not a zero). A call site drawing the split baseline row uses this to
+ *   choose the word role for [primary] itself (`"Bodyweight"`) instead of the numeral role
+ *   [number]/[unit] would otherwise take.
  */
 data class WeightDisplay(
     val primary: String,
     val secondary: String?,
+    val number: String?,
+    val unit: String?,
+    val isBodyweight: Boolean,
 )
 
 /**
@@ -31,7 +47,9 @@ object WeightFormatter {
         kilograms: Double?,
         primary: WeightUnit,
     ): WeightDisplay {
-        if (kilograms == null) return WeightDisplay(BODYWEIGHT, secondary = null)
+        if (kilograms == null) {
+            return WeightDisplay(BODYWEIGHT, secondary = null, number = null, unit = null, isBodyweight = true)
+        }
 
         val other = if (primary == WeightUnit.LB) WeightUnit.KG else WeightUnit.LB
         return WeightDisplay(
@@ -39,6 +57,9 @@ object WeightFormatter {
             // Converted from the stored kilograms, not from the primary string: deriving one
             // from the other would round twice and drift.
             secondary = render(kilograms, other),
+            number = number(UnitConverter.fromKilograms(kilograms, primary)),
+            unit = primary.label,
+            isBodyweight = false,
         )
     }
 

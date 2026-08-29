@@ -6,7 +6,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.feature.logging.GuidedActions
@@ -59,6 +61,17 @@ internal fun SessionDialogs(
  *
  * Finishing is once per workout, so the extra tap costs nothing measurable; ending a workout
  * you were halfway through costs the rest of it.
+ *
+ * **Partially retuned by ADR-0011's Turn 4 amendment (frame `4e`).** The title reads through
+ * `title.lg` now. The frame's own mockup also shows session progress ("24 min · 5 of 5"), an
+ * up-next preview and a stats `FlowRow` inside this dialog, and its two buttons stacking full
+ * width below 340dp — none of that is done here. The first three would be new content this
+ * dialog has no parameters to carry (`onConfirm`/`onDismiss` alone), which is new behaviour, out
+ * of scope for a type-and-layout pass. The stacking would need replacing `AlertDialog` itself —
+ * Material3's version places `confirmButton`/`dismissButton` in its own internal row with no
+ * exposed way to make that row become a column below a width, so doing it faithfully means
+ * building a custom `Dialog`, a bigger structural change than this pass's scope. Flagged rather
+ * than half-built.
  */
 @Composable
 internal fun FinishWorkoutDialog(
@@ -67,7 +80,7 @@ internal fun FinishWorkoutDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Finish this workout?") },
+        title = { GymText(text = "Finish this workout?", role = GymTextRoles.TitleLg) },
         text = { Text("It moves to your past workouts. Sets you have already logged are kept.") },
         confirmButton = {
             TextButton(onClick = onConfirm, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {

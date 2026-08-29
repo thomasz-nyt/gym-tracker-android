@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ADR-0011's Turn 4 amendment (frame 4d): "Delete" moves from a 96dp accent text button to a
+     44dp neutral icon button, so the accent stays reserved for the one filled action on screen
+     and a history row's title keeps its column. Hand-authored from Lucide's "trash-2" glyph
+     (ISC-licensed; https://lucide.dev), the same reasoning ic_nav_train.xml already gives for
+     drawing glyphs by hand rather than adding an icon-library dependency — no new entry needed
+     in tech-stack.md. Stroke-only, tinted at the call site via Icon's own tint parameter. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M3,6 L21,6"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M19,6 L19,20 A2,2 0 0,1 17,22 L7,22 A2,2 0 0,1 5,20 L5,6"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M8,6 L8,4 A2,2 0 0,1 10,2 L14,2 A2,2 0 0,1 16,4 L16,6"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M10,11 L10,17"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M14,11 L14,17"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>
