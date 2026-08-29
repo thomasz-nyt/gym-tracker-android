@@ -144,13 +144,23 @@ member's `unitPreference`. There must be a single `UnitConverter` in
 `:core:domain` with a rounding-behaviour test table. Unit bugs in a lifting app are
 uniquely infuriating; do not scatter conversions.
 
-### Identity before M2
+### Identity before, and after, sign-in
 
-M1 has no auth. On first launch the app generates one **local member UUID**
-(stored in DataStore) and stamps it on every session and set as `user_id`. One
-device = one member until M2. At M2 sign-in, the local UUID's rows are
-re-assigned to the authenticated Supabase user id in a single UPDATE before the
-first sync.
+M1 has no auth, and sign-in stays optional for the life of the app (ADR-0042) — a device
+never needs one to use REP. On first launch the app generates one **local member UUID**
+(stored in DataStore, key `local_member_id`) and stamps it on every session and set as
+`user_id`. One device = one local member for as long as it stays signed out.
+
+**At sign-in, the re-key UPDATE runs at most once per install.** A second DataStore
+boolean, `has_completed_first_sign_in` (default `false`), gates it: if this is the
+device's first-ever sign-in, the local UUID's rows are re-assigned to the authenticated
+Supabase user id in a single UPDATE before the first sync, and the boolean flips to `true`
+in the same transaction. If the device has adopted an account before — a different member
+signing in on a shared household phone, or the same member signing in again after signing
+out — the UPDATE does not run again; the newly-signed-in member's rows are whatever the
+server already holds for their `auth.uid()`, and the device's existing local rows are left
+exactly where they are, under whatever id already owns them. ADR-0042 states the failure
+mode this guards against and why the boolean, not a confirmation dialog, is the mechanism.
 
 ## Room (local, source of truth for the UI)
 
@@ -310,8 +320,15 @@ DataStore, so a reinstall generates a new member UUID — and `sessions`, `routi
 `SetDao` prefill queries all filter on `user_id`. Rows restored under a dead id are invisible
 to every screen, and the app looks exactly as empty as it did before the import. Import writes
 the id back rather than rewriting the rows, which keeps export → import an identity function.
-This is consistent with *§ Identity before M2* above: the id names the member, not the install,
-which is why one UPDATE can re-assign it to a Supabase user at sign-in.
+This is consistent with *§ Identity, before and after sign-in* above: the id names the member,
+not the install, which is why one UPDATE can re-assign it to a Supabase user at sign-in.
+
+**`has_completed_first_sign_in` (ADR-0042) is not in it, for the same reason
+`rest_ends_at` and the guided-flow keys are not.** It describes this install's own history —
+whether it has ever adopted an account — not a fact about the member. A backup restored onto a
+fresh install must not silently mark that install as already having signed in once; doing so
+would skip the adoption UPDATE on the install's real first sign-in and leave its restored rows
+under a dead local id forever.
 
 **`updated_at` and `sync_state` are not in it.** Both are M2 bookkeeping — `sync_state` is
 written `PENDING` at every call site and read by nothing — so a backup records neither, and
@@ -517,3 +534,10 @@ ordering its own edits. Deletes are hard deletes propagated through `sync_queue`
 Conflicts are rare here by nature — two people do not edit the same set — so do not
 build CRDTs. Document the chosen behaviour in an ADR and test the three cases:
 local-only change, remote-only change, both changed.
+
+**ADR-0043 is that documentation.** It settles what this section leaves open: `sync_queue`
+is populated by an insert alongside every existing `sync_state = 'PENDING'` write, in the
+same transaction, rather than derived later — a hard-deleted row leaves nothing to scan for
+after the fact; an exact `updated_at` tie under "both changed" keeps the local row's payload
+and takes the remote timestamp; and the WorkManager worker that drains the queue only ever
+runs for a signed-in member (ADR-0042) — signed out, this table simply never fills.
