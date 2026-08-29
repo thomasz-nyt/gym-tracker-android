@@ -795,6 +795,33 @@ session already includes, in either direction.
 - US-03's two-tap ceiling and US-35's one-tap log button are unchanged for a member who never
   switches exercises — `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 
+### US-52 — One inset, one spacing vocabulary
+Added 2026-08-29, from the `Redesign.dc.html` audit's Turn 5, file `01-insets-and-spacing.md`.
+See `adr/0044-a-legal-spacing-vocabulary-and-one-inset-consumer.md`. Foundational and
+presentation-only — the other Turn 5 files (`02`, `03`, `04`, `06`) read this story's spacing
+vocabulary; file `05` (set corrections) is deferred until M2's sync engine has landed in every
+DAO call site, since it is the one Turn 5 file that touches the set DAO.
+
+- The gap between the bottom of the status bar and the first content pixel is measured, not
+  assumed, on the session screen, the Progress screen, and a history detail screen, each at
+  393dp — and is ≤ 40dp on all three once this story ships. If the measured gap was already
+  ≤ 40dp before any code changed, that is reported as such rather than treated as a bug to fix.
+- No screen, app bar, or panel in `feature/**` consumes `WindowInsets.statusBars` (or
+  `.systemBars`) a second time beyond the root `Scaffold` — `LiveHeartRateChip`'s own status-bar
+  padding is the one named exception (US-47), since it deliberately floats a reading in that
+  area on every screen.
+- `GymDimens.PrimaryAction` is 64dp (down from 72dp); `GymDimens.LogRowHeight` no longer exists
+  as a separate token. Every `GymDimens` token outside this pair — `PhotoHeight`, `ChartHeight`,
+  `Thumbnail`, `MascotHome`/`MascotInline`, `CompactScreenPadding`, and the rest — is unchanged.
+- A build-time check fails on a `.dp` literal written directly in `feature/**`, inside a
+  `Spacer` height, a vertical `Arrangement.spacedBy`, a `.height(...)` modifier, or vertical
+  padding, whose value is not in `{2, 4, 12, 20, 32, 44, 56, 64, 80}`. Scoped to vertical
+  spacing and row/element height — the two categories file `01` itself names — not every `.dp`
+  literal in the module; icon sizes, stroke widths, and horizontal-only padding are untouched. A
+  named `GymDimens` token is exempt regardless of its value.
+- The screen gutter (left and right padding) measures 20dp on the four main screens (Train,
+  Exercises, Progress, and a history detail screen).
+
 ---
 
 ## M4a — Rep, animated

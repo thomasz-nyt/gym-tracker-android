@@ -1078,6 +1078,44 @@ The one entry this heading used to carry as "in progress" — "Finish as a summa
 confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is already ticked `[x]` in M4 above;
 the heading itself had gone stale rather than the work.
 
+**Turn 5, file `01` (insets and spacing) landed 2026-08-29; the rest of Turn 5 is scoped, not
+built.** `Redesign.dc.html` synced a fifth turn, exported this time as a `handoff/` bundle of
+seven gated files rather than one prose document — `00-gate.md` (the shared legal vocabulary and
+rules) plus `01`–`06`, each its own commit, mapped to frames `5a`–`5h`. File `05` (set
+corrections) is deferred: it is the one file that touches the set DAO, and M2's sync engine
+(ADR-0043) is landing an outbox-enqueue statement in every syncable DAO's write transaction right
+now — writing new set-deletion logic against a DAO shape mid-change risked exactly the collision
+prior redesign turns avoided by touching no table a milestone reads. Files `02`–`04` and `06`
+remain to be built.
+
+See `specs/adr/0044-a-legal-spacing-vocabulary-and-one-inset-consumer.md` and US-52 for what
+shipped: `GymDimens.PrimaryAction` reverts 72dp → 64dp (ADR-0011's Turn 4 amendment, reversed —
+every primary action in the app now shares one floor, not two), `LogRowHeight` is retired as a
+now-redundant token, and a source-tree check (`LegalSpacingLiteralsTest`) enforces the legal
+vertical-spacing/row-height vocabulary `{2, 4, 12, 20, 32, 44, 56, 64, 80}` going forward, scoped
+to `.height(...)`, vertical `Arrangement.spacedBy`, and vertical padding specifically — not
+every `.dp` literal in a feature module, which the gate table's own assertion 1.5 reads more
+broadly than file `01`'s prose states; see the ADR for why the narrower reading was confirmed
+with the maintainer rather than assumed.
+
+**The claimed ~210dp double-inset does not reproduce.** A source grep found no second
+`statusBarsPadding()`/`windowInsetsPadding(statusBars)` call anywhere outside the root
+`Scaffold` in `GymTrackerNavHost` (`LiveHeartRateChip`'s own is a deliberate, named exception,
+US-47). An instrumented measurement against a real session, run on a local Android emulator (not yet
+CI's own), confirmed the real number instead of trusting the grep alone: **49.14dp**, not
+~210dp, and not caused by double-consumed insets at all — `InsetConsumptionTest` traces it to
+the status bar (24dp, consumed exactly once, correctly) plus `SessionHeader`'s own
+`CompactScreenPadding` (20dp) plus ordinary text line-height overhead. Insets are not this
+file's remaining ~9dp problem; the session header's own padding is, and that header belongs to
+file `03` (the session screen rewrite), which file `01` explicitly does not touch. Gate 1.1's
+≤40dp assertion is therefore left honestly open here — 49.14dp measured today, expected to close
+once `03` lands, not claimed done. All four gates green locally
+(`ktlintCheck detekt :core:domain:test testDebugUnitTest :app:lintDebug`);
+`InsetConsumptionTest` was run against the unmodified build first and failed with this same
+49.14dp measurement, confirming it describes the current app, not a hypothetical — CI's own run
+on push is still the authority PR #67's entry above insisted on, and hasn't happened yet for
+this change.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
