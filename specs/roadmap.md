@@ -7,11 +7,19 @@ member could actually use.
 M0, M1, M3, M3a, M3b, M3c, M4, M4a and M5 are complete as of 2026-08-20 — several closed
 in name only for a while, their checkboxes left unticked across the PRs that shipped them, until
 this entry reconciled the file against the code (see each section's own "Exit" note for what was
-verified and how). M2 is deliberately postponed so the offline core can be finished before
-accounts and sync arrive; M3a, M3b, M3c and M4a were all taken ahead of their sequential position
+verified and how). M3a, M3b, M3c and M4a were all taken ahead of their sequential position
 for reasons argued in each one's own section below. US-23, M5's last story, merged in PR #65;
-the opening status had not been updated with it. Per the sequential rule at the top of this file,
-**M2 is now next**.
+the opening status had not been updated with it.
+
+**M2 is now underway (2026-08-29).** It was postponed after M1 so the offline core could be
+finished before accounts and sync arrived, and every milestone that could still be taken ahead
+of it on that same narrow exception (M3, M3a, M3b, M3c, M4a, M4b) has now been. The exception
+has run out: per the sequential rule at the top of this file, M2 is next, and specs for it were
+written 2026-08-29 (ADR-0042, ADR-0043) before any code, per `CLAUDE.md`. M2's scope was also
+narrowed on the same pass: the two media items it used to carry (mirroring stock exercise media,
+and US-15's family-recorded clips) neither serve nor are served by M2's own exit criterion, so
+they split out to a new **M2a**, taken after M2 exits, on the terms M3a/M3b/M3c already
+established for running ahead of sequence.
 
 M5a's implementation is also shipped (ADR-0039, US-46 … US-49). Subsequent live use with a
 Fitbit Charge 6 proved the real pairing-to-readout path well enough to expose a legibility bug in
@@ -97,24 +105,67 @@ anything mid-set.
 
 ## M2 — Accounts, household, sync
 
-Stories: US-07 … US-11, plus US-15 which moved here from M3.
+Stories: US-07 … US-11. US-15 moved to M2a; see that section for why.
 
-**Postponed until after M3** (2026-08-01). Nothing in M1 or M3 needs it, and the household
-does not need accounts to start using the app.
+**Postponed until after M3** (2026-08-01) so the offline core could be finished before
+accounts and sync arrived. **Taken up 2026-08-29**, once every milestone that could still run
+ahead of it on that same exception (M3, M3a, M3b, M3c, M4a, M4b) had been. Scope narrowed the
+same day: the household does not need accounts to start using the app (constitution §3), so
+sign-in stays optional for the life of the app rather than gating it — see ADR-0042, which also
+settles what happens to a device's existing local rows on first sign-in, since a shared
+household phone can hold one member's real training history when a second member signs in on
+it, and the wrong answer there is destructive.
 
 - [ ] Supabase project, migrations in `supabase/migrations/`
-- [ ] Auth: sign up, sign in, sign out
+- [ ] Auth: sign up, sign in, sign out. Optional — every M1–M5a feature keeps working with no
+      account, and a device adopts its local rows into an account exactly once (ADR-0042)
 - [ ] `households` + `profiles`; invite a member by code
 - [ ] RLS policies on every table + pgTAP tests proving cross-household reads fail
 - [ ] Sync engine: local-first, WorkManager, last-write-wins per row with
-      `updated_at`, conflict cases documented
-- [ ] Offline queue survives app kill
-- [ ] Data export (JSON) and account deletion
-- [ ] Stock exercise media mirrored into Supabase Storage, never hotlinked (ADR-0014)
-- [ ] Family-recorded clips for a household (US-15, moved from M3)
+      `updated_at`, conflict cases documented (ADR-0043)
+- [ ] Offline queue survives app kill (`sync_queue`, ADR-0043)
+- [ ] Sync status — synced / pending / error — visible without opening Settings (US-10),
+      sharing `GymTrackerNavHost`'s `topBar` slot with `LiveHeartRateChip` and silent when
+      synced (ADR-0043); the full three-state detail lives in Settings
+- [ ] Account deletion, server-side cascade plus local wipe, verified by a test (US-11's
+      remaining obligation — the export half already shipped as US-40 in M3c; see that
+      section's note below)
 
 **Exit:** two devices, two family members, same household, log offline, reconnect,
-converge. A pgTAP suite proves isolation.
+converge, with no lost rows and no duplicates. Each member sees the other's name and session
+summaries but zero of their sets while `share_details` is false. A pgTAP suite proves
+cross-household and cross-member isolation at the database layer. Verified on device — one
+phone plus `Medium_Phone_API_36.1(AVD)`, the same emulator image every prior milestone was
+verified on — not only in the suite, the way M3c's and M5's exits were.
+
+A note on US-11: its export half is already satisfied. US-40 (M3c, 2026-08-16) shipped JSON
+export of every member table through the Storage Access Framework, which is what US-11's own
+"I can export all my data as JSON to a file" asks for — written before M2 existed because
+constitution §5 promised it independent of accounts. What M2 still owes US-11 is the half an
+export cannot provide on its own: deleting the account and every row that belongs to it,
+server-side, with a test proving the rows are actually gone rather than just orphaned.
+
+---
+
+## M2a — Household media
+
+Story: US-15. ADR-0014's stock-media mirror also lives here — see below.
+
+Split out of M2 2026-08-29, once M2's own exit criterion turned out not to need either
+item: two devices converging and proving isolation requires no media at all. **Runs after M2
+exits**, on the terms M3a/M3b/M3c already used for running ahead of sequence: this needs the
+household and the sync engine M2 builds, so it cannot run *before* M2, but nothing about it
+needs to block M2's own, narrower exit.
+
+- [ ] Stock exercise media mirrored into Supabase Storage, never hotlinked (ADR-0014). Has no
+      content to mirror today — the catalog ships instructions, not GIFs (ADR-0014's own
+      finding) — so this stays a checkbox with nothing behind it until a media source exists
+- [ ] Family-recorded clips for a household (US-15): record or pick a short clip, attach it to
+      a catalog exercise for the household, overriding stock media for that household only.
+      Stored on-device and works offline; sharing it goes through the sync engine M2 builds
+
+**Exit:** a household can attach its own clip to an exercise, see it in place of stock media on
+every member's device, and keep using it offline.
 
 ---
 
@@ -1016,9 +1067,12 @@ layout assertions section 3 of the redesign prompt calls "the part that stops it
 11 commits total. All four CI gates green on the full, unscoped repo
 (`ktlintCheck detekt :core:domain:test testDebugUnitTest :app:lintDebug`).
 
-**Not yet done:** the two new instrumented assertions compile against the real classpath but have
-not run on a device or emulator — none was available in the environment this landed from. Needs
-that pass, and the PR itself, before this can be called verified rather than merely built.
+**Verified 2026-08-28, correcting this entry's own earlier note.** This section originally said
+the two new instrumented assertions had only compiled, with no emulator available to run them on
+— true when it was written, no longer true once PR #67 opened: CI's real emulator ran the full
+suite and caught two genuine failures a purely local pass could not have (`50b5b6a`, then
+`9463e7c`, `a0730ee`, `aac9309` and `3582f2d` fixing the picker-row assertion itself), all fixed
+before merge. PR #67 merged 2026-08-28 with the full suite green.
 
 The one entry this heading used to carry as "in progress" — "Finish as a summary rather than a
 confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is already ticked `[x]` in M4 above;

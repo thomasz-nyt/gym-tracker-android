@@ -186,6 +186,14 @@ is no way to answer "what did I do on Tuesday, and at what weight".
 ### US-07 — Sign up and sign in
 - Email + password. Session persists across app restarts.
 - Sign-out clears local data for that member only.
+- **Amended 2026-08-29 (ADR-0042): sign-in is optional, for the life of the app.** Every
+  feature from M1 through M5a keeps working fully with no account; nothing gains a
+  requirement to sign in. On a device's first-ever sign-in, its existing local rows are
+  adopted into the newly-signed-in account (`data-model.md`'s own re-key UPDATE). A second
+  sign-in on the same device — a different member on a shared household phone, or the same
+  member signing in again after signing out — adopts nothing further: the device has already
+  adopted once, and that member's session starts with an empty household view rather than
+  inheriting whatever is already on the device.
 
 ### US-08 — Create or join a household
 - The first member creates a household and gets an invite code.
@@ -201,18 +209,37 @@ is no way to answer "what did I do on Tuesday, and at what weight".
 - Every M1 action works with no network.
 - Changes queue and sync when connectivity returns, surviving app kill.
 - A sync status indicator distinguishes: synced / pending / error.
+- **Amended 2026-08-29 (ADR-0043): the indicator is silent exactly when synced.** It shares
+  `GymTrackerNavHost`'s `topBar` slot with `LiveHeartRateChip` rather than adding new
+  permanent chrome — a muted pending count, or a tappable error row, when there is something
+  to report; nothing when there is not. "Synced" is not itself announced there, since silence
+  already means "nothing more urgent than usual" for the chip it shares the slot with. The
+  full three-state detail this story's "distinguishes: synced / pending / error" asks for,
+  including *when* it last synced, lives in Settings, where a member can go look for it.
 
 ### US-11 — Export and delete
 - I can export all my data as JSON to a file.
 - I can delete my account; all my rows are removed and this is verified by a test.
+- **Note added 2026-08-29:** the export half is already shipped. US-40 (M3c, 2026-08-16)
+  delivered exactly this — every member table as JSON through the Storage Access Framework —
+  ahead of M2 because constitution §5 promised an export independent of accounts existing.
+  What M2 still owes this story is account deletion: a server-side cascade removing every row
+  belonging to the account, plus the local wipe, both proven by a test.
+
+---
+
+## M2a — Household media
 
 ### US-15 — Record our own gym's equipment
-Moved here from M3 on 2026-08-01: it is written in terms of a household, and there is
-no household until this milestone (ADR-0014).
+Moved to M2 from M3 on 2026-08-01: it is written in terms of a household, and there is
+no household until M2 (ADR-0014). **Moved again 2026-08-29, from M2 to this new M2a**: M2's
+own exit criterion — two devices converging, isolation proven — needs no media at all, and
+this story needs the household and sync engine M2 builds, so it belongs after M2 exits
+rather than inside it.
 - I can record or pick a short clip and attach it to a catalog exercise for my
   household, overriding the stock media for us only.
 - The clip is stored on the device and works offline; sharing it with the household
-  goes through the same sync engine as everything else in this milestone.
+  goes through the same sync engine M2 built.
 
 ---
 
