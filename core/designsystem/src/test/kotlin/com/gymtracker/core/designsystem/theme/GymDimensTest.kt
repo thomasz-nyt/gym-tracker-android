@@ -19,11 +19,13 @@ class GymDimensTest {
     }
 
     @Test
-    fun `the primary action is 72dp, per the redesign's sweaty-hands constraint`() {
-        // Pinned, not just floored: `>= MinTouchTarget` above already passed at 64dp, which is
-        // how the mismatch between this file and the redesign's constraints shipped unnoticed.
-        // Raised from 64dp (ADR-0016's original value) to 72dp so the drift can't recur silently.
-        assertEquals(72.dp, GymDimens.PrimaryAction)
+    fun `the primary action is 64dp, per Turn 5's legal row-height set`() {
+        // Pinned, not just floored: `>= MinTouchTarget` above already passes at either 64dp or
+        // 72dp, which is how the mismatch this comment used to describe shipped unnoticed once.
+        // ADR-0044 reverses ADR-0011's Turn 4 amendment (64dp -> 72dp): Turn 5's legal row-height
+        // set is {44, 56, 64, 80} with no 72, applied to every primary action in the app, not
+        // just the log button that already held 64dp as LogRowHeight (now retired, see below).
+        assertEquals(64.dp, GymDimens.PrimaryAction)
     }
 
     @Test
@@ -121,13 +123,22 @@ class GymDimensTest {
         assertEquals(54.dp, GymDimens.AddExerciseCellWidth)
         assertEquals(44.dp, GymDimens.AddExerciseButtonHeight)
         assertTrue(GymDimens.AddExerciseButtonHeight < GymDimens.AddExerciseCellWidth)
-        assertEquals(64.dp, GymDimens.LogRowHeight)
-        assertTrue(GymDimens.LogRowHeight < GymDimens.PrimaryAction)
         // The frame's own number is 44dp; MinTouchTarget (48dp) wins, per this file's own
         // "nothing tappable is smaller than this, anywhere" rule.
         assertEquals(GymDimens.MinTouchTarget, GymDimens.WarmUpRowHeight)
         assertEquals(340.dp, GymDimens.StackedButtonsBreakpoint)
         assertEquals(14.dp, GymDimens.MetricFlowRowGapHorizontal)
         assertEquals(6.dp, GymDimens.MetricFlowRowGapVertical)
+    }
+
+    @Test
+    fun `LogRowHeight is retired by ADR-0044, not kept alongside an equal PrimaryAction`() {
+        // Turn 4 gave the log button its own 64dp floor specifically because PrimaryAction held
+        // 72dp; now both are 64dp (see the pinned test above), a second token for the same
+        // number would only invite the two drifting apart again unnoticed. This test's only job
+        // is to fail to compile if LogRowHeight is ever reintroduced as a distinct token — see
+        // GymButtons.kt's PrimaryActionButton(eyebrow, detail) overload, which reads
+        // PrimaryAction directly now.
+        assertTrue(GymDimens.PrimaryAction == 64.dp)
     }
 }
