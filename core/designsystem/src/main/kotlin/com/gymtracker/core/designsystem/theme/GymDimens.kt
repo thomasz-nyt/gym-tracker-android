@@ -20,11 +20,14 @@ object GymDimens {
     /**
      * A screen's one primary action: full width, and this tall. Sized to be hit without looking.
      *
-     * Raised from ADR-0016's original 64dp to 72dp (redesign audit, "sweaty hands, phone at
-     * arm's length") — see `GymDimensTest`'s pinned-value test, added because `>= MinTouchTarget`
-     * alone let 64dp and 72dp look identical to the suite.
+     * Raised from ADR-0016's original 64dp to 72dp by ADR-0011's Turn 4 amendment ("sweaty
+     * hands, phone at arm's length"), then reverted to 64dp by ADR-0044: Turn 5's legal
+     * row-height set is `{44, 56, 64, 80}`, applied to every primary action app-wide, including
+     * the log button — which had already carried its own 64dp floor as the now-retired
+     * `LogRowHeight` since Turn 4 split it from this token. See `GymDimensTest`'s pinned-value
+     * test.
      */
-    val PrimaryAction = 72.dp
+    val PrimaryAction = 64.dp
 
     val ScreenPadding = 24.dp
     val Gap = 12.dp
@@ -156,13 +159,6 @@ object GymDimens {
 
     /** The `+` button inside [AddExerciseCellWidth] (frame `4a`). */
     val AddExerciseButtonHeight = 44.dp
-
-    /**
-     * The one-tap log button's floor once its eyebrow/detail overload becomes two fixed lines
-     * (frame `4b`/`4c`) rather than a variable-height sentence — [PrimaryAction] (72dp) is
-     * unchanged and still the floor for every single-line primary button elsewhere in the app.
-     */
-    val LogRowHeight = 64.dp
 
     /**
      * The warm-up row, once it stops floating as loose text (frame `4c`).

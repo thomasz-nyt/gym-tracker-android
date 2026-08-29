@@ -69,11 +69,11 @@ fun PrimaryActionButton(
  * every other outlined control in this codebase already uses (`Done`, `Add set`, `SKIP REST`)
  * rather than hand-matching the design's literal ink-coloured border.
  *
- * **Floor retuned 72dp → [GymDimens.LogRowHeight] (64dp) by ADR-0011's Turn 4 amendment.** The
- * amendment's split baseline row and dropped kg conversion mean [detail] is now always exactly
- * "`135 lb × 8`" — a fixed two lines with [eyebrow], never the three-unit sentence that used to
- * need extra room. [GymDimens.PrimaryAction] (72dp) is unchanged and still the floor for the
- * single-string overload above, and for every other primary button in the app.
+ * **Floor retuned 72dp → 64dp by ADR-0011's Turn 4 amendment**, then unified with
+ * [GymDimens.PrimaryAction] itself by ADR-0044 (Turn 5): both overloads now read the same
+ * 64dp floor, so the log button is no longer shorter than a less-frequent primary action. The
+ * dedicated `LogRowHeight` token this KDoc used to name is retired — a second name for the same
+ * number as [GymDimens.PrimaryAction] had no reader left to serve once the two floors matched.
  */
 @Composable
 fun PrimaryActionButton(
@@ -86,7 +86,7 @@ fun PrimaryActionButton(
 ) {
     // sizeIn, not a fixed height: a large font scale can still push two short lines past 64dp,
     // and the button should grow rather than clip — 64dp is the floor, not a ceiling.
-    val buttonModifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.LogRowHeight)
+    val buttonModifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.PrimaryAction)
     val label: @Composable RowScope.() -> Unit = {
         Column(
             modifier = Modifier.fillMaxWidth(),
