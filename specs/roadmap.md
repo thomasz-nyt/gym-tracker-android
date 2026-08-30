@@ -1143,6 +1143,41 @@ with the PR. All four gates green locally, plus the full instrumented suite
 (`:app:connectedDebugAndroidTest`, 32 tests, 5 skipped — the pre-existing conditional-feature
 skips plus `InsetConsumptionTest` above — 0 failed) on the same local emulator file `01` used.
 
+**Turn 5, file `03` (the session screen) sub-piece 1 of 4 landed 2026-08-30.** File `03` — "the
+largest file in the pass," touching over 3,200 lines across the plausibly-affected files —
+ships as an ordered sequence of commits rather than one pass, per `CLAUDE.md`'s split guidance.
+See `specs/adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md` and US-54.
+
+**A second reversal risk found and stopped, the same shape as file `02`'s.** File `03`'s "one
+composable, two contracts" contract table has a guided kicker — `"SET 2 OF 3"` — close enough to
+`GuidedExerciseScreen.kt`'s own existing `"SET ${running.setsDone + 1} OF ${running.targetSets}"`
+that reading file `03` as "fold that screen back into the main session screen" was a real
+possibility, not a stretch. That screen is a **separate, full-screen route**, put there
+deliberately two weeks ago (ADR-0033, 2026-08-14) from the maintainer's own live report about
+its pre-redesign styling, with its own explicit scope note: "without reopening ADR-0029's `1a`
+decision for the main screen." Confirmed with the maintainer before writing any code: file `03`'s
+"guided" is the main screen's own concept — `sessionExercise.target?.sets != null` per exercise,
+`SessionProgress.orderIsAPlan` per session, both fields the domain model already carried — not a
+merge, and `GuidedExerciseScreen.kt`/ADR-0033 are untouched. `Remove`'s move to long-press is
+file `05`'s (deferred past M2); confirmed to keep `Remove` exactly where it is, unchanged in
+function, rather than deleting it now for a gesture that isn't landing yet.
+
+**Sub-piece 1 (this commit): the kicker, section label, and header tag become plan-aware.**
+`sessionKicker`/`otherExercisesSectionLabel` (`SessionMovements.kt`) are pure, unit-tested
+functions — `"EXERCISE n OF total · SET x OF y"` when the open exercise has a sets target,
+`"CURRENT"` otherwise; `"THEN"` / `"ALSO TODAY"` on `orderIsAPlan` alone, a label rename that
+doesn't touch which exercises appear there (US-45 stands). A new `ModeTag` (`GUIDED`/`NO PLAN`,
+local to `SessionScaffold.kt` pending a second real consumer) sits beside the session title on
+the same signal. No change to what logging a set does. Verified on-device: a freestyle session
+with two exercises shows `NO PLAN` / `CURRENT` / `ALSO TODAY` correctly; the plan-backed path is
+covered by `SessionKickerTest` but not yet screenshotted live (no routine was set up in this
+session to trigger it) — worth a follow-up on-device check before file `03` is considered done,
+not before this sub-piece merges. All four gates green; full instrumented suite unchanged (32
+tests, 5 skipped, 0 failed).
+
+Remaining, not yet built: plan-overrun labelling (`SET 5 · EXTRA`), `Add set`/`Add exercise`'s
+button-chrome-to-`label.caps` change, and the rest band's redraw.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
