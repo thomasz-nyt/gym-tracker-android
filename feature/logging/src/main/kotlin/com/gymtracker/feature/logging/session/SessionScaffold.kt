@@ -1,6 +1,8 @@
 package com.gymtracker.feature.logging.session
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -319,6 +321,7 @@ private fun ActiveSession(
                 openSessionExerciseId = openSessionExerciseId,
                 unit = unit,
                 nextLoggableSet = nextLoggableSet,
+                orderIsAPlan = progress?.orderIsAPlan == true,
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
                 onStartExercise = onStartExercise,
@@ -332,13 +335,23 @@ private fun ActiveSession(
         AddExerciseButton(onClick = onAddExercise)
     }
 
-    if (confirmingFinish) {
+    FinishConfirmation(confirmingFinish, onFinishWorkout) { confirmingFinish = it }
+}
+
+/** Split out of [ActiveSession] to keep that function under detekt's length ceiling. */
+@Composable
+private fun FinishConfirmation(
+    confirming: Boolean,
+    onFinishWorkout: () -> Unit,
+    setConfirming: (Boolean) -> Unit,
+) {
+    if (confirming) {
         FinishWorkoutDialog(
             onConfirm = {
-                confirmingFinish = false
+                setConfirming(false)
                 onFinishWorkout()
             },
-            onDismiss = { confirmingFinish = false },
+            onDismiss = { setConfirming(false) },
         )
     }
 }
@@ -380,6 +393,7 @@ private fun MidSetBody(
     openSessionExerciseId: SessionExerciseId?,
     unit: WeightUnit,
     nextLoggableSet: UpNextSet?,
+    orderIsAPlan: Boolean,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
@@ -407,6 +421,7 @@ private fun MidSetBody(
                 openSessionExerciseId = openSessionExerciseId,
                 nextLoggableSet = nextLoggableSet,
                 unit = unit,
+                orderIsAPlan = orderIsAPlan,
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
                 onStartExercise = onStartExercise,
@@ -468,16 +483,22 @@ private fun SessionHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            GymText(
-                // ADR-0011's Turn 4 amendment (frame 4c): sentence case, not the uppercase
-                // ADR-0029 originally drew this in — title.lg carries its own weight (800) and
-                // tracking for hierarchy, so the string transform is no longer needed for it to
-                // read as a title. The session's own routine.name is still never mutated.
-                text = session.routine?.name ?: "Freestyle",
-                role = GymTextRoles.TitleLg,
-                modifier = Modifier.testTag(SESSION_TITLE_TEST_TAG),
-                semantics = { contentDescription = "Session for ${session.routine?.name ?: "Freestyle"}" },
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GymText(
+                    // ADR-0011's Turn 4 amendment (frame 4c): sentence case, not the uppercase
+                    // ADR-0029 originally drew this in — title.lg carries its own weight (800) and
+                    // tracking for hierarchy, so the string transform is no longer needed for it to
+                    // read as a title. The session's own routine.name is still never mutated.
+                    text = session.routine?.name ?: "Freestyle",
+                    role = GymTextRoles.TitleLg,
+                    modifier = Modifier.testTag(SESSION_TITLE_TEST_TAG),
+                    semantics = { contentDescription = "Session for ${session.routine?.name ?: "Freestyle"}" },
+                )
+                ModeTag(orderIsAPlan = progress?.orderIsAPlan == true)
+            }
             GymText(
                 text = headerMeta(elapsed, progress),
                 role = GymTextRoles.Meta,
@@ -492,6 +513,28 @@ private fun SessionHeader(
             Text("FINISH")
         }
     }
+}
+
+/**
+ * US-54 / ADR-0046: `GUIDED` (accent outline) for a session backed by a routine, `NO PLAN`
+ * (neutral outline) otherwise — the same [orderIsAPlan][com.gymtracker.core.domain.session
+ * .SessionProgress.orderIsAPlan] signal [sessionKicker]'s callers combine with a per-exercise
+ * target. Local to this file rather than promoted to the design system: nothing else in the app
+ * draws this exact "2px-outline caption" shape yet, and a second real consumer is what should
+ * decide its home, not a guess now.
+ */
+@Composable
+private fun ModeTag(orderIsAPlan: Boolean) {
+    val color = if (orderIsAPlan) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    GymText(
+        text = if (orderIsAPlan) "GUIDED" else "NO PLAN",
+        role = GymTextRoles.TagCaps,
+        color = color,
+        modifier =
+            Modifier
+                .border(BorderStroke(GymDimens.DividerThickness, color))
+                .padding(horizontal = GymDimens.TightGap, vertical = GymDimens.HairGap),
+    )
 }
 
 /**

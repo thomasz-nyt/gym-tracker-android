@@ -58,12 +58,14 @@ import java.time.Duration
  * including US-45/ADR-0037's explicit, sticky override for when the machine was taken and a
  * member switches back to an earlier exercise.
  *
- * **"Other exercises" (US-45) is every exercise but the open one, in plan order — earlier or
- * later, touched or not.** It used to be `position > currentRow.position` only, which is
- * exactly the bug ADR-0037 fixes: log a set on exercise 3 and exercises 1–2 had no row, no
+ * **The other-exercises section (US-45) is every exercise but the open one, in plan order —
+ * earlier or later, touched or not.** It used to be `position > currentRow.position` only, which
+ * is exactly the bug ADR-0037 fixes: log a set on exercise 3 and exercises 1–2 had no row, no
  * button, nothing to tap for the rest of the session. Reads plan order back out of [exercises]
  * itself (`sessionExercise.position`) rather than needing a second, separately-ordered list
- * passed in.
+ * passed in. Its own label — "Other exercises" is gone — reads [otherExercisesSectionLabel]
+ * (US-54): `THEN` for a plan-backed session, `ALSO TODAY` otherwise. Which exercises appear here
+ * is unchanged by that rename.
  *
  * "Start exercise" (US-05a) and "Remove" (US-02c) are not in the design's frames — the mockup
  * does not show every control the app already has to keep. They stay, as a quiet text row under
@@ -87,6 +89,7 @@ internal fun SessionPlan(
     openSessionExerciseId: SessionExerciseId?,
     nextLoggableSet: UpNextSet?,
     unit: WeightUnit,
+    orderIsAPlan: Boolean,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
@@ -127,7 +130,7 @@ internal fun SessionPlan(
         if (otherExercises.isNotEmpty()) {
             item(key = "other-exercises-label") {
                 EyebrowLabel(
-                    text = "Other exercises",
+                    text = otherExercisesSectionLabel(orderIsAPlan),
                     // Deliberately muted, not accent — the redesign audit's finding 07 flagged
                     // exactly this shape (a label the same colour as a link) reading as tappable
                     // when it is not.
@@ -248,7 +251,7 @@ private fun CurrentMovement(
             verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
         ) {
             EyebrowLabel(
-                text = "Exercise $exerciseNumber of $movementsTotal",
+                text = sessionKicker(exerciseNumber, movementsTotal, row.sessionExercise.target, row.sets.size),
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
@@ -450,6 +453,27 @@ internal fun EyebrowLabel(
         modifier = modifier,
     )
 }
+
+/**
+ * US-54 / ADR-0046: the open exercise's kicker. A real sets count on the exercise's own
+ * [target][MovementTarget.sets] is what "plan" means here — not
+ * [com.gymtracker.core.domain.session.SessionProgress.orderIsAPlan], which gates the header tag
+ * and section label instead (a plan-backed session's open exercise can still have no target of
+ * its own, and a freestyle session's exercise could in principle carry one — the two signals are
+ * independent, both already real fields on the domain model this pass didn't add).
+ */
+internal fun sessionKicker(
+    exerciseNumber: Int,
+    movementsTotal: Int,
+    target: MovementTarget?,
+    setsLogged: Int,
+): String {
+    val setsPlanned = target?.sets ?: return "CURRENT"
+    return "EXERCISE $exerciseNumber OF $movementsTotal · SET ${setsLogged + 1} OF $setsPlanned"
+}
+
+/** US-54: the other-exercises section label — a rename only, not a filter change (US-45 stands). */
+internal fun otherExercisesSectionLabel(orderIsAPlan: Boolean): String = if (orderIsAPlan) "THEN" else "ALSO TODAY"
 
 /** "Target 3 × 8 · 105 lb" for the current movement, or null when it has no target (US-13). */
 private fun targetLine(
