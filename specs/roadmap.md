@@ -1175,8 +1175,28 @@ session to trigger it) — worth a follow-up on-device check before file `03` is
 not before this sub-piece merges. All four gates green; full instrumented suite unchanged (32
 tests, 5 skipped, 0 failed).
 
-Remaining, not yet built: plan-overrun labelling (`SET 5 · EXTRA`), `Add set`/`Add exercise`'s
-button-chrome-to-`label.caps` change, and the rest band's redraw.
+**A real, pre-existing bug found testing sub-piece 1, fixed the same PR.** `GuidedExerciseScreen.kt`'s
+`"Next: <exercise name>"` button, for a long name, wrapped to two lines inside the fixed-height
+`PrimaryActionButton` and the second line was hard-clipped with no ellipsis — the tail of the
+name silently gone (e.g. "Next: Incline Dumbbell" losing "Bench With Palms Facing In" entirely).
+Not a Turn 5 regression — `ButtonLabel` (`core/designsystem`) never had `maxLines` on this
+overload, so every call site with a long enough string had the same exposure. Fixed with
+`maxLines = 1` / `TextOverflow.Ellipsis`; `PrimaryActionButtonTest` reproduces the exact
+constrained-`Row` shape `GuidedExerciseScreen.kt` uses (a naive full-width repro didn't trigger
+it — width is the whole bug) and confirmed both the break and the fix on-device.
+
+**Sub-piece 2: plan-overrun labelling, landed 2026-08-30.** `sessionKicker` now absorbs a set
+logged past its exercise's own target silently — `SET n · EXTRA`, dropping the exercise-position
+and `OF target` parts, per `00-gate.md` 3.11's exact expected string for "the 5th set of a 4-set
+plan." Pure function, unit-tested (`SessionKickerTest`); not yet screenshotted live on-device —
+reaching this state needs a routine-backed session with a real per-exercise target, which the
+freestyle add-exercise sheet doesn't currently set (targets come from a routine or the guided
+setup dialog), so it wasn't reachable in the time this sub-piece took. Same open item as
+sub-piece 1's: worth a live check before file `03` as a whole is done. All four gates green;
+full instrumented suite unchanged (33 tests, 5 skipped, 0 failed).
+
+Remaining, not yet built: `Add set`/`Add exercise`'s button-chrome-to-`label.caps` change, and
+the rest band's redraw.
 
 **Designed, not built, and needing a user story first:**
 

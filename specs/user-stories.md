@@ -844,9 +844,10 @@ nothing") is unchanged by this story — nothing about what is or isn't recorded
 
 ### US-54 — The session screen says whether it's following a plan
 Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-screen.md`
-(sub-piece 1 of that file — see `adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md`
-for why this is the main session screen's own concept, not a merge with
-`GuidedExerciseScreen.kt`, which this story does not touch).
+(sub-pieces 1 and 2 of that file — see
+`adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md` for why this is the main session
+screen's own concept, not a merge with `GuidedExerciseScreen.kt`, which this story does not
+touch).
 
 - A session backed by a routine (`SessionProgress.orderIsAPlan`) whose open exercise carries a
   set target shows a kicker naming its position in both the plan and the set:
@@ -854,6 +855,9 @@ for why this is the main session screen's own concept, not a merge with
 - The open exercise otherwise shows `CURRENT`, unchanged from a plain position count — this
   covers both a freestyle session and a plan-backed session whose open exercise has no target of
   its own.
+- Logging past the exercise's own planned set count is absorbed silently, not flagged or
+  blocked: the kicker drops the exercise-position and `OF {target}` parts and reads `SET {n} ·
+  EXTRA` instead. The plan is a suggestion; nothing prevents or warns about exceeding it.
 - The section listing every other exercise reads `THEN` when the session is plan-backed, `ALSO
   TODAY` otherwise. Which exercises appear there is unchanged (US-45) — this is a label, not a
   filter.
