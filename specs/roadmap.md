@@ -1078,6 +1078,71 @@ The one entry this heading used to carry as "in progress" — "Finish as a summa
 confirm dialog" (US-31) — shipped in `87e975c` (PR #35) and is already ticked `[x]` in M4 above;
 the heading itself had gone stale rather than the work.
 
+**Turn 5, file `01` (insets and spacing) landed 2026-08-29; the rest of Turn 5 is scoped, not
+built.** `Redesign.dc.html` synced a fifth turn, exported this time as a `handoff/` bundle of
+seven gated files rather than one prose document — `00-gate.md` (the shared legal vocabulary and
+rules) plus `01`–`06`, each its own commit, mapped to frames `5a`–`5h`. File `05` (set
+corrections) is deferred: it is the one file that touches the set DAO, and M2's sync engine
+(ADR-0043) is landing an outbox-enqueue statement in every syncable DAO's write transaction right
+now — writing new set-deletion logic against a DAO shape mid-change risked exactly the collision
+prior redesign turns avoided by touching no table a milestone reads. Files `02`–`04` and `06`
+remain to be built.
+
+See `specs/adr/0044-a-legal-spacing-vocabulary-and-one-inset-consumer.md` and US-52 for what
+shipped: `GymDimens.PrimaryAction` reverts 72dp → 64dp (ADR-0011's Turn 4 amendment, reversed —
+every primary action in the app now shares one floor, not two), `LogRowHeight` is retired as a
+now-redundant token, and a source-tree check (`LegalSpacingLiteralsTest`) enforces the legal
+vertical-spacing/row-height vocabulary `{2, 4, 12, 20, 32, 44, 56, 64, 80}` going forward, scoped
+to `.height(...)`, vertical `Arrangement.spacedBy`, and vertical padding specifically — not
+every `.dp` literal in a feature module, which the gate table's own assertion 1.5 reads more
+broadly than file `01`'s prose states; see the ADR for why the narrower reading was confirmed
+with the maintainer rather than assumed.
+
+**The claimed ~210dp double-inset does not reproduce.** A source grep found no second
+`statusBarsPadding()`/`windowInsetsPadding(statusBars)` call anywhere outside the root
+`Scaffold` in `GymTrackerNavHost` (`LiveHeartRateChip`'s own is a deliberate, named exception,
+US-47). An instrumented measurement against a real session, run on a local Android emulator (not yet
+CI's own), confirmed the real number instead of trusting the grep alone: **49.14dp**, not
+~210dp, and not caused by double-consumed insets at all — `InsetConsumptionTest` traces it to
+the status bar (24dp, consumed exactly once, correctly) plus `SessionHeader`'s own
+`CompactScreenPadding` (20dp) plus ordinary text line-height overhead. Insets are not this
+file's remaining ~9dp problem; the session header's own padding is, and that header belongs to
+file `03` (the session screen rewrite), which file `01` explicitly does not touch. Gate 1.1's
+≤40dp assertion is therefore left honestly open here — 49.14dp measured today, expected to close
+once `03` lands, not claimed done. All four gates green locally
+(`ktlintCheck detekt :core:domain:test testDebugUnitTest :app:lintDebug`);
+`InsetConsumptionTest` was run against the unmodified build first and failed with this same
+49.14dp measurement, confirming it describes the current app, not a hypothetical — CI's own run
+on push is still the authority PR #67's entry above insisted on, and hasn't happened yet for
+this change. **Left `@Ignore`d rather than deleted or loosened**, once file `02` landed and made
+this the one instrumented test in the suite still red: a permanently-failing test in the tree
+would break CI for every PR after it, the exact "red build merged" failure mode this file's own
+Turn 4 entry warns about — `@Ignore("Gate 1.1 open pending Turn 5 file 03 ...")` keeps the gate
+visible in test source (re-enabling it later is a one-line diff) without blocking anything ahead
+of it.
+
+**Turn 5, file `02` (the warm-up becomes a full-screen step) landed 2026-08-29.** See
+`specs/adr/0045-the-warm-up-becomes-a-full-screen-step.md` and US-53. ADR-0021 ("a warm-up timer
+that records nothing") is unchanged — the file's own point 4 (recording elapsed warm-up time on
+the session, showing it in the header) is exactly the change that ADR names as its own trigger
+for a constitution §1 amendment, and the maintainer's call was to build the rest of the file
+without it. The file's "starting a session with a warm-up goes to a warm-up route first" framing
+also doesn't describe how this app's warm-up actually works — ADR-0021 already rejected warm-up
+as a session/routine property, so there is no session-start gate to build; what changed instead
+is what happens when a member taps the existing "Start warm-up" trigger, which now swaps to a
+dedicated full-screen `WarmUpStep` (the same full-screen-replaces-the-route idiom
+`SessionUiState.finish` already uses, not a new `NavHost` destination — ADR-0013's own reasoning
+for why session state comes from Room, not a back stack, argued directly against a pushed route
+here). `SKIP` (header) and `DONE — START LIFTING` (primary) both call the same `onStop` — nothing
+in ADR-0021's data model distinguishes "finished" from "changed my mind." The kicker reads
+`WARM-UP`, not "STEP 1 OF 2" — this build has no cool-down step to count against, and showing one
+would claim a feature that doesn't exist, the same §2.4 honesty reasoning ADR-0021 already
+established for this exact screen. Verified on-device, light and dark, both with and without a
+next exercise in the plan (the `THEN` row) — screenshots taken, not attached to this file, kept
+with the PR. All four gates green locally, plus the full instrumented suite
+(`:app:connectedDebugAndroidTest`, 32 tests, 5 skipped — the pre-existing conditional-feature
+skips plus `InsetConsumptionTest` above — 0 failed) on the same local emulator file `01` used.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason

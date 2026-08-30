@@ -20,11 +20,14 @@ object GymDimens {
     /**
      * A screen's one primary action: full width, and this tall. Sized to be hit without looking.
      *
-     * Raised from ADR-0016's original 64dp to 72dp (redesign audit, "sweaty hands, phone at
-     * arm's length") — see `GymDimensTest`'s pinned-value test, added because `>= MinTouchTarget`
-     * alone let 64dp and 72dp look identical to the suite.
+     * Raised from ADR-0016's original 64dp to 72dp by ADR-0011's Turn 4 amendment ("sweaty
+     * hands, phone at arm's length"), then reverted to 64dp by ADR-0044: Turn 5's legal
+     * row-height set is `{44, 56, 64, 80}`, applied to every primary action app-wide, including
+     * the log button — which had already carried its own 64dp floor as the now-retired
+     * `LogRowHeight` since Turn 4 split it from this token. See `GymDimensTest`'s pinned-value
+     * test.
      */
-    val PrimaryAction = 72.dp
+    val PrimaryAction = 64.dp
 
     val ScreenPadding = 24.dp
     val Gap = 12.dp
@@ -32,6 +35,13 @@ object GymDimens {
 
     /** The one step below [TightGap]: a label and the row directly under it, nothing looser. */
     val HairGap = 4.dp
+
+    /**
+     * Section-to-section space (ADR-0044/ADR-0045, Turn 5 file `01`'s legal vertical-spacing
+     * value): where a 2px rule alone isn't enough to separate two groups. New, not a repoint —
+     * nothing existing read a 32dp gap before Turn 5's warm-up step needed one.
+     */
+    val SectionSpace = 32.dp
 
     /** Catalog thumbnails: big enough to recognise a machine from across the gym floor. */
     val Thumbnail = 72.dp
@@ -136,6 +146,14 @@ object GymDimens {
     val MascotInline = 80.dp
 
     /**
+     * `RepMascot`'s height on the dedicated warm-up step (ADR-0045, Turn 5 file `02`) — bigger
+     * than [MascotInline] since Rep is again the only other thing in the frame (the same
+     * reasoning [MascotHome] uses for Train home), but this screen also carries a countdown and
+     * a primary action [MascotHome] does not share space with, so it stops short of that value.
+     */
+    val MascotWarmUp = 150.dp
+
+    /**
      * ADR-0011's Turn 4 amendment: five tokens for the six screens that pass moves to the new
      * [GymTextRoles] scale, each a **new name**, not [ScreenPadding] or [Thumbnail] repointed —
      * both of those are read by files this pass does not touch, and lowering them in place
@@ -156,13 +174,6 @@ object GymDimens {
 
     /** The `+` button inside [AddExerciseCellWidth] (frame `4a`). */
     val AddExerciseButtonHeight = 44.dp
-
-    /**
-     * The one-tap log button's floor once its eyebrow/detail overload becomes two fixed lines
-     * (frame `4b`/`4c`) rather than a variable-height sentence — [PrimaryAction] (72dp) is
-     * unchanged and still the floor for every single-line primary button elsewhere in the app.
-     */
-    val LogRowHeight = 64.dp
 
     /**
      * The warm-up row, once it stops floating as loose text (frame `4c`).

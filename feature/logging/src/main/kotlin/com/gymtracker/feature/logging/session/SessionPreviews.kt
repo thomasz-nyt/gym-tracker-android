@@ -1,8 +1,12 @@
 package com.gymtracker.feature.logging.session
 
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
 import com.gymtracker.core.designsystem.theme.GymPreviews
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
+import com.gymtracker.core.domain.model.Equipment
+import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
@@ -134,6 +138,49 @@ private fun WarmingUpPreview() {
     GymTrackerTheme {
         LoggingScreen(
             state = SessionUiState(isLoading = false, activeSession = previewSession),
+            onStartWorkout = {},
+            onResolveStale = {},
+            warmUp = WarmUp(elapsed = Duration.ofSeconds(252)),
+        )
+    }
+}
+
+/**
+ * ADR-0045 / `00-gate.md` section 5: the two device configurations every changed composable in
+ * this pass carries beside its existing previews. The longest bundled exercise name stress-tests
+ * the `THEN` row's truncation at the narrowest of the two.
+ */
+@Preview(name = "narrow, worst case", widthDp = 320, fontScale = 1.3f, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "393dp", widthDp = 393, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WarmingUpNextExerciseWorstCasePreview() {
+    GymTrackerTheme {
+        LoggingScreen(
+            state =
+                SessionUiState(
+                    isLoading = false,
+                    activeSession = previewSession,
+                    exercises =
+                        listOf(
+                            SessionExerciseRow(
+                                previewAppearance,
+                                exercise =
+                                    Exercise(
+                                        id = ExerciseId("preview-longest"),
+                                        name = "Barbell Incline Bench Press - Medium Grip",
+                                        aliases = emptyList(),
+                                        primaryMuscles = emptyList(),
+                                        secondaryMuscles = emptyList(),
+                                        equipment = Equipment.BARBELL,
+                                        instructions = emptyList(),
+                                        mediaUrl = null,
+                                        mediaType = null,
+                                        youtubeUrl = null,
+                                        source = "preview",
+                                    ),
+                            ),
+                        ),
+                ),
             onStartWorkout = {},
             onResolveStale = {},
             warmUp = WarmUp(elapsed = Duration.ofSeconds(252)),

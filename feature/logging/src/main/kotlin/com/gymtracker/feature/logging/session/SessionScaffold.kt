@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import com.gymtracker.core.designsystem.component.GymText
@@ -274,6 +275,13 @@ private fun ActiveSession(
     onSelectExercise: (SessionExerciseId) -> Unit,
     warmUp: WarmUp,
 ) {
+    // ADR-0045: the running warm-up is a full-screen step, not content drawn alongside the
+    // session — this branch is the entire reason "no state where both are visible" holds.
+    if (warmUp.elapsed != null) {
+        WarmUpStep(warmUp = warmUp, nextExerciseName = exercises.firstOrNull()?.exercise?.name)
+        return
+    }
+
     var confirmingFinish by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -467,6 +475,7 @@ private fun SessionHeader(
                 // read as a title. The session's own routine.name is still never mutated.
                 text = session.routine?.name ?: "Freestyle",
                 role = GymTextRoles.TitleLg,
+                modifier = Modifier.testTag(SESSION_TITLE_TEST_TAG),
                 semantics = { contentDescription = "Session for ${session.routine?.name ?: "Freestyle"}" },
             )
             GymText(
@@ -577,6 +586,9 @@ private fun SegmentBarSegment(
 
 private const val CURRENT_SEGMENT_ALPHA = 0.55f
 private const val UPCOMING_SEGMENT_ALPHA = 0.2f
+
+/** ADR-0044: lets an instrumented test find the session title without matching its dynamic text. */
+private const val SESSION_TITLE_TEST_TAG = "session-title"
 
 /**
  * "HH:mm", shared by the abandoned-session dialog's explanation
