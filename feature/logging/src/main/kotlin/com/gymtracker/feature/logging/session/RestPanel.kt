@@ -29,7 +29,6 @@ import com.gymtracker.core.designsystem.component.GymLoadRow
 import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.NumeralText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
-import com.gymtracker.core.designsystem.component.RepMascot
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTextRoles
 import com.gymtracker.core.designsystem.theme.GymTrackerTheme
@@ -66,83 +65,39 @@ import java.util.Locale
  * There is nothing to save. Stopping it discards it, which is why the control says "Done"
  * rather than anything that sounds like it writes a row.
  *
- * US-43 / ADR-0035: running, `RepMascot` plays beside "Done" — there is nothing to tap here but
- * "Done" itself, so nothing is competing with it for attention the way a mid-set control would.
- *
- * **Stacked, not a `Row` (`Redesign.dc.html` Turn 3, finding 01 / frame `3a`).** 312dp of usable
- * width; a tabular `18:47` at `displayLarge`'s 104sp is ~230 of it, and the old layout put "Done"
- * and `RepMascot` beside it on the same line — asking "Done" to fit in −14dp. The countdown now
- * owns a full-width line of its own, so no control ever shares its axis and the arithmetic that
- * produced the overflow cannot recur regardless of how wide the number gets. `Done` and Rep sit
- * in a second row beneath a rule, both sized to [GymDimens.StepperTarget] (56dp) — "where 56dp is
- * plenty," per the frame.
+ * **The running state moved to [WarmUpStep], full screen (ADR-0045, Turn 5 file `02`).** This
+ * composable now only ever draws the idle trigger — the countdown, "Done", and `RepMascot` that
+ * used to render inline here (Turn 3, finding 01 / frame `3a`, "stacked, not a `Row`") are
+ * [WarmUpStep]'s problem now, not this one's. [warmUp]'s idle branch is otherwise unchanged.
  */
 @Composable
 internal fun WarmUpPanel(warmUp: WarmUp) {
-    val elapsed = warmUp.elapsed
+    // The running state is drawn full screen by WarmUpStep instead (ADR-0045); a caller that
+    // still reaches this function while a warm-up is running is the one case that shouldn't
+    // happen, so this draws nothing rather than a second copy of a screen already up elsewhere.
+    if (warmUp.elapsed != null) return
 
-    if (elapsed == null) {
-        // ADR-0011's Turn 4 amendment (frame 4c): a 44dp row between 2px rules, replacing the
-        // floating 17sp red sentence this used to be — label.caps in the accent, matching the
-        // "secondary buttons" row this role is named for. The string itself stays exactly
-        // "Start warm-up", sentence case: WarmUpPanelScreenTest matches it literally, the same
-        // tripwire the amendment's "frames vs. this repo's own tripwires" note names.
-        GymDivider()
-        TextButton(
-            onClick = warmUp.onStart,
-            contentPadding = ButtonDefaults.TextButtonContentPadding,
-            modifier = Modifier.fillMaxWidth().height(GymDimens.WarmUpRowHeight),
-        ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                GymText(
-                    text = "Start warm-up",
-                    role = GymTextRoles.LabelCaps,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.CenterStart),
-                )
-            }
-        }
-        GymDivider()
-        return
-    }
-
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
+    // ADR-0011's Turn 4 amendment (frame 4c): a 44dp row between 2px rules, replacing the
+    // floating 17sp red sentence this used to be — label.caps in the accent, matching the
+    // "secondary buttons" row this role is named for. The string itself stays exactly
+    // "Start warm-up", sentence case: WarmUpPanelScreenTest matches it literally, the same
+    // tripwire the amendment's "frames vs. this repo's own tripwires" note names.
+    GymDivider()
+    TextButton(
+        onClick = warmUp.onStart,
+        contentPadding = ButtonDefaults.TextButtonContentPadding,
+        modifier = Modifier.fillMaxWidth().height(GymDimens.WarmUpRowHeight),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(GymDimens.Gap),
-            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-        ) {
-            // ADR-0021's "not recorded" rule used to live only in the contentDescription below;
-            // Turn 3 puts it on screen where it can be read, not just announced.
-            EyebrowLabel(text = "Warm-up · not recorded", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(modifier = Modifier.fillMaxWidth()) {
             GymText(
-                text = elapsed.asMinutesSeconds(),
-                role = GymTextRoles.DisplayTimer,
-                semantics = { contentDescription = "Warm-up ${elapsed.asMinutesSeconds()} elapsed, not recorded" },
+                text = "Start warm-up",
+                role = GymTextRoles.LabelCaps,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.CenterStart),
             )
-            GymDivider()
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedButton(
-                    onClick = warmUp.onStop,
-                    // Shape.kt's own class doc names this exact trap: OutlinedButton's default
-                    // shape is CornerFull, not one of GymShapes's roles, so it stays a pill
-                    // unless a shape is passed explicitly — confirmed on device, not caught by
-                    // any test (nothing here asserts geometry).
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.weight(1f).height(GymDimens.StepperTarget),
-                ) {
-                    Text("Done")
-                }
-                RepMascot(modifier = Modifier.height(GymDimens.StepperTarget))
-            }
         }
     }
+    GymDivider()
 }
 
 /**

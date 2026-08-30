@@ -36,6 +36,13 @@ object GymDimens {
     /** The one step below [TightGap]: a label and the row directly under it, nothing looser. */
     val HairGap = 4.dp
 
+    /**
+     * Section-to-section space (ADR-0044/ADR-0045, Turn 5 file `01`'s legal vertical-spacing
+     * value): where a 2px rule alone isn't enough to separate two groups. New, not a repoint —
+     * nothing existing read a 32dp gap before Turn 5's warm-up step needed one.
+     */
+    val SectionSpace = 32.dp
+
     /** Catalog thumbnails: big enough to recognise a machine from across the gym floor. */
     val Thumbnail = 72.dp
 
@@ -137,6 +144,14 @@ object GymDimens {
      * this value.
      */
     val MascotInline = 80.dp
+
+    /**
+     * `RepMascot`'s height on the dedicated warm-up step (ADR-0045, Turn 5 file `02`) — bigger
+     * than [MascotInline] since Rep is again the only other thing in the frame (the same
+     * reasoning [MascotHome] uses for Train home), but this screen also carries a countdown and
+     * a primary action [MascotHome] does not share space with, so it stops short of that value.
+     */
+    val MascotWarmUp = 150.dp
 
     /**
      * ADR-0011's Turn 4 amendment: five tokens for the six screens that pass moves to the new

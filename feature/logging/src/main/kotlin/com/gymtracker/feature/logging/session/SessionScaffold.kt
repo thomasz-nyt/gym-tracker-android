@@ -275,6 +275,13 @@ private fun ActiveSession(
     onSelectExercise: (SessionExerciseId) -> Unit,
     warmUp: WarmUp,
 ) {
+    // ADR-0045: the running warm-up is a full-screen step, not content drawn alongside the
+    // session — this branch is the entire reason "no state where both are visible" holds.
+    if (warmUp.elapsed != null) {
+        WarmUpStep(warmUp = warmUp, nextExerciseName = exercises.firstOrNull()?.exercise?.name)
+        return
+    }
+
     var confirmingFinish by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
