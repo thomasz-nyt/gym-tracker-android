@@ -875,6 +875,26 @@ touch).
 - No change to what logging a set does, what `nextLoggableSet` computes, or the rest timer.
   `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, and `SwitchingExercisesTest` pass unedited.
 
+### US-55 — The rest band is ink, not a second filled screen
+Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-screen.md`
+(sub-piece 4 of that file — the last of it). See
+`adr/0047-the-rest-band-is-ink-not-a-second-filled-element.md`, which amends ADR-0036.
+
+- Resting shows a compact band — `REST`, the countdown, and `of {total}` — 56dp, directly under
+  the header, not a hero block. Its container is ink at all times; only the countdown's own
+  colour flips to accent for the final ten seconds (ADR-0029 as applied in Turn 3), never the
+  band itself.
+- Because the band is never filled, the log button beneath it stays filled throughout a rest —
+  there is no second surface for it to ever compete with, and no step-back-to-outlined moment
+  left to trigger.
+- `SKIP REST` and `Add set` share one `label.caps` secondary row above the log button — the same
+  shape US-54 already gave the mid-set state's `Add set`/`Add exercise` row.
+- "Up next" — the movement, its target, the comparison to last time — is unchanged: below the
+  band, on bare ground, not inside a coloured block.
+- No change to what logging a set does, when rest ends, or what `RestTimerStore` tracks.
+  `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, `WarmUpPanelScreenTest`, and
+  `SwitchingExercisesTest` pass unedited.
+
 ---
 
 ## M4a — Rep, animated

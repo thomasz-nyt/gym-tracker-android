@@ -1207,7 +1207,34 @@ suite, not assumed from the diff) — the literal-text tripwires this repo relie
 controls render as quiet text, no border, in every state checked. All four gates green; full
 instrumented suite unchanged (33 tests, 5 skipped, 0 failed).
 
-Remaining, not yet built: the rest band's redraw.
+**Sub-piece 4: the rest band's redraw, landed 2026-08-30 — file `03` closes.** File `03`'s third
+sentence on the rest band ("nothing else about it changes") turned out to change a premise
+ADR-0036 was built on: the band's `#2b2827` ground is now permanent, and only the countdown
+numeral's own colour flips to accent for the final ten seconds — never the container, the way
+today's build had it. Confirmed with the maintainer this was the intended reading before writing
+any code, the same as the two prior sub-pieces' real conflicts. `PrimaryActionButton`'s
+`outlined` parameter (ADR-0036's step-back mechanism) is removed as dead code — grep-verified to
+have had exactly one caller, the one this sub-piece deletes — since a band that is never filled
+gives the log button nothing left to step back from. `SKIP REST`, which no file `03` table ever
+placed anywhere, moves into the resting state's own `label.caps × 2` secondary row beside `Add
+set`, confirmed with the maintainer as the same shape sub-piece 3 already gave the mid-set state.
+28sp (the frame's literal countdown size) has no role in this app's ten-role scale; it reads
+`numeral.md` (24sp), the closer of the two existing numeral roles, rather than adding an
+eleventh. See `specs/adr/0047-the-rest-band-is-ink-not-a-second-filled-element.md`.
+
+Verified on-device, light and dark: the compact 56dp band renders correctly under the header,
+the countdown numeral visibly flips to accent in the final ten seconds while the band's own
+background stays ink, `SKIP REST`/`Add set` render as quiet text above a full-width, always-
+filled `LOG SET` button, and a rest ending naturally returns cleanly to the mid-set view. All
+four gates green; full instrumented suite unchanged (33 tests, 5 skipped, 0 failed) — including
+`TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, `WarmUpPanelScreenTest`, and
+`SwitchingExercisesTest`, all of which read a string this sub-piece touched and all of which pass
+unedited.
+
+Both of file `03`'s open items are still open, not resolved by this sub-piece: the plan-backed
+kicker path (`GUIDED` / `EXERCISE n OF total · SET x OF y` / `SET n · EXTRA`) still needs a
+routine-backed session to screenshot live, and file `05` (set corrections — `Remove`'s move to
+long-press, undo, finishing on plan-complete) is still deferred past M2.
 
 **Designed, not built, and needing a user story first:**
 
