@@ -49,6 +49,31 @@ class SessionKickerTest {
     }
 
     @Test
+    fun `logging up to the planned set count stays a normal SET x OF y kicker`() {
+        val target = MovementTarget(sets = 4, reps = 8, weightKg = 47.6)
+        assertEquals(
+            "EXERCISE 1 OF 1 · SET 4 OF 4",
+            sessionKicker(exerciseNumber = 1, movementsTotal = 1, target = target, setsLogged = 3),
+        )
+    }
+
+    @Test
+    fun `going past the planned set count absorbs it silently as SET n EXTRA`() {
+        // 00-gate.md 3.11: "the 5th set of a 4-set plan" reads "SET 5 · EXTRA" — no "EXERCISE n
+        // OF total" prefix, no "OF 4": the plan was a suggestion, not a ceiling, and once past it
+        // the exercise/total position stops being the interesting number.
+        val target = MovementTarget(sets = 4, reps = 8, weightKg = 47.6)
+        assertEquals(
+            "SET 5 · EXTRA",
+            sessionKicker(exerciseNumber = 1, movementsTotal = 1, target = target, setsLogged = 4),
+        )
+        assertEquals(
+            "SET 6 · EXTRA",
+            sessionKicker(exerciseNumber = 1, movementsTotal = 1, target = target, setsLogged = 5),
+        )
+    }
+
+    @Test
     fun `the other-exercises section label reads THEN for a plan-backed session, ALSO TODAY otherwise`() {
         assertEquals("THEN", otherExercisesSectionLabel(orderIsAPlan = true))
         assertEquals("ALSO TODAY", otherExercisesSectionLabel(orderIsAPlan = false))
