@@ -1143,6 +1143,22 @@ with the PR. All four gates green locally, plus the full instrumented suite
 (`:app:connectedDebugAndroidTest`, 32 tests, 5 skipped — the pre-existing conditional-feature
 skips plus `InsetConsumptionTest` above — 0 failed) on the same local emulator file `01` used.
 
+**The rest notification became a surface (2026-08-30).** See US-54 and
+`specs/adr/0046-the-rest-notification-is-a-surface.md`. Driven by a complaint from real use
+rather than by the audit: the notification could not be tapped, and it said nothing. Both are
+now fixed, and ADR-0010's option 2 — the persistent notification it rejected — is **partly**
+adopted: an ongoing, silent notification during the rest, with a countdown Android renders
+itself (`setUsesChronometer` + `setChronometerCountDown`), carrying the movement, the next set,
+`LOG SET` and `SKIP REST`. Still no foreground service, still no new permission; the ADR argues
+why those are separable, since ADR-0010 had treated them as one thing.
+
+It also fixes a promise ADR-0010 made and never kept: **skipping a rest never cancelled the
+alarm.** `RestController.skip()` did not flip the flag the scheduling side effect keyed on, so
+the "cancelled on skip" half of that ADR has been false since it was written. Harmless as a
+stray buzz, not harmless as a countdown left running on a lock screen — which is why it was
+fixed here rather than filed. The fix is structural: `restEndsAt` is now the sole trigger for
+scheduling *and* dismissal, so there is no longer a call site that can forget.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
@@ -1157,9 +1173,12 @@ skips plus `InsetConsumptionTest` above — 0 failed) on the same local emulator
 **Needs the maintainer's call before it can be written:**
 
 - **+30s on the rest timer.** ADR-0016 deferred it explicitly as a US-05 amendment; it is on
-  the redesign's screens but has never been decided.
+  the redesign's screens but has never been decided. **Put to the maintainer again on 2026-08-30
+  while US-54 was being planned, and deliberately left open** — US-54 gives it an obvious home
+  (the notification has a third action slot free) and an obvious home is not a decision.
 - **An audio cue at 0:10 and 0:00.** For earbuds with the phone in a pocket. US-05 promises a
-  notification only, so this is an amendment rather than a bug.
+  notification only, so this is an amendment rather than a bug. Unchanged by US-54, which is a
+  visual surface and makes no sound.
 
 **Deliberately not designed, and staying that way:**
 
