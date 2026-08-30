@@ -468,8 +468,16 @@ internal fun sessionKicker(
     target: MovementTarget?,
     setsLogged: Int,
 ): String {
-    val setsPlanned = target?.sets ?: return "CURRENT"
-    return "EXERCISE $exerciseNumber OF $movementsTotal · SET ${setsLogged + 1} OF $setsPlanned"
+    val setsPlanned = target?.sets
+    val setNumber = setsLogged + 1
+    return when {
+        setsPlanned == null -> "CURRENT"
+        // Absorbed silently (00-gate.md 3.11), not flagged or blocked: the plan was a
+        // suggestion, and once setNumber exceeds it, the exercise/total position stops being
+        // the number worth naming — just which set this is, and that it's past the plan.
+        setNumber > setsPlanned -> "SET $setNumber · EXTRA"
+        else -> "EXERCISE $exerciseNumber OF $movementsTotal · SET $setNumber OF $setsPlanned"
+    }
 }
 
 /** US-54: the other-exercises section label — a rename only, not a filter change (US-45 stands). */
