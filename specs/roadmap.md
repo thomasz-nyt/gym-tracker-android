@@ -1152,6 +1152,14 @@ itself (`setUsesChronometer` + `setChronometerCountDown`), carrying the movement
 `LOG SET` and `SKIP REST`. Still no foreground service, still no new permission; the ADR argues
 why those are separable, since ADR-0010 had treated them as one thing.
 
+**Verified on a device, and two bugs were found that way** — the pattern this file keeps
+recording. A green suite (40 instrumented, 0 failures) had already passed when installing it
+showed a new rest leaving the previous rest's "Rest over" in the shade beside the new countdown,
+each naming a different set; and granting notification permission mid-rest — which is exactly
+when US-05 asks for it, on the member's first ever rest — leaving that rest with no notification
+at all, a regression against the code being replaced. Both fixed and both now covered; see
+ADR-0046 § "Two things only a device said".
+
 It also fixes a promise ADR-0010 made and never kept: **skipping a rest never cancelled the
 alarm.** `RestController.skip()` did not flip the flag the scheduling side effect keyed on, so
 the "cancelled on skip" half of that ADR has been false since it was written. Harmless as a

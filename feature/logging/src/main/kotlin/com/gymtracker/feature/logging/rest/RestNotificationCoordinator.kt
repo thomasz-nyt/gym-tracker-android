@@ -3,7 +3,9 @@ package com.gymtracker.feature.logging.rest
 import com.gymtracker.core.domain.rest.RestTimerStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,21 +33,40 @@ class RestNotificationCoordinator
         private val alarms: RestAlarms,
         private val notifier: RestNotifier,
     ) {
+        private var scope: CoroutineScope? = null
+
         /** @param scope the process-lifetime scope to collect on; never cancelled in the app. */
         fun start(scope: CoroutineScope) {
+            this.scope = scope
             scope.launch {
                 // The first emission is acted on like any other, including when it is null.
                 // That is what clears a countdown left in the shade by a process that was
                 // killed mid-rest — notifications outlive the process that posted them.
-                store.restEndsAt.distinctUntilChanged().collect { endsAt ->
-                    if (endsAt == null) {
-                        alarms.cancel()
-                        notifier.dismissResting()
-                    } else {
-                        alarms.schedule(endsAt)
-                        notifier.showResting(endsAt)
-                    }
-                }
+                store.restEndsAt.distinctUntilChanged().collect(::apply)
+            }
+        }
+
+        /**
+         * Re-applies the running rest without waiting for it to change.
+         *
+         * Because whether we *can* post is not part of `restEndsAt`. Granting notification
+         * permission mid-rest — which is exactly when US-05 asks for it, on the member's very
+         * first rest — leaves that rest with an alarm that was never scheduled and a
+         * notification that was never posted, and nothing about the stored end time changes to
+         * say so. Called when the app resumes, which covers the permission dialog closing and
+         * equally a member turning notifications back on in system Settings.
+         */
+        fun reapply() {
+            scope?.launch { apply(store.restEndsAt.first()) }
+        }
+
+        private suspend fun apply(endsAt: Instant?) {
+            if (endsAt == null) {
+                alarms.cancel()
+                notifier.dismissResting()
+            } else {
+                alarms.schedule(endsAt)
+                notifier.showResting(endsAt)
             }
         }
     }

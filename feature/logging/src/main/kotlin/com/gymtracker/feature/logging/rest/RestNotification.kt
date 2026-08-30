@@ -39,6 +39,13 @@ class RestNotification
         override suspend fun showResting(endsAt: Instant) {
             val notice = describe()
 
+            // The mirror of showRestOver's own dismissal, and found on a device rather than in
+            // a test: without it, starting a rest leaves the *previous* rest's "Rest over" in
+            // the shade, and it is now stale — it names the set that has just been logged while
+            // the countdown beside it names the one after. Two notifications disagreeing about
+            // the same question is worse than either of them alone.
+            dismissRestOver()
+
             post(
                 id = RESTING_ID,
                 notification =

@@ -108,6 +108,37 @@ class RestNotificationCoordinatorTest {
             assertEquals(listOf(now.plusSeconds(45)), alarms.scheduled)
         }
 
+    @Test
+    fun `re-applying re-posts the running rest without waiting for it to change`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val coordinator = RestNotificationCoordinator(store, alarms, notifier)
+            coordinator.start(backgroundScope)
+            store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
+
+            // Standing in for notification permission arriving mid-rest: the stored end time is
+            // unchanged, so nothing in the collection above will fire again on its own.
+            coordinator.reapply()
+
+            assertEquals(
+                listOf(now.plusSeconds(60), now.plusSeconds(60)),
+                notifier.shown,
+                "the rest the member is actually taking gets its notification after the grant",
+            )
+        }
+
+    @Test
+    fun `re-applying with no rest running clears rather than posts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val coordinator = RestNotificationCoordinator(store, alarms, notifier)
+            coordinator.start(backgroundScope)
+            val dismissalsBefore = notifier.dismissed
+
+            coordinator.reapply()
+
+            assertEquals(emptyList(), notifier.shown)
+            assertEquals(dismissalsBefore + 1, notifier.dismissed)
+        }
+
     private class RecordingAlarms : RestAlarms {
         val scheduled = mutableListOf<Instant>()
         var cancelled = 0

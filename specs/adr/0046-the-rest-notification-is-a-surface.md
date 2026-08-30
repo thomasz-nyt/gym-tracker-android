@@ -106,6 +106,28 @@ No new permissions. `USE_EXACT_ALARM` and `POST_NOTIFICATIONS` are already decla
   Suppressing it would mean tracking process lifecycle state to save a redundancy that costs
   nothing, and the lock screen is the case this feature exists for.
 
+## Two things only a device said
+
+Both were found by installing and using this, with a green suite in hand. Recorded because
+neither is obvious from the design, and both would have shipped.
+
+- **A new rest did not clear the previous rest's "Rest over".** The two sat in the shade
+  together, and the older one was by then stale — it named the set that had just been logged
+  while the countdown beside it named the one after. `showRestOver` already dismissed the
+  countdown; the mirror of that was simply missing. Two notifications disagreeing about the same
+  question is worse than either alone.
+- **Granting notification permission mid-rest left that rest with nothing.** US-05 asks for the
+  permission *during* the member's very first rest, and whether we can post is not part of
+  `restEndsAt` — so nothing about the stored end time changes when the answer arrives, and the
+  collection above never fires again. The member's first ever rest got no notification and no
+  buzz. The code this replaced handled it by re-scheduling in the permission callback; the
+  rewrite dropped that, which makes it a regression rather than a gap.
+
+  Fixed with `reapply()`, called from `MainActivity.onResume`, which re-applies the running rest
+  without waiting for it to change. Deliberately not keyed to the permission result: resuming is
+  the more general fact, and it covers a member turning notifications back on in system Settings
+  and coming back just as well.
+
 ## Consequences
 
 - The rest becomes usable without unlocking the phone, which is the actual ergonomic win: the

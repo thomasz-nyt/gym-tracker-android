@@ -215,6 +215,29 @@ class RestNotificationTest {
     }
 
     @Test
+    fun startingARestClearsAStaleRestOver() {
+        runBlocking {
+            notifier.showRestOver()
+            posted(REST_OVER_ID)
+
+            notifier.showResting(Instant.now().plus(Duration.ofSeconds(60)))
+
+            // Found on a device, not here: the two would otherwise sit in the shade together,
+            // the older one naming the set that had just been logged.
+            assertTrue(
+                await {
+                    manager.activeNotifications
+                        .none { n ->
+                            n.id == REST_OVER_ID
+                        }.takeIf { gone -> gone }
+                } == true,
+                "the previous rest's 'Rest over' must not outlive the rest that replaced it",
+            )
+            assertNotNull(awaitOrNull(RESTING_ID), "and the countdown is up")
+        }
+    }
+
+    @Test
     fun dismissingTheRestTakesTheNotificationWithIt() {
         runBlocking {
             notifier.showResting(Instant.now().plus(Duration.ofSeconds(60)))
