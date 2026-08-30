@@ -98,9 +98,10 @@ private fun RestingPreview() {
 }
 
 /**
- * The final ten seconds of a rest (ADR-0036): the countdown block takes the accent fill, and
- * the log button beneath it steps back to outlined — this is the frame where a future edit
- * that lets both go filled at once would look wrong first.
+ * The final ten seconds of a rest (ADR-0047): only the rest band's numeral takes the accent
+ * colour — the band's own container stays ink, and the log button beneath it stays filled
+ * throughout. This is the frame where a future edit that re-fills the band's container would
+ * look wrong first.
  */
 @GymPreviews
 @Composable
