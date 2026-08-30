@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.gymtracker.core.designsystem.theme.GymDimens
@@ -168,6 +169,11 @@ private fun ButtonLabel(
         text = text,
         style = style.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.05.em),
         textAlign = TextAlign.Start,
+        // Reported live: a long label (GuidedExerciseScreen.kt's "Next: <exercise name>", in the
+        // width-constrained Row it shares with "Stop here") wrapped to two lines and the fixed-
+        // height Button clipped the rest with no ellipsis — see PrimaryActionButtonTest.
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth(),
     )
 }
