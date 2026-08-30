@@ -842,6 +842,28 @@ nothing") is unchanged by this story — nothing about what is or isn't recorded
   plan; starting one while one is already running still doesn't reset it; and it still never
   blocks logging a set — `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 
+### US-54 — The session screen says whether it's following a plan
+Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-screen.md`
+(sub-piece 1 of that file — see `adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md`
+for why this is the main session screen's own concept, not a merge with
+`GuidedExerciseScreen.kt`, which this story does not touch).
+
+- A session backed by a routine (`SessionProgress.orderIsAPlan`) whose open exercise carries a
+  set target shows a kicker naming its position in both the plan and the set:
+  `EXERCISE {n} OF {total} · SET {logged + 1} OF {target}`.
+- The open exercise otherwise shows `CURRENT`, unchanged from a plain position count — this
+  covers both a freestyle session and a plan-backed session whose open exercise has no target of
+  its own.
+- The section listing every other exercise reads `THEN` when the session is plan-backed, `ALSO
+  TODAY` otherwise. Which exercises appear there is unchanged (US-45) — this is a label, not a
+  filter.
+- A `GUIDED` or `NO PLAN` tag sits beside the session title, matching the same `orderIsAPlan`
+  signal the kicker and section label read.
+- `Remove` and `Start exercise` are unchanged in position and function — restyled only if this
+  story's own rules require it, not deleted, and not gated behind any other story.
+- No change to what logging a set does, what `nextLoggableSet` computes, or the rest timer.
+  `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, and `SwitchingExercisesTest` pass unedited.
+
 ---
 
 ## M4a — Rep, animated
