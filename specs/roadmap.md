@@ -1114,7 +1114,34 @@ once `03` lands, not claimed done. All four gates green locally
 `InsetConsumptionTest` was run against the unmodified build first and failed with this same
 49.14dp measurement, confirming it describes the current app, not a hypothetical — CI's own run
 on push is still the authority PR #67's entry above insisted on, and hasn't happened yet for
-this change.
+this change. **Left `@Ignore`d rather than deleted or loosened**, once file `02` landed and made
+this the one instrumented test in the suite still red: a permanently-failing test in the tree
+would break CI for every PR after it, the exact "red build merged" failure mode this file's own
+Turn 4 entry warns about — `@Ignore("Gate 1.1 open pending Turn 5 file 03 ...")` keeps the gate
+visible in test source (re-enabling it later is a one-line diff) without blocking anything ahead
+of it.
+
+**Turn 5, file `02` (the warm-up becomes a full-screen step) landed 2026-08-29.** See
+`specs/adr/0045-the-warm-up-becomes-a-full-screen-step.md` and US-53. ADR-0021 ("a warm-up timer
+that records nothing") is unchanged — the file's own point 4 (recording elapsed warm-up time on
+the session, showing it in the header) is exactly the change that ADR names as its own trigger
+for a constitution §1 amendment, and the maintainer's call was to build the rest of the file
+without it. The file's "starting a session with a warm-up goes to a warm-up route first" framing
+also doesn't describe how this app's warm-up actually works — ADR-0021 already rejected warm-up
+as a session/routine property, so there is no session-start gate to build; what changed instead
+is what happens when a member taps the existing "Start warm-up" trigger, which now swaps to a
+dedicated full-screen `WarmUpStep` (the same full-screen-replaces-the-route idiom
+`SessionUiState.finish` already uses, not a new `NavHost` destination — ADR-0013's own reasoning
+for why session state comes from Room, not a back stack, argued directly against a pushed route
+here). `SKIP` (header) and `DONE — START LIFTING` (primary) both call the same `onStop` — nothing
+in ADR-0021's data model distinguishes "finished" from "changed my mind." The kicker reads
+`WARM-UP`, not "STEP 1 OF 2" — this build has no cool-down step to count against, and showing one
+would claim a feature that doesn't exist, the same §2.4 honesty reasoning ADR-0021 already
+established for this exact screen. Verified on-device, light and dark, both with and without a
+next exercise in the plan (the `THEN` row) — screenshots taken, not attached to this file, kept
+with the PR. All four gates green locally, plus the full instrumented suite
+(`:app:connectedDebugAndroidTest`, 32 tests, 5 skipped — the pre-existing conditional-feature
+skips plus `InsetConsumptionTest` above — 0 failed) on the same local emulator file `01` used.
 
 **Designed, not built, and needing a user story first:**
 

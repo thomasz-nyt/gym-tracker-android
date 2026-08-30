@@ -822,6 +822,26 @@ DAO call site, since it is the one Turn 5 file that touches the set DAO.
 - The screen gutter (left and right padding) measures 20dp on the four main screens (Train,
   Exercises, Progress, and a history detail screen).
 
+### US-53 — The warm-up is a step, not a strip
+Added 2026-08-29, from the `Redesign.dc.html` audit's Turn 5, file `02-warmup-step.md`. See
+`adr/0045-the-warm-up-becomes-a-full-screen-step.md`. ADR-0021 ("a warm-up timer that records
+nothing") is unchanged by this story — nothing about what is or isn't recorded moves.
+
+- Starting a warm-up replaces the session screen with a dedicated, full-screen step — a count-up
+  timer and nothing else logging-related. There is no state where the running warm-up and the
+  session's set list, target, or log button are visible together.
+- `SKIP`, in the step's header, and `DONE — START LIFTING`, the step's one primary action, both
+  end the warm-up and return to the session — consistent with ADR-0021, since stopping the timer
+  discards it the same way regardless of which button ends it.
+- The next exercise in the session's plan, if any, is shown on the step under a `THEN` label —
+  informational only; tapping it does nothing, and it is absent (not blank) when the session has
+  no exercises yet.
+- The step never shows a step count ("1 of 2" or similar) — this build has no cool-down step to
+  count against, and showing one would claim a feature that doesn't exist.
+- US-28's constraints are unaffected: the warm-up is still reachable from the session, not from a
+  plan; starting one while one is already running still doesn't reset it; and it still never
+  blocks logging a set — `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
+
 ---
 
 ## M4a — Rep, animated
