@@ -3,9 +3,9 @@ package com.gymtracker.core.domain.rest
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExerciseId
+import com.gymtracker.core.domain.set.FakeSetRepository
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.LogSets
-import com.gymtracker.core.domain.set.FakeSetRepository
 import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.Flow

@@ -14,6 +14,14 @@
         <receiver
             android:name="com.gymtracker.feature.logging.rest.RestOverReceiver"
             android:exported="false" />
+
+        <!--
+          US-54: the notification's LOG SET / SKIP REST buttons. Not exported — the only
+          thing that ever sends to it is our own PendingIntent.
+        -->
+        <receiver
+            android:name="com.gymtracker.feature.logging.rest.RestActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

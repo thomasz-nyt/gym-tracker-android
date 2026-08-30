@@ -2,20 +2,22 @@ package com.gymtracker.feature.logging.rest
 
 import android.Manifest
 import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Schedules the "rest is over" notification (ADR-0010).
@@ -23,14 +25,15 @@ import javax.inject.Inject
  * The alarm is only ever a notification trigger — the timer itself is the end time in
  * DataStore, so a missed or cancelled alarm costs a buzz, never the timer.
  */
+@Singleton
 class RestAlarm
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
-    ) {
+    ) : RestAlarms {
         private val alarms = context.getSystemService(AlarmManager::class.java)
 
-        fun schedule(endsAt: Instant) {
+        override fun schedule(endsAt: Instant) {
             if (!canNotify()) return
 
             // Exact because a rest is 60 seconds; an inexact alarm can land minutes late,
@@ -38,7 +41,7 @@ class RestAlarm
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAt.toEpochMilli(), pendingIntent())
         }
 
-        fun cancel() {
+        override fun cancel() {
             alarms.cancel(pendingIntent())
         }
 
@@ -64,46 +67,28 @@ class RestAlarm
         }
     }
 
-/** Posts the notification when a rest ends. Thin by design; the logic lives in the domain. */
+/**
+ * Posts the notification when a rest ends. Still thin, but no longer empty: what it says comes
+ * from the domain (US-54, ADR-0046), so this only decides *when*.
+ */
+@AndroidEntryPoint
 class RestOverReceiver : BroadcastReceiver() {
+    @Inject
+    lateinit var notifier: RestNotifier
+
     override fun onReceive(
         context: Context,
         intent: Intent?,
     ) {
-        val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return
-
-        val channel =
-            NotificationChannel(CHANNEL_ID, "Rest timer", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Tells you when a rest between sets is over."
+        // Reading the next set out of Room is more than onReceive may do inline, and well
+        // inside what goAsync allows.
+        val pending = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            try {
+                notifier.showRestOver()
+            } finally {
+                pending.finish()
             }
-        manager.createNotificationChannel(channel)
-
-        val notification =
-            NotificationCompat
-                .Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
-                .setContentTitle("Rest over")
-                .setContentText("Time for your next set.")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .build()
-
-        // Checked inline rather than in a helper: lint's data flow does not follow an
-        // extension function, and a suppression here would hide a genuine crash class.
-        val granted =
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            // The catch covers permission being revoked between the check and the post. Losing
-            // the buzz is fine — the timer is the stored end time, so nothing depends on this.
-            runCatching { manager.notify(NOTIFICATION_ID, notification) }
         }
-    }
-
-    private companion object {
-        const val CHANNEL_ID = "rest-timer"
-        const val NOTIFICATION_ID = 1
     }
 }

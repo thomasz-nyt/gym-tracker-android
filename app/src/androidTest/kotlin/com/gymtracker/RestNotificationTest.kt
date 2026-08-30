@@ -184,7 +184,10 @@ class RestNotificationTest {
             val posted = posted(REST_OVER_ID)
             assertEquals(listOf("LOG SET"), posted.actions.orEmpty().map { it.title.toString() })
             assertTrue(
-                posted.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("135 lb × 8"),
+                posted.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains("135 lb × 8"),
                 "it should name the set it is about, in the member's unit",
             )
         }

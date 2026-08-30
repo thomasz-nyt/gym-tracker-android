@@ -117,8 +117,12 @@ No new permissions. `USE_EXACT_ALARM` and `POST_NOTIFICATIONS` are already decla
 - One more thing can be wrong on a lock screen. A stale notification is now a visible bug rather
   than a missing buzz, which raises the cost of getting `restEndsAt` handling wrong — and is
   exactly why that handling collapsed to a single rule.
-- `RestController.restStarted` and `onHandled()` lose their purpose and go. That is a small
-  simplification of a class that existed partly to drive scheduling from the UI.
+- `RestController.restStarted` keeps one job and loses the other. It no longer drives
+  scheduling, but it still gates the one-time permission request — and it has to, because
+  `restEndsAt` is the wrong signal for that: it can go non-null from a notification action while
+  the app is backgrounded, and popping a permission dialog at that moment would be wrong. "A
+  rest started *on this screen*" and "a rest is running" turned out to be genuinely different
+  questions, which was not obvious until the two were separated.
 - **Revisit if** a member reports the ongoing notification as unwanted noise, in which case
   degrading to option 3 (rich content at zero only) is a small change and needs no new mechanism,
   or if Play distribution forces the foreground service after all.

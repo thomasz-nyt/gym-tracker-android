@@ -20,10 +20,8 @@ import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import java.time.Duration
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -46,7 +44,6 @@ class DescribeRestNotificationTest {
     private val sessionExercises = FakeSessionExerciseRepository()
     private val sets = FakeSetRepository()
     private val catalog = FakeExerciseCatalog(listOf(catalogEntry(bench, "Barbell Bench Press")))
-    private val store = FakeRestTimerStore()
     private val unitPreference = FakeUnitPreference()
 
     private val describe =
@@ -56,7 +53,6 @@ class DescribeRestNotificationTest {
             unitPreference = unitPreference,
             determineUpNextSet = DetermineUpNextSet(sessionExercises, sets, PrefillFromLastSet(sets)),
             catalog = catalog,
-            store = store,
         )
 
     @Test
@@ -123,31 +119,6 @@ class DescribeRestNotificationTest {
             assertEquals(2, notice?.setNumber, "the set is still real even when the name is not available")
         }
 
-    @Test
-    fun `the notice carries when the running rest ends, so the countdown has something to count to`() =
-        runTest {
-            startSession()
-            val appearance = appear("se-1", bench)
-            logged(appearance, id = "s1", weightKg = 60.0, reps = 8)
-            store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
-
-            assertEquals(now.plusSeconds(60), describe()?.endsAt)
-        }
-
-    @Test
-    fun `once the rest is over the notice says so rather than reporting a stale end time`() =
-        runTest {
-            startSession()
-            val appearance = appear("se-1", bench)
-            logged(appearance, id = "s1", weightKg = 60.0, reps = 8)
-            store.setRestEndsAt(null)
-
-            val notice = describe()
-
-            assertNull(notice?.endsAt, "no rest running — the caller renders the 'rest over' state")
-            assertEquals(2, notice?.setNumber, "what is next is still worth saying")
-        }
-
     private suspend fun startSession() {
         sessions.startSession(
             WorkoutSession(thisSession, alice, gymName = null, startedAt = now, endedAt = null, metrics = null),
@@ -209,39 +180,6 @@ class DescribeRestNotificationTest {
 
         override suspend fun set(unit: WeightUnit) {
             state.value = unit
-        }
-    }
-
-    private class FakeRestTimerStore : RestTimerStore {
-        private val endsAt = MutableStateFlow<Instant?>(null)
-        private val total = MutableStateFlow<Duration?>(null)
-        private val default = MutableStateFlow(Duration.ofSeconds(60))
-        private val asked = MutableStateFlow(false)
-
-        override val restEndsAt = endsAt
-        override val restTotal = total
-        override val defaultRest = default
-        override val shouldAskForNotificationPermission = asked.map { !it }
-
-        override suspend fun setRestEndsAt(instant: Instant?) {
-            endsAt.value = instant
-            if (instant == null) total.value = null
-        }
-
-        override suspend fun setRest(
-            endsAt: Instant,
-            total: Duration,
-        ) {
-            this.endsAt.value = endsAt
-            this.total.value = total
-        }
-
-        override suspend fun setDefaultRest(rest: Duration) {
-            default.value = rest
-        }
-
-        override suspend fun markNotificationPermissionAsked() {
-            asked.value = true
         }
     }
 }

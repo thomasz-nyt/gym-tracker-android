@@ -1,8 +1,8 @@
 package com.gymtracker.feature.logging.rest
 
 import com.gymtracker.feature.logging.FakeRestTimerStore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.time.Duration
@@ -24,14 +24,16 @@ class RestNotificationCoordinatorTest {
     private val alarms = RecordingAlarms()
     private val notifier = RecordingNotifier()
 
-    private fun coordinate(scope: TestScope) {
+    // `backgroundScope`, because the collection is meant to run for the life of the process
+    // and so never completes on its own — see the class under test.
+    private fun coordinate(scope: CoroutineScope) {
         RestNotificationCoordinator(store, alarms, notifier).start(scope)
     }
 
     @Test
     fun `nothing is scheduled or shown while no rest is running`() =
         runTest(UnconfinedTestDispatcher()) {
-            coordinate(this)
+            coordinate(backgroundScope)
 
             assertEquals(emptyList(), alarms.scheduled)
             assertEquals(emptyList(), notifier.shown)
@@ -40,7 +42,7 @@ class RestNotificationCoordinatorTest {
     @Test
     fun `starting a rest schedules the alarm and shows the countdown`() =
         runTest(UnconfinedTestDispatcher()) {
-            coordinate(this)
+            coordinate(backgroundScope)
 
             store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
 
@@ -51,21 +53,37 @@ class RestNotificationCoordinatorTest {
     @Test
     fun `skipping a rest takes the alarm and the notification with it`() =
         runTest(UnconfinedTestDispatcher()) {
-            coordinate(this)
+            coordinate(backgroundScope)
             store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
 
             // What `RestTimer.skip()` writes. Nothing else is signalled — that is the point:
             // a caller cannot forget to cancel, because cancelling is not a thing callers do.
+            val alarmsBefore = alarms.cancelled
+            val dismissalsBefore = notifier.dismissed
+
             store.setRestEndsAt(null)
 
-            assertEquals(1, alarms.cancelled, "the buzz that was coming is called off")
-            assertEquals(1, notifier.dismissed, "and the countdown does not outlive the rest")
+            assertEquals(alarmsBefore + 1, alarms.cancelled, "the buzz that was coming is called off")
+            assertEquals(dismissalsBefore + 1, notifier.dismissed, "and the countdown does not outlive the rest")
+        }
+
+    @Test
+    fun `a stale notification from a previous process is cleared on startup`() =
+        runTest(UnconfinedTestDispatcher()) {
+            // Notifications outlive the process that posted them, so an app killed mid-rest can
+            // relaunch to find a countdown still sitting in the shade with nothing behind it.
+            // Acting on the *first* value — including a null one — is what clears it, and is why
+            // the collection deliberately does not skip its initial emission.
+            coordinate(backgroundScope)
+
+            assertEquals(1, alarms.cancelled)
+            assertEquals(1, notifier.dismissed)
         }
 
     @Test
     fun `logging the next set retimes rather than stacking a second countdown`() =
         runTest(UnconfinedTestDispatcher()) {
-            coordinate(this)
+            coordinate(backgroundScope)
             store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
 
             store.setRest(now.plusSeconds(120), Duration.ofSeconds(60))
@@ -84,7 +102,7 @@ class RestNotificationCoordinatorTest {
             // coordinator re-derives rather than stranding a notification nobody owns.
             store.setRest(now.plusSeconds(45), Duration.ofSeconds(60))
 
-            coordinate(this)
+            coordinate(backgroundScope)
 
             assertEquals(listOf(now.plusSeconds(45)), notifier.shown)
             assertEquals(listOf(now.plusSeconds(45)), alarms.scheduled)
@@ -116,5 +134,7 @@ class RestNotificationCoordinatorTest {
         }
 
         override suspend fun showRestOver() = error("the alarm's receiver posts this one, not the coordinator")
+
+        override fun dismissRestOver() = error("the alarm's receiver posts this one, not the coordinator")
     }
 }
