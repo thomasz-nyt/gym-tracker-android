@@ -29,12 +29,31 @@ class RestController(
 ) {
     private val started = MutableStateFlow(false)
 
-    /** Flips when a rest begins, so the screen knows to schedule the notification. */
+    /**
+     * Flips when a rest begins *on this screen*, which is the one moment it is appropriate to
+     * ask for notification permission (US-05).
+     *
+     * Deliberately not the same signal as `restEndsAt` going non-null, which the notification
+     * itself follows (ADR-0046). That one also fires when `LOG SET` is tapped from the shade
+     * with the app in the background — a fine moment to post a notification, and a terrible one
+     * to raise a permission dialog.
+     */
     val restStarted: StateFlow<Boolean> = started
 
     /** Starts the rest that follows a logged set. */
     suspend fun startAfterSet() {
         restTimer.start()
+        markStarted()
+    }
+
+    /**
+     * Notes that a rest has begun without starting one.
+     *
+     * For the one-tap path, where `LogUpNextSet` starts the rest itself so the notification's
+     * `LOG SET` gets the same behaviour without a second implementation (US-54). Calling
+     * [startAfterSet] there would re-time the rest that use case has already started.
+     */
+    fun markStarted() {
         started.value = true
     }
 
@@ -52,7 +71,7 @@ class RestController(
         scope.launch { store.markNotificationPermissionAsked() }
     }
 
-    /** Acknowledges that the alarm for this rest has been scheduled. */
+    /** Acknowledges that this rest's permission check has been made. */
     fun onHandled() {
         started.value = false
     }

@@ -895,6 +895,40 @@ Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-s
   `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, `WarmUpPanelScreenTest`, and
   `SwitchingExercisesTest` pass unedited.
 
+### US-56 — The rest notification is a place to work, not a buzz
+Added 2026-08-30. See `adr/0048-the-rest-notification-is-a-surface.md`. This amends US-05, which
+promised a notification "at zero" and got one that says nothing and does nothing. Two complaints
+from real use: the notification cannot be tapped, and everything worth knowing during a rest is
+on a screen you are not looking at.
+
+- While a rest is running, a notification shows a **live countdown**, the movement's name, and
+  the set that is coming with its weight and reps. It is silent and does not pop — a rest starts
+  every 60 seconds and a heads-up each time would be intolerable.
+- **Tapping it opens the app into the running session.** Today it opens nothing at all, which is
+  the bug that started this story.
+- It carries `LOG SET` and `SKIP REST`. `LOG SET` writes exactly the set the in-app one-tap
+  button writes (US-35) and starts the next rest; `SKIP REST` ends the rest. **Neither brings the
+  app to the foreground** — the answer to "did that work?" is the notification updating in place.
+- `LOG SET` is present *during* the rest, not only after it. US-05's "it never blocks logging the
+  next set" is a promise about the rest, not about the screen, and it has to hold in the shade
+  too.
+- At zero the running notification is replaced by the existing high-priority "Rest over", which
+  carries the same set line and the same `LOG SET`.
+- **Skipping a rest removes the notification and the buzz that was coming.** ADR-0010 promised
+  this and it has never been true (see the ADR's own § "What was already broken").
+- Killing the app strands nothing: the countdown keeps rendering, "Rest over" still fires, and
+  reopening re-derives the same state from the stored end time.
+- When nothing has been logged in the session yet there is no set to name, and the notification
+  says what it says today rather than inventing one (constitution §2.4).
+- With notification permission denied, nothing above happens and the in-app countdown is exactly
+  as it is now. US-05's "asked once, never re-prompted" is unchanged.
+- The two-tap and one-tap paths are untouched: `TwoTapSetLoggingTest` and `OneTapSetLoggingTest`
+  pass **unedited**.
+
+**Not decided here.** `+30s` and an audio cue at 0:10/0:00 are both listed in
+`specs/roadmap.md` as needing the maintainer's call, and both stayed open when this story was
+written. The notification has room for a third action; that is not an argument for filling it.
+
 ---
 
 ## M4a — Rep, animated

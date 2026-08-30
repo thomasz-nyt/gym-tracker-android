@@ -64,7 +64,9 @@ import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.progress.PersonalRecordsOf
 import com.gymtracker.core.domain.progress.SessionsWithRecords
 import com.gymtracker.core.domain.progress.WeeklyVolumeByBodyPart
+import com.gymtracker.core.domain.rest.DescribeRestNotification
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
+import com.gymtracker.core.domain.rest.LogUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.routine.AddExerciseToRoutine
@@ -375,6 +377,23 @@ object DataModule {
         sets: SetRepository,
         prefillFromLastSet: PrefillFromLastSet,
     ): DetermineUpNextSet = DetermineUpNextSet(sessionExercises, sets, prefillFromLastSet)
+
+    @Provides
+    fun describeRestNotification(
+        sessions: SessionRepository,
+        currentMember: CurrentMember,
+        unitPreference: UnitPreference,
+        determineUpNextSet: DetermineUpNextSet,
+        catalog: ExerciseCatalog,
+    ): DescribeRestNotification =
+        DescribeRestNotification(sessions, currentMember, unitPreference, determineUpNextSet, catalog)
+
+    @Provides
+    fun logUpNextSet(
+        logSets: LogSets,
+        restTimer: RestTimer,
+        unitPreference: UnitPreference,
+    ): LogUpNextSet = LogUpNextSet(logSets, restTimer, unitPreference)
 
     @Provides
     fun updateSet(sets: SetRepository): UpdateSet = UpdateSet(sets)

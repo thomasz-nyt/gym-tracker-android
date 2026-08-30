@@ -19,6 +19,7 @@ import com.gymtracker.core.domain.progress.DetectPersonalRecord
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.progress.PersonalRecordsAchievedIn
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
+import com.gymtracker.core.domain.rest.LogUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.routine.StartSessionFromRoutine
@@ -39,7 +40,6 @@ import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.set.ResolveSetPrefill
 import com.gymtracker.core.domain.set.RestoreSet
-import com.gymtracker.core.domain.set.SetInput
 import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.set.UpdateSet
@@ -580,6 +580,15 @@ class ActiveSessionViewModel
         }
 
         /**
+         * Built from dependencies this class already holds rather than injected as an eleventh
+         * constructor parameter. The point of sharing it with the notification's `LOG SET` is
+         * that the *logic* lives in one class (US-54); which of two identical instances this
+         * screen uses is not part of that, and a new parameter would have churned ten test
+         * files that have nothing to do with this story.
+         */
+        private val logUpNextSet = LogUpNextSet(logSets, restTimer, unitPreference)
+
+        /**
          * Logs the set the rest panel is offering, without opening the sheet (ADR-0023).
          *
          * One tap, which is under US-03's two-tap ceiling rather than at it. The rest then
@@ -589,20 +598,12 @@ class ActiveSessionViewModel
          */
         fun onLogNextSet(next: UpNextSet) {
             viewModelScope.launch {
-                val logged =
-                    logSets(
-                        sessionExerciseId = next.sessionExerciseId,
-                        input =
-                            SetInput(
-                                weight = next.prefill.weight,
-                                unit = unitPreference.current(),
-                                reps = next.prefill.reps,
-                                rpe = null,
-                            ),
-                        sets = 1,
-                    )
-                rest.startAfterSet()
-                justSetRecord.value = detectPersonalRecord(logged.first(), next.exerciseId, currentMember.id())
+                // The write and the rest that follows it are `LogUpNextSet`'s, shared with the
+                // notification's own LOG SET so the two cannot drift (US-54). What stays here
+                // is the part that is genuinely this screen's: the record banner.
+                val logged = logUpNextSet(next)
+                rest.markStarted()
+                justSetRecord.value = detectPersonalRecord(logged, next.exerciseId, currentMember.id())
             }
         }
 

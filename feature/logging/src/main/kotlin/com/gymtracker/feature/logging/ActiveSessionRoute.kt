@@ -11,10 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.domain.model.ExerciseId
@@ -24,7 +21,6 @@ import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.StaleSessionPrompt
-import com.gymtracker.feature.logging.rest.RestAlarm
 import com.gymtracker.feature.logging.session.SessionBody
 import com.gymtracker.feature.logging.session.SessionDialogs
 import kotlinx.coroutines.launch
@@ -68,7 +64,7 @@ fun LoggingRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val warmUpElapsed by warmUpViewModel.elapsed.collectAsStateWithLifecycle()
     val nextRoutine by trainHomeViewModel.nextRoutine.collectAsStateWithLifecycle()
-    RestNotifications(viewModel)
+    RestNotificationPermission(viewModel)
 
     // Re-ranked whenever NoSession is what's on screen (US-36) — after finishing a workout, or
     // after a visit to Routines that might have added, deleted or renamed one. Firing on every
@@ -375,31 +371,27 @@ private fun SessionScreen(
 }
 
 /**
- * Schedules the rest notification and asks for permission once (US-05, ADR-0010).
+ * Asks for notification permission, once, the first time a rest starts (US-05, ADR-0010).
  *
- * The alarm is a side effect of a rest starting, not part of the timer: the timer is the
- * stored end time, so if this never runs the countdown on screen is still correct.
+ * All that is left here. Scheduling the alarm and posting the notification used to be a side
+ * effect of this composable too, and that was the bug: a rest outlives the screen that started
+ * it, and skipping one never reached `alarm.cancel()`. Both now follow the stored end time
+ * instead — see `RestNotificationCoordinator`.
+ *
+ * The permission request stays because it genuinely cannot move: it needs an Activity.
  */
 @Composable
-private fun RestNotifications(viewModel: ActiveSessionViewModel) {
-    val context = LocalContext.current
-    val alarm = remember(context) { RestAlarm(context) }
+private fun RestNotificationPermission(viewModel: ActiveSessionViewModel) {
     val restStarted by viewModel.rest.restStarted.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-
     val requestPermission =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            // Scheduled here, not before launching: RestAlarm checks the permission, so
-            // scheduling while the dialog is still open silently does nothing. Found on a
-            // device — the countdown looked right and no notification ever arrived.
-            scope.launch {
-                viewModel.rest.endsAt()?.let(alarm::schedule)
-                viewModel.rest.onHandled()
-            }
+            // Whatever the member answers, the rest is already stored, so the coordinator has
+            // already tried to post. On a grant it will post the next one; nothing to do here.
         }
 
     LaunchedEffect(restStarted) {
         if (!restStarted) return@LaunchedEffect
+        viewModel.rest.onHandled()
 
         val mustAsk =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -409,9 +401,6 @@ private fun RestNotifications(viewModel: ActiveSessionViewModel) {
             // Once, ever (US-05). Denial is fine — the countdown still runs on screen.
             viewModel.rest.onNotificationPermissionAsked()
             requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            viewModel.rest.endsAt()?.let(alarm::schedule) ?: alarm.cancel()
-            viewModel.rest.onHandled()
         }
     }
 }

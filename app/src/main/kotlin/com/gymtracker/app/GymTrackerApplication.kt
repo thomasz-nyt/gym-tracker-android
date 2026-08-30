@@ -3,6 +3,7 @@ package com.gymtracker.app
 import android.app.Application
 import android.util.Log
 import com.gymtracker.core.data.exercise.CatalogSeeder
+import com.gymtracker.feature.logging.rest.RestNotificationCoordinator
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,11 +17,17 @@ class GymTrackerApplication : Application() {
     @Inject
     lateinit var catalogSeeder: CatalogSeeder
 
+    @Inject
+    lateinit var restNotifications: RestNotificationCoordinator
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         seedCatalog()
+        // Process-scoped on purpose: a rest outlives the screen that started it, and after a
+        // process kill this re-reads the stored end time and converges (US-54, ADR-0046).
+        restNotifications.start(scope)
     }
 
     /**
