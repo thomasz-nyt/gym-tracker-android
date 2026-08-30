@@ -1195,8 +1195,19 @@ setup dialog), so it wasn't reachable in the time this sub-piece took. Same open
 sub-piece 1's: worth a live check before file `03` as a whole is done. All four gates green;
 full instrumented suite unchanged (33 tests, 5 skipped, 0 failed).
 
-Remaining, not yet built: `Add set`/`Add exercise`'s button-chrome-to-`label.caps` change, and
-the rest band's redraw.
+**Sub-piece 3: `Add set`/`Add exercise` drop their button chrome, landed 2026-08-30.** Both move
+from `OutlinedButton` to plain `label.caps` text — `Start warm-up`'s exact idiom. Kept in place
+rather than merged into one shared row above the primary, per the maintainer's call: file `03`'s
+own frame draws them combined, but that row only exists in the normal mid-set view, and merging
+would have made `Add exercise` unreachable during rest or with zero exercises — a real narrowing
+neither the frame nor the maintainer asked for. `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`,
+`SwitchingExercisesTest` all pass unedited (confirmed by running them explicitly before the full
+suite, not assumed from the diff) — the literal-text tripwires this repo relies on
+(`GymTextRoles.LabelCaps` carries no forced-uppercase transform) held. Verified on-device: both
+controls render as quiet text, no border, in every state checked. All four gates green; full
+instrumented suite unchanged (33 tests, 5 skipped, 0 failed).
+
+Remaining, not yet built: the rest band's redraw.
 
 **Designed, not built, and needing a user story first:**
 

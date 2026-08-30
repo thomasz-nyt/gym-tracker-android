@@ -844,7 +844,7 @@ nothing") is unchanged by this story — nothing about what is or isn't recorded
 
 ### US-54 — The session screen says whether it's following a plan
 Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-screen.md`
-(sub-pieces 1 and 2 of that file — see
+(sub-pieces 1, 2 and 3 of that file — see
 `adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md` for why this is the main session
 screen's own concept, not a merge with `GuidedExerciseScreen.kt`, which this story does not
 touch).
@@ -863,8 +863,15 @@ touch).
   filter.
 - A `GUIDED` or `NO PLAN` tag sits beside the session title, matching the same `orderIsAPlan`
   signal the kicker and section label read.
-- `Remove` and `Start exercise` are unchanged in position and function — restyled only if this
-  story's own rules require it, not deleted, and not gated behind any other story.
+- `Remove` and `Start exercise` are unchanged in position, function, *and* style — this story
+  does not reach them.
+- `Add set` (beside the one-tap log button) and `Add exercise` (its own row, every session
+  state) drop their outlined-button chrome for plain `label.caps` text — the same quiet-text
+  idiom `Start warm-up` already uses. Both stay exactly where and when they already were: `Add
+  set` beside the primary, `Add exercise` its own always-reachable row, not merged into one
+  shared row above the primary the way the design's own frame draws it — merging would have
+  made `Add exercise` unreachable during rest or with zero exercises, which the maintainer's
+  call was to avoid rather than accept as a narrowing.
 - No change to what logging a set does, what `nextLoggableSet` computes, or the rest timer.
   `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, and `SwitchingExercisesTest` pass unedited.
 
