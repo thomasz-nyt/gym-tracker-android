@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -175,12 +174,17 @@ internal fun SessionPlan(
  * brand-new exercise with no history and no target has nothing sensible to write without
  * opening the sheet first, so only the sheet-opening button shows in that case.
  *
- * **The secondary button reads "Add set", not the design's "ADJUST".** It is the exact same
+ * **The secondary control reads "Add set", not the design's "ADJUST".** It is the exact same
  * control `Add set` always was — same callback, same sheet, same "Save set" confirm — and
  * `TwoTapSetLoggingTest` matches `onNodeWithText("Add set")` literally. Renaming the label
  * without renaming what it does would be exactly the kind of change CLAUDE.md and the roadmap
  * both call out: "if this test needs editing, the redesign went wrong." It does not need
- * editing, because the control it depends on kept its name.
+ * editing, because the control it depends on kept its name — [GymTextRoles.LabelCaps] carries no
+ * forced-uppercase transform (confirmed against [GymText]'s own implementation, the same way
+ * "Start warm-up" stayed sentence-case through its own restyle), so this can move from an
+ * `OutlinedButton`'s chrome to plain [GymTextRoles.LabelCaps] text (US-54, file `03` §3 — the
+ * button-chrome deletion applies here, kept beside the primary rather than moved into a shared
+ * row, per the maintainer's call to restyle Add set/Add exercise in place without merging them).
  */
 @Composable
 private fun BottomLogBar(
@@ -199,12 +203,11 @@ private fun BottomLogBar(
                 onClick = { onLogNextSet(nextLoggableSet) },
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(
+            TextButton(
                 onClick = { onAddSet(currentRow) },
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
+                modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.MinTouchTarget),
             ) {
-                Text("Add set")
+                GymText(text = "Add set", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
             }
         } else {
             PrimaryActionButton(

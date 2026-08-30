@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -436,21 +438,34 @@ private fun MidSetBody(
 
 /**
  * Not in the design's frames (a routine already sets up the plan; "Add exercise" is for the
- * freestyle case, or adding an extra movement mid-workout) — kept as a quiet outlined control
- * rather than the screen's one filled action, which the log button is now (ADR-0029).
+ * freestyle case, or adding an extra movement mid-workout) — kept as a quiet control rather than
+ * the screen's one filled action, which the log button is now (ADR-0029).
+ *
+ * **Button chrome dropped for plain `label.caps` text (US-54, file `03` §3)**, same idiom
+ * [WarmUpPanel]'s idle "Start warm-up" already uses. Unchanged in position and always-reachable
+ * behaviour — still its own row, still shown in every session state including empty and resting
+ * — per the maintainer's call to restyle in place rather than merge into `BottomLogBar`'s
+ * secondary row, which would have made this unreachable during rest or with zero exercises.
  */
 @Composable
 private fun AddExerciseButton(onClick: () -> Unit) {
-    OutlinedButton(
+    TextButton(
         onClick = onClick,
-        shape = MaterialTheme.shapes.large,
+        contentPadding = ButtonDefaults.TextButtonContentPadding,
         modifier =
             Modifier
                 .fillMaxWidth()
                 .sizeIn(minHeight = GymDimens.MinTouchTarget)
                 .padding(horizontal = GymDimens.ScreenPadding, vertical = GymDimens.TightGap),
     ) {
-        Text("Add exercise")
+        Box(modifier = Modifier.fillMaxWidth()) {
+            GymText(
+                text = "Add exercise",
+                role = GymTextRoles.LabelCaps,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.CenterStart),
+            )
+        }
     }
 }
 
