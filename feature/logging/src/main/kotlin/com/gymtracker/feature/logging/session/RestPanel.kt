@@ -5,22 +5,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -101,39 +97,38 @@ internal fun WarmUpPanel(warmUp: WarmUp) {
 }
 
 /**
- * Resting, as ADR-0036 redraws ADR-0029's frame: the countdown block is ink while resting is
- * calm and takes the accent fill only for the final ten seconds, and "Up next" — the movement,
- * its target, and the comparison to last time — sits below it on the bare ground, not inside the
- * coloured block. The log button beneath both stays live and says "DON'T WAIT" (ADR-0023's rule,
- * restated for the new copy): resting never blocks logging; ADR-0036 additionally steps its fill
- * back to outlined for the same ten seconds the countdown block itself is filled, so the two are
- * never both accent-filled together.
+ * Resting, as ADR-0047 redraws ADR-0036's frame: the rest band is ink at all times — only the
+ * countdown numeral's own colour flips to accent for the final ten seconds, never the band's
+ * container — and "Up next" — the movement, its target, and the comparison to last time — sits
+ * below it on the bare ground, not inside a coloured block. `SKIP REST` and `Add set` share one
+ * `label.caps` secondary row above the log button, the same shape sub-piece 3 (US-54) already
+ * gave the mid-set state's `Add set`/`Add exercise` row. The log button beneath both stays live
+ * (ADR-0023: resting never blocks logging) and, since the band is never filled, always stays
+ * filled itself — there is no swap left to make.
  *
  * **The design's `+30s` and its audio-cue label ("CUE AT 0:10 & 0:00") are both left out**, a
- * second time — confirmed again when ADR-0036 was written. `RestTimer.extend()` does not exist
- * yet, and a button that visibly does nothing is worse than an absent one — as is a label
- * promising a sound the phone never makes. Both arrive together with the use case that backs
- * them, rather than as chrome drawn ahead of its behaviour. The countdown block's own colour
- * flip at 0:10 is kept: it costs nothing undelivered and is itself the cue.
+ * second time — confirmed again when ADR-0036 was written, unrevisited by ADR-0047.
+ * `RestTimer.extend()` does not exist yet, and a button that visibly does nothing is worse than
+ * an absent one — as is a label promising a sound the phone never makes. Both arrive together
+ * with the use case that backs them, rather than as chrome drawn ahead of its behaviour. The
+ * countdown numeral's own colour flip at 0:10 is kept: it costs nothing undelivered and is
+ * itself the cue.
  *
  * [total] is nullable rather than required because it is a display refinement, not a
  * precondition (ADR-0029/US-29): a member on this exact screen the moment the app is upgraded
  * has a rest already running with no total on record (`RestTimerStore`'s pinned-total migration
  * is additive, so an in-flight rest predates the field entirely). The countdown number itself
- * never depended on it and still renders; only the bar and the `"of {total}"` readout are
- * skipped, rather than drawing them against a guessed total.
+ * never depended on it and still renders; only the `"of {total}"` readout is skipped, rather
+ * than drawing it against a guessed total.
  *
- * **[justSetRecord] (US-18) adds a banner above the countdown, rather than replacing it** the
- * way `Redesign.dc.html`'s `2a PR moment` frame does — that frame drops the countdown to an
- * unfilled block so only one accent-filled surface is on screen, matching ADR-0029's "exactly
- * one filled element" rule. `PrimaryActionButton`'s `outlined` parameter (ADR-0036) is now the
- * exact "countdown block built two ways" mechanism that swap needs, but the swap itself stays
- * out of scope here: with the countdown no longer accent-filled outside the final ten seconds,
- * the two-filled-surfaces problem the PR banner posed has mostly dissolved on its own, and a
- * member's own history says this fires rarely regardless. The frame's "Beats 95 lb from Sat 26
- * Jul" comparison line is left out entirely: [PersonalRecord] carries the new best, not the one
- * it beat, and manufacturing that number here would be inventing a comparison nobody computed
- * (constitution §2.4) rather than reading one back.
+ * **[justSetRecord] (US-18) adds a banner above the band, rather than replacing it** the way
+ * `Redesign.dc.html`'s `2a PR moment` frame does. ADR-0047 makes that frame's own reasoning
+ * (drop the countdown to unfilled so only one accent surface is on screen) moot here — the band
+ * is never filled outside its own numeral now, so there is no second filled surface to avoid in
+ * the first place. The frame's "Beats 95 lb from Sat 26 Jul" comparison line stays left out:
+ * [PersonalRecord] carries the new best, not the one it beat, and manufacturing that number here
+ * would be inventing a comparison nobody computed (constitution §2.4) rather than reading one
+ * back.
  */
 @Composable
 internal fun RestingBody(
@@ -163,7 +158,7 @@ internal fun RestingBody(
             )
         }
 
-        RestCountdownBanner(remaining = remaining, total = total, onSkipRest = onSkipRest)
+        RestBand(remaining = remaining, total = total)
 
         if (upNext != null) {
             // A display refinement, not a promise: read back from the SessionExercise's own
@@ -184,40 +179,44 @@ internal fun RestingBody(
                 modifier = Modifier.padding(GymDimens.CompactScreenPadding).weight(1f, fill = false),
             )
 
-            // Deliberately *not* wrapped in Modifier.verticalScroll to give performScrollTo() a
-            // scrollable ancestor — SessionMovements.kt's BottomLogBar tried exactly that and
-            // it made Compose's test idling hang instead of the throw it was meant to avoid,
-            // for as long as the caller's own timeout. No test currently targets this row, but
-            // if one needs to, the proven fix is putting it inside a real LazyColumn (as
-            // SessionPlan's log bar is now), not a bare verticalScroll on an already-fitting Row.
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
-                modifier = Modifier.padding(horizontal = GymDimens.CompactScreenPadding, vertical = GymDimens.Gap),
-            ) {
-                PrimaryActionButton(
-                    // "— DON'T WAIT" is cut (ADR-0011's Turn 4 amendment, frame 4c): it was the
-                    // longest string on the screen, and the value line beneath already says
-                    // what tapping it will do — ADR-0023's "resting never blocks logging" rule
-                    // is unchanged, it just no longer needs restating in the button's own label.
-                    eyebrow = "LOG SET ${upNext.setNumber}",
-                    detail = logButtonDetail(upNext, unit),
-                    onClick = onLogNext,
-                    // ADR-0036: steps back to outlined for exactly the seconds the countdown
-                    // block above is itself accent-filled, so the two are never both filled.
-                    outlined = remaining <= FINAL_STRETCH,
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedButton(
-                    onClick = onAdjust,
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
-                ) {
-                    // "Add set", not the design's "ADJUST" — see SessionScaffold.kt's
-                    // BottomLogBar for why: this opens the exact sheet that label already names,
-                    // and TwoTapSetLoggingTest matches that string literally.
-                    Text("Add set")
-                }
-            }
+            RestSecondaryRow(onSkipRest = onSkipRest, onAdjust = onAdjust)
+
+            // "— DON'T WAIT" is cut (ADR-0011's Turn 4 amendment, frame 4c): it was the longest
+            // string on the screen, and the value line beneath already says what tapping it will
+            // do — ADR-0023's "resting never blocks logging" rule is unchanged, it just no
+            // longer needs restating in the button's own label.
+            PrimaryActionButton(
+                eyebrow = "LOG SET ${upNext.setNumber}",
+                detail = logButtonDetail(upNext, unit),
+                onClick = onLogNext,
+                modifier =
+                    Modifier.padding(horizontal = GymDimens.CompactScreenPadding, vertical = GymDimens.Gap),
+            )
+        }
+    }
+}
+
+/**
+ * `SKIP REST` and `Add set` (ADR-0047): the resting state's own `label.caps × 2` secondary row,
+ * the same shape sub-piece 3 (US-54) already gave `BottomLogBar`'s mid-set
+ * `Add set`/`Add exercise`. `Add set`, not the design's "ADJUST" — see `SessionScaffold.kt`'s
+ * `BottomLogBar` for why: this opens the exact sheet that label already names, and
+ * `TwoTapSetLoggingTest` matches both strings literally.
+ */
+@Composable
+private fun RestSecondaryRow(
+    onSkipRest: () -> Unit,
+    onAdjust: () -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap),
+        modifier = Modifier.padding(horizontal = GymDimens.CompactScreenPadding, vertical = GymDimens.TightGap),
+    ) {
+        TextButton(onClick = onSkipRest, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+            GymText(text = "SKIP REST", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
+        }
+        TextButton(onClick = onAdjust, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+            GymText(text = "Add set", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -257,124 +256,59 @@ private fun PersonalRecordBanner(
 }
 
 /**
- * The countdown block (ADR-0036): ink while resting is calm, and red only for the final ten
- * seconds — the one moment the countdown, not the log button, is the thing to notice. Never
- * both filled at once; [RestingBody] steps the log button back to outlined for exactly the
- * seconds this block is accent-filled, so "exactly one filled element" (ADR-0029) holds through
- * the swap, not just around it.
+ * The rest band (ADR-0047, amending ADR-0036): ink at all times — `inverseSurface`, never a
+ * second filled element competing with the log button — and 56dp, not a hero block. Only the
+ * countdown numeral's own colour flips to accent for the final ten seconds; the band's container
+ * never does. `label.caps` "REST", `numeral.md` (24sp, the closer of this app's two numeral
+ * roles to the design's literal 28sp — see the ADR for why a new role wasn't added for one call
+ * site), and a muted `"of {total}"` meta, all on one baseline row.
  *
- * [total] stays nullable through to here — see [RestingBody]'s doc for why — and the bar plus
- * the `"of {total}"` readout are both skipped together when it is absent, rather than one
- * rendering against a total the other does not have.
+ * [total] stays nullable — see [RestingBody]'s doc for why — and the `"of {total}"` readout is
+ * skipped when it is absent, rather than rendering against a guessed total.
  */
 @Composable
-private fun RestCountdownBanner(
+private fun RestBand(
     remaining: Duration,
     total: Duration?,
-    onSkipRest: () -> Unit,
 ) {
     val urgent = remaining <= FINAL_STRETCH
-    val containerColor =
-        if (urgent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.inverseSurface
-    val contentColor =
-        if (urgent) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.inverseOnSurface
+    val containerColor = MaterialTheme.colorScheme.inverseSurface
+    val contentColor = MaterialTheme.colorScheme.inverseOnSurface
+    val numeralColor = if (urgent) MaterialTheme.colorScheme.primary else contentColor
 
-    Surface(
-        color = containerColor,
-        contentColor = contentColor,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(GymDimens.CompactScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
-        ) {
-            EyebrowLabel(text = "Rest", color = contentColor)
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-                GymText(
-                    text = remaining.asMinutesSeconds(),
-                    role = GymTextRoles.DisplayTimer,
-                    color = contentColor,
-                    semantics = { contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining" },
-                )
-                if (total != null) {
-                    GymText(
-                        text = "of ${total.asMinutesSeconds()}",
-                        role = GymTextRoles.Meta,
-                        color = contentColor.copy(alpha = MUTED_ALPHA),
-                    )
-                }
-            }
-            if (total != null) {
-                RestProgressBar(
-                    remaining = remaining,
-                    total = total,
-                    fillColor = contentColor,
-                    trackColor = contentColor.copy(alpha = REST_BAR_TRACK_ALPHA),
-                )
-            }
-            OutlinedButton(
-                onClick = onSkipRest,
-                shape = MaterialTheme.shapes.large,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
-                modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.StepperTarget),
-            ) {
-                Text("SKIP REST")
-            }
-        }
-    }
-}
-
-/**
- * How much rest is left, as a shrinking bar — the same track-and-fill shape
- * `WeeklyVolumeScreen`'s `VolumeBar` already uses. [fillColor] and [trackColor] are the block's
- * own content colour at two alphas (ADR-0036), the same two-weight idiom [GymDivider]'s
- * ink/outlineVariant pairing already uses elsewhere on this screen, chosen so the bar reads
- * correctly in both the calm and urgent states without a colour of its own to keep in sync with
- * the swap above.
- *
- * Carries no semantics: the countdown number immediately above already announces "Rest N
- * remaining," and a bar repeating that as a percentage would be noise, not a second fact.
- */
-@Composable
-private fun RestProgressBar(
-    remaining: Duration,
-    total: Duration,
-    fillColor: Color,
-    trackColor: Color,
-) {
+    GymDivider()
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(GymDimens.VolumeBarHeight)
-                .background(trackColor)
-                .clearAndSetSemantics {},
+                .height(GymDimens.StepperTarget)
+                .background(containerColor)
+                .padding(horizontal = GymDimens.CompactScreenPadding),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth(remaining.fractionOf(total))
-                    .fillMaxHeight()
-                    .background(fillColor),
+        GymText(text = "REST", role = GymTextRoles.LabelCaps, color = contentColor)
+        GymText(
+            text = remaining.asMinutesSeconds(),
+            role = GymTextRoles.NumeralMd,
+            color = numeralColor,
+            semantics = { contentDescription = "Rest ${remaining.asMinutesSeconds()} remaining" },
         )
+        if (total != null) {
+            GymText(
+                text = "of ${total.asMinutesSeconds()}",
+                role = GymTextRoles.Meta,
+                color = contentColor.copy(alpha = MUTED_ALPHA),
+            )
+        }
     }
+    GymDivider()
 }
 
-/** Never negative, never past full — a rest just started or one mid-tick beyond `total` alike. */
-private fun Duration.fractionOf(total: Duration): Float =
-    if (total.isZero || total.isNegative) {
-        0f
-    } else {
-        (seconds.toFloat() / total.seconds.toFloat()).coerceIn(0f, 1f)
-    }
-
-/** ADR-0036: the countdown block flips to accent-filled for the last ten seconds of a rest. */
+/** ADR-0047: the rest band's numeral flips to accent for the last ten seconds of a rest. */
 private const val FINAL_STRETCH_SECONDS = 10L
 private val FINAL_STRETCH: Duration = Duration.ofSeconds(FINAL_STRETCH_SECONDS)
 private const val MUTED_ALPHA = 0.6f
-
-/** Faint enough that the giant countdown number stays the loudest thing on the surface. */
-private const val REST_BAR_TRACK_ALPHA = 0.3f
 
 /**
  * What the next set will be, and what the same movement was last time (ADR-0023, ADR-0029).

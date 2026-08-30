@@ -842,8 +842,61 @@ nothing") is unchanged by this story — nothing about what is or isn't recorded
   plan; starting one while one is already running still doesn't reset it; and it still never
   blocks logging a set — `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 
-### US-54 — The rest notification is a place to work, not a buzz
-Added 2026-08-30. See `adr/0046-the-rest-notification-is-a-surface.md`. This amends US-05, which
+### US-54 — The session screen says whether it's following a plan
+Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-screen.md`
+(sub-pieces 1, 2 and 3 of that file — see
+`adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md` for why this is the main session
+screen's own concept, not a merge with `GuidedExerciseScreen.kt`, which this story does not
+touch).
+
+- A session backed by a routine (`SessionProgress.orderIsAPlan`) whose open exercise carries a
+  set target shows a kicker naming its position in both the plan and the set:
+  `EXERCISE {n} OF {total} · SET {logged + 1} OF {target}`.
+- The open exercise otherwise shows `CURRENT`, unchanged from a plain position count — this
+  covers both a freestyle session and a plan-backed session whose open exercise has no target of
+  its own.
+- Logging past the exercise's own planned set count is absorbed silently, not flagged or
+  blocked: the kicker drops the exercise-position and `OF {target}` parts and reads `SET {n} ·
+  EXTRA` instead. The plan is a suggestion; nothing prevents or warns about exceeding it.
+- The section listing every other exercise reads `THEN` when the session is plan-backed, `ALSO
+  TODAY` otherwise. Which exercises appear there is unchanged (US-45) — this is a label, not a
+  filter.
+- A `GUIDED` or `NO PLAN` tag sits beside the session title, matching the same `orderIsAPlan`
+  signal the kicker and section label read.
+- `Remove` and `Start exercise` are unchanged in position, function, *and* style — this story
+  does not reach them.
+- `Add set` (beside the one-tap log button) and `Add exercise` (its own row, every session
+  state) drop their outlined-button chrome for plain `label.caps` text — the same quiet-text
+  idiom `Start warm-up` already uses. Both stay exactly where and when they already were: `Add
+  set` beside the primary, `Add exercise` its own always-reachable row, not merged into one
+  shared row above the primary the way the design's own frame draws it — merging would have
+  made `Add exercise` unreachable during rest or with zero exercises, which the maintainer's
+  call was to avoid rather than accept as a narrowing.
+- No change to what logging a set does, what `nextLoggableSet` computes, or the rest timer.
+  `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, and `SwitchingExercisesTest` pass unedited.
+
+### US-55 — The rest band is ink, not a second filled screen
+Added 2026-08-30, from the `Redesign.dc.html` audit's Turn 5, file `03-session-screen.md`
+(sub-piece 4 of that file — the last of it). See
+`adr/0047-the-rest-band-is-ink-not-a-second-filled-element.md`, which amends ADR-0036.
+
+- Resting shows a compact band — `REST`, the countdown, and `of {total}` — 56dp, directly under
+  the header, not a hero block. Its container is ink at all times; only the countdown's own
+  colour flips to accent for the final ten seconds (ADR-0029 as applied in Turn 3), never the
+  band itself.
+- Because the band is never filled, the log button beneath it stays filled throughout a rest —
+  there is no second surface for it to ever compete with, and no step-back-to-outlined moment
+  left to trigger.
+- `SKIP REST` and `Add set` share one `label.caps` secondary row above the log button — the same
+  shape US-54 already gave the mid-set state's `Add set`/`Add exercise` row.
+- "Up next" — the movement, its target, the comparison to last time — is unchanged: below the
+  band, on bare ground, not inside a coloured block.
+- No change to what logging a set does, when rest ends, or what `RestTimerStore` tracks.
+  `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, `WarmUpPanelScreenTest`, and
+  `SwitchingExercisesTest` pass unedited.
+
+### US-56 — The rest notification is a place to work, not a buzz
+Added 2026-08-30. See `adr/0048-the-rest-notification-is-a-surface.md`. This amends US-05, which
 promised a notification "at zero" and got one that says nothing and does nothing. Two complaints
 from real use: the notification cannot be tapped, and everything worth knowing during a rest is
 on a screen you are not looking at.

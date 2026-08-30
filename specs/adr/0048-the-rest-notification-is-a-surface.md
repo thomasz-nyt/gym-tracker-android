@@ -1,4 +1,4 @@
-# ADR-0046: The rest notification is a surface, not a buzz
+# ADR-0048: The rest notification is a surface, not a buzz
 
 - **Status:** accepted
 - **Date:** 2026-08-30
@@ -8,7 +8,7 @@
 ## Context
 
 ADR-0010 built the rest timer and gave it a notification: one static line, `Rest over`, posted at
-zero by a stateless `BroadcastReceiver`. US-54 asks for two things that notification cannot do.
+zero by a stateless `BroadcastReceiver`. US-56 asks for two things that notification cannot do.
 
 **It cannot be tapped.** `RestOverReceiver` never calls `setContentIntent`, so the notification
 only `setAutoCancel`s itself away. This is a plain bug with a one-line fix, and it is not what

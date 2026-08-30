@@ -1143,8 +1143,101 @@ with the PR. All four gates green locally, plus the full instrumented suite
 (`:app:connectedDebugAndroidTest`, 32 tests, 5 skipped — the pre-existing conditional-feature
 skips plus `InsetConsumptionTest` above — 0 failed) on the same local emulator file `01` used.
 
-**The rest notification became a surface (2026-08-30).** See US-54 and
-`specs/adr/0046-the-rest-notification-is-a-surface.md`. Driven by a complaint from real use
+**Turn 5, file `03` (the session screen) sub-piece 1 of 4 landed 2026-08-30.** File `03` — "the
+largest file in the pass," touching over 3,200 lines across the plausibly-affected files —
+ships as an ordered sequence of commits rather than one pass, per `CLAUDE.md`'s split guidance.
+See `specs/adr/0046-the-session-screens-own-plan-vs-freestyle-contract.md` and US-54.
+
+**A second reversal risk found and stopped, the same shape as file `02`'s.** File `03`'s "one
+composable, two contracts" contract table has a guided kicker — `"SET 2 OF 3"` — close enough to
+`GuidedExerciseScreen.kt`'s own existing `"SET ${running.setsDone + 1} OF ${running.targetSets}"`
+that reading file `03` as "fold that screen back into the main session screen" was a real
+possibility, not a stretch. That screen is a **separate, full-screen route**, put there
+deliberately two weeks ago (ADR-0033, 2026-08-14) from the maintainer's own live report about
+its pre-redesign styling, with its own explicit scope note: "without reopening ADR-0029's `1a`
+decision for the main screen." Confirmed with the maintainer before writing any code: file `03`'s
+"guided" is the main screen's own concept — `sessionExercise.target?.sets != null` per exercise,
+`SessionProgress.orderIsAPlan` per session, both fields the domain model already carried — not a
+merge, and `GuidedExerciseScreen.kt`/ADR-0033 are untouched. `Remove`'s move to long-press is
+file `05`'s (deferred past M2); confirmed to keep `Remove` exactly where it is, unchanged in
+function, rather than deleting it now for a gesture that isn't landing yet.
+
+**Sub-piece 1 (this commit): the kicker, section label, and header tag become plan-aware.**
+`sessionKicker`/`otherExercisesSectionLabel` (`SessionMovements.kt`) are pure, unit-tested
+functions — `"EXERCISE n OF total · SET x OF y"` when the open exercise has a sets target,
+`"CURRENT"` otherwise; `"THEN"` / `"ALSO TODAY"` on `orderIsAPlan` alone, a label rename that
+doesn't touch which exercises appear there (US-45 stands). A new `ModeTag` (`GUIDED`/`NO PLAN`,
+local to `SessionScaffold.kt` pending a second real consumer) sits beside the session title on
+the same signal. No change to what logging a set does. Verified on-device: a freestyle session
+with two exercises shows `NO PLAN` / `CURRENT` / `ALSO TODAY` correctly; the plan-backed path is
+covered by `SessionKickerTest` but not yet screenshotted live (no routine was set up in this
+session to trigger it) — worth a follow-up on-device check before file `03` is considered done,
+not before this sub-piece merges. All four gates green; full instrumented suite unchanged (32
+tests, 5 skipped, 0 failed).
+
+**A real, pre-existing bug found testing sub-piece 1, fixed the same PR.** `GuidedExerciseScreen.kt`'s
+`"Next: <exercise name>"` button, for a long name, wrapped to two lines inside the fixed-height
+`PrimaryActionButton` and the second line was hard-clipped with no ellipsis — the tail of the
+name silently gone (e.g. "Next: Incline Dumbbell" losing "Bench With Palms Facing In" entirely).
+Not a Turn 5 regression — `ButtonLabel` (`core/designsystem`) never had `maxLines` on this
+overload, so every call site with a long enough string had the same exposure. Fixed with
+`maxLines = 1` / `TextOverflow.Ellipsis`; `PrimaryActionButtonTest` reproduces the exact
+constrained-`Row` shape `GuidedExerciseScreen.kt` uses (a naive full-width repro didn't trigger
+it — width is the whole bug) and confirmed both the break and the fix on-device.
+
+**Sub-piece 2: plan-overrun labelling, landed 2026-08-30.** `sessionKicker` now absorbs a set
+logged past its exercise's own target silently — `SET n · EXTRA`, dropping the exercise-position
+and `OF target` parts, per `00-gate.md` 3.11's exact expected string for "the 5th set of a 4-set
+plan." Pure function, unit-tested (`SessionKickerTest`); not yet screenshotted live on-device —
+reaching this state needs a routine-backed session with a real per-exercise target, which the
+freestyle add-exercise sheet doesn't currently set (targets come from a routine or the guided
+setup dialog), so it wasn't reachable in the time this sub-piece took. Same open item as
+sub-piece 1's: worth a live check before file `03` as a whole is done. All four gates green;
+full instrumented suite unchanged (33 tests, 5 skipped, 0 failed).
+
+**Sub-piece 3: `Add set`/`Add exercise` drop their button chrome, landed 2026-08-30.** Both move
+from `OutlinedButton` to plain `label.caps` text — `Start warm-up`'s exact idiom. Kept in place
+rather than merged into one shared row above the primary, per the maintainer's call: file `03`'s
+own frame draws them combined, but that row only exists in the normal mid-set view, and merging
+would have made `Add exercise` unreachable during rest or with zero exercises — a real narrowing
+neither the frame nor the maintainer asked for. `TwoTapSetLoggingTest`, `OneTapSetLoggingTest`,
+`SwitchingExercisesTest` all pass unedited (confirmed by running them explicitly before the full
+suite, not assumed from the diff) — the literal-text tripwires this repo relies on
+(`GymTextRoles.LabelCaps` carries no forced-uppercase transform) held. Verified on-device: both
+controls render as quiet text, no border, in every state checked. All four gates green; full
+instrumented suite unchanged (33 tests, 5 skipped, 0 failed).
+
+**Sub-piece 4: the rest band's redraw, landed 2026-08-30 — file `03` closes.** File `03`'s third
+sentence on the rest band ("nothing else about it changes") turned out to change a premise
+ADR-0036 was built on: the band's `#2b2827` ground is now permanent, and only the countdown
+numeral's own colour flips to accent for the final ten seconds — never the container, the way
+today's build had it. Confirmed with the maintainer this was the intended reading before writing
+any code, the same as the two prior sub-pieces' real conflicts. `PrimaryActionButton`'s
+`outlined` parameter (ADR-0036's step-back mechanism) is removed as dead code — grep-verified to
+have had exactly one caller, the one this sub-piece deletes — since a band that is never filled
+gives the log button nothing left to step back from. `SKIP REST`, which no file `03` table ever
+placed anywhere, moves into the resting state's own `label.caps × 2` secondary row beside `Add
+set`, confirmed with the maintainer as the same shape sub-piece 3 already gave the mid-set state.
+28sp (the frame's literal countdown size) has no role in this app's ten-role scale; it reads
+`numeral.md` (24sp), the closer of the two existing numeral roles, rather than adding an
+eleventh. See `specs/adr/0047-the-rest-band-is-ink-not-a-second-filled-element.md`.
+
+Verified on-device, light and dark: the compact 56dp band renders correctly under the header,
+the countdown numeral visibly flips to accent in the final ten seconds while the band's own
+background stays ink, `SKIP REST`/`Add set` render as quiet text above a full-width, always-
+filled `LOG SET` button, and a rest ending naturally returns cleanly to the mid-set view. All
+four gates green; full instrumented suite unchanged (33 tests, 5 skipped, 0 failed) — including
+`TwoTapSetLoggingTest`, `OneTapSetLoggingTest`, `WarmUpPanelScreenTest`, and
+`SwitchingExercisesTest`, all of which read a string this sub-piece touched and all of which pass
+unedited.
+
+Both of file `03`'s open items are still open, not resolved by this sub-piece: the plan-backed
+kicker path (`GUIDED` / `EXERCISE n OF total · SET x OF y` / `SET n · EXTRA`) still needs a
+routine-backed session to screenshot live, and file `05` (set corrections — `Remove`'s move to
+long-press, undo, finishing on plan-complete) is still deferred past M2.
+
+**The rest notification became a surface (2026-08-30).** See US-56 and
+`specs/adr/0048-the-rest-notification-is-a-surface.md`. Driven by a complaint from real use
 rather than by the audit: the notification could not be tapped, and it said nothing. Both are
 now fixed, and ADR-0010's option 2 — the persistent notification it rejected — is **partly**
 adopted: an ongoing, silent notification during the rest, with a countdown Android renders
@@ -1158,7 +1251,7 @@ showed a new rest leaving the previous rest's "Rest over" in the shade beside th
 each naming a different set; and granting notification permission mid-rest — which is exactly
 when US-05 asks for it, on the member's first ever rest — leaving that rest with no notification
 at all, a regression against the code being replaced. Both fixed and both now covered; see
-ADR-0046 § "Two things only a device said".
+ADR-0048 § "Two things only a device said".
 
 It also fixes a promise ADR-0010 made and never kept: **skipping a rest never cancelled the
 alarm.** `RestController.skip()` did not flip the flag the scheduling side effect keyed on, so
@@ -1182,10 +1275,10 @@ scheduling *and* dismissal, so there is no longer a call site that can forget.
 
 - **+30s on the rest timer.** ADR-0016 deferred it explicitly as a US-05 amendment; it is on
   the redesign's screens but has never been decided. **Put to the maintainer again on 2026-08-30
-  while US-54 was being planned, and deliberately left open** — US-54 gives it an obvious home
+  while US-56 was being planned, and deliberately left open** — US-56 gives it an obvious home
   (the notification has a third action slot free) and an obvious home is not a decision.
 - **An audio cue at 0:10 and 0:00.** For earbuds with the phone in a pocket. US-05 promises a
-  notification only, so this is an amendment rather than a bug. Unchanged by US-54, which is a
+  notification only, so this is an amendment rather than a bug. Unchanged by US-56, which is a
   visual surface and makes no sound.
 
 **Deliberately not designed, and staying that way:**
