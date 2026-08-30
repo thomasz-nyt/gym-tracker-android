@@ -100,6 +100,10 @@ class RestNotificationTest {
             sessions.deleteSession(TODAY_SESSION)
             restTimerStore.setRestEndsAt(null)
             manager.cancelAll()
+            // The app's own RestNotificationCoordinator reacts to that write on a background
+            // dispatcher. Without waiting for it to settle, its dismissal can land *after* the
+            // notification a test method posts and take it straight back down again.
+            awaitNoNotifications()
 
             sessions.startSession(WorkoutSession(TODAY_SESSION, member, null, now, null, null))
             sessionExercises.add(SessionExercise(TODAY, TODAY_SESSION, benchPress.id, 1))
@@ -218,17 +222,35 @@ class RestNotificationTest {
             notifier.dismissResting()
 
             assertTrue(
-                manager.activeNotifications.none { it.id == RESTING_ID },
+                await { manager.activeNotifications.none { n -> n.id == RESTING_ID }.takeIf { gone -> gone } } == true,
                 "a skipped rest must not leave a countdown running on the lock screen",
             )
         }
     }
 
+    /**
+     * `notify` posts asynchronously, so `activeNotifications` read immediately after it can
+     * legitimately not show the notification yet. Polling rather than asserting on the first
+     * read is the difference between this suite and a flaky one — three of these methods failed
+     * exactly that way before the wait was added.
+     */
     private fun posted(id: Int): Notification =
-        manager.activeNotifications
-            .firstOrNull { it.id == id }
-            ?.notification
-            ?: error("no notification posted with id $id")
+        awaitOrNull(id)?.notification ?: error("no notification posted with id $id")
+
+    private fun awaitOrNull(id: Int) = await { manager.activeNotifications.firstOrNull { it.id == id } }
+
+    private fun awaitNoNotifications() {
+        await { manager.activeNotifications.isEmpty().takeIf { it } }
+    }
+
+    private fun <T> await(read: () -> T?): T? {
+        val deadline = System.currentTimeMillis() + POST_TIMEOUT_MILLIS
+        while (System.currentTimeMillis() < deadline) {
+            read()?.let { return it }
+            Thread.sleep(POLL_MILLIS)
+        }
+        return null
+    }
 
     private companion object {
         const val EXERCISE = "Barbell Bench Press - Medium Grip"
@@ -238,5 +260,8 @@ class RestNotificationTest {
         const val RESTING_ID = 2
         const val REST_OVER_ID = 1
         const val RESTING_CHANNEL = "rest-running"
+
+        const val POST_TIMEOUT_MILLIS = 5_000L
+        const val POLL_MILLIS = 50L
     }
 }
