@@ -2,7 +2,6 @@ package com.gymtracker.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.sizeIn
@@ -10,7 +9,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.gymtracker.core.designsystem.theme.GymDimens
@@ -62,12 +61,12 @@ fun PrimaryActionButton(
  * used to mention dimming inline (`"· 45.4 kg"`) is withdrawn from this surface entirely
  * (ADR-0008's Turn 4 amendment), so there is no longer a secondary span to dim.
  *
- * **[outlined] (ADR-0036).** The rest countdown's final-ten-seconds swap needs this exact button
- * built two ways: filled while the countdown is calm, stepped back to outlined the moment the
- * countdown itself takes the accent fill — "exactly one filled accent element" holding true
- * through the swap, not just around it. Outlined reuses the same unstyled `OutlinedButton` idiom
- * every other outlined control in this codebase already uses (`Done`, `Add set`, `SKIP REST`)
- * rather than hand-matching the design's literal ink-coloured border.
+ * **Always filled, no `outlined` escape hatch (ADR-0047, amending ADR-0036).** Turn 3 gave this
+ * a step-back-to-outlined mode so the rest countdown's final-ten-seconds accent fill and this
+ * button were never both filled at once. Turn 5's rest band redraw removes the countdown's own
+ * fill entirely — only its numeral's colour changes now, never the band's ink container — so the
+ * conflict this parameter existed to avoid no longer arises, and it was grep-verified to have no
+ * other caller before removal.
  *
  * **Floor retuned 72dp → 64dp by ADR-0011's Turn 4 amendment**, then unified with
  * [GymDimens.PrimaryAction] itself by ADR-0044 (Turn 5): both overloads now read the same
@@ -82,12 +81,15 @@ fun PrimaryActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    outlined: Boolean = false,
 ) {
-    // sizeIn, not a fixed height: a large font scale can still push two short lines past 64dp,
-    // and the button should grow rather than clip — 64dp is the floor, not a ceiling.
-    val buttonModifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.PrimaryAction)
-    val label: @Composable RowScope.() -> Unit = {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = MaterialTheme.shapes.large,
+        // sizeIn, not a fixed height: a large font scale can still push two short lines past
+        // 64dp, and the button should grow rather than clip — 64dp is the floor, not a ceiling.
+        modifier = modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.PrimaryAction),
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.Start,
@@ -102,24 +104,6 @@ fun PrimaryActionButton(
             )
             GymText(text = detail, role = GymTextRoles.TitleMd, modifier = Modifier.fillMaxWidth())
         }
-    }
-
-    if (outlined) {
-        OutlinedButton(
-            onClick = onClick,
-            enabled = enabled,
-            shape = MaterialTheme.shapes.large,
-            modifier = buttonModifier,
-            content = label,
-        )
-    } else {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            shape = MaterialTheme.shapes.large,
-            modifier = buttonModifier,
-            content = label,
-        )
     }
 }
 
@@ -168,6 +152,11 @@ private fun ButtonLabel(
         text = text,
         style = style.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.05.em),
         textAlign = TextAlign.Start,
+        // Reported live: a long label (GuidedExerciseScreen.kt's "Next: <exercise name>", in the
+        // width-constrained Row it shares with "Stop here") wrapped to two lines and the fixed-
+        // height Button clipped the rest with no ellipsis — see PrimaryActionButtonTest.
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth(),
     )
 }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,12 +57,14 @@ import java.time.Duration
  * including US-45/ADR-0037's explicit, sticky override for when the machine was taken and a
  * member switches back to an earlier exercise.
  *
- * **"Other exercises" (US-45) is every exercise but the open one, in plan order — earlier or
- * later, touched or not.** It used to be `position > currentRow.position` only, which is
- * exactly the bug ADR-0037 fixes: log a set on exercise 3 and exercises 1–2 had no row, no
+ * **The other-exercises section (US-45) is every exercise but the open one, in plan order —
+ * earlier or later, touched or not.** It used to be `position > currentRow.position` only, which
+ * is exactly the bug ADR-0037 fixes: log a set on exercise 3 and exercises 1–2 had no row, no
  * button, nothing to tap for the rest of the session. Reads plan order back out of [exercises]
  * itself (`sessionExercise.position`) rather than needing a second, separately-ordered list
- * passed in.
+ * passed in. Its own label — "Other exercises" is gone — reads [otherExercisesSectionLabel]
+ * (US-54): `THEN` for a plan-backed session, `ALSO TODAY` otherwise. Which exercises appear here
+ * is unchanged by that rename.
  *
  * "Start exercise" (US-05a) and "Remove" (US-02c) are not in the design's frames — the mockup
  * does not show every control the app already has to keep. They stay, as a quiet text row under
@@ -87,6 +88,7 @@ internal fun SessionPlan(
     openSessionExerciseId: SessionExerciseId?,
     nextLoggableSet: UpNextSet?,
     unit: WeightUnit,
+    orderIsAPlan: Boolean,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
@@ -127,7 +129,7 @@ internal fun SessionPlan(
         if (otherExercises.isNotEmpty()) {
             item(key = "other-exercises-label") {
                 EyebrowLabel(
-                    text = "Other exercises",
+                    text = otherExercisesSectionLabel(orderIsAPlan),
                     // Deliberately muted, not accent — the redesign audit's finding 07 flagged
                     // exactly this shape (a label the same colour as a link) reading as tappable
                     // when it is not.
@@ -172,12 +174,17 @@ internal fun SessionPlan(
  * brand-new exercise with no history and no target has nothing sensible to write without
  * opening the sheet first, so only the sheet-opening button shows in that case.
  *
- * **The secondary button reads "Add set", not the design's "ADJUST".** It is the exact same
+ * **The secondary control reads "Add set", not the design's "ADJUST".** It is the exact same
  * control `Add set` always was — same callback, same sheet, same "Save set" confirm — and
  * `TwoTapSetLoggingTest` matches `onNodeWithText("Add set")` literally. Renaming the label
  * without renaming what it does would be exactly the kind of change CLAUDE.md and the roadmap
  * both call out: "if this test needs editing, the redesign went wrong." It does not need
- * editing, because the control it depends on kept its name.
+ * editing, because the control it depends on kept its name — [GymTextRoles.LabelCaps] carries no
+ * forced-uppercase transform (confirmed against [GymText]'s own implementation, the same way
+ * "Start warm-up" stayed sentence-case through its own restyle), so this can move from an
+ * `OutlinedButton`'s chrome to plain [GymTextRoles.LabelCaps] text (US-54, file `03` §3 — the
+ * button-chrome deletion applies here, kept beside the primary rather than moved into a shared
+ * row, per the maintainer's call to restyle Add set/Add exercise in place without merging them).
  */
 @Composable
 private fun BottomLogBar(
@@ -196,12 +203,11 @@ private fun BottomLogBar(
                 onClick = { onLogNextSet(nextLoggableSet) },
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(
+            TextButton(
                 onClick = { onAddSet(currentRow) },
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.PrimaryAction),
+                modifier = Modifier.sizeIn(minHeight = GymDimens.PrimaryAction, minWidth = GymDimens.MinTouchTarget),
             ) {
-                Text("Add set")
+                GymText(text = "Add set", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
             }
         } else {
             PrimaryActionButton(
@@ -248,7 +254,7 @@ private fun CurrentMovement(
             verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
         ) {
             EyebrowLabel(
-                text = "Exercise $exerciseNumber of $movementsTotal",
+                text = sessionKicker(exerciseNumber, movementsTotal, row.sessionExercise.target, row.sets.size),
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
@@ -450,6 +456,35 @@ internal fun EyebrowLabel(
         modifier = modifier,
     )
 }
+
+/**
+ * US-54 / ADR-0046: the open exercise's kicker. A real sets count on the exercise's own
+ * [target][MovementTarget.sets] is what "plan" means here — not
+ * [com.gymtracker.core.domain.session.SessionProgress.orderIsAPlan], which gates the header tag
+ * and section label instead (a plan-backed session's open exercise can still have no target of
+ * its own, and a freestyle session's exercise could in principle carry one — the two signals are
+ * independent, both already real fields on the domain model this pass didn't add).
+ */
+internal fun sessionKicker(
+    exerciseNumber: Int,
+    movementsTotal: Int,
+    target: MovementTarget?,
+    setsLogged: Int,
+): String {
+    val setsPlanned = target?.sets
+    val setNumber = setsLogged + 1
+    return when {
+        setsPlanned == null -> "CURRENT"
+        // Absorbed silently (00-gate.md 3.11), not flagged or blocked: the plan was a
+        // suggestion, and once setNumber exceeds it, the exercise/total position stops being
+        // the number worth naming — just which set this is, and that it's past the plan.
+        setNumber > setsPlanned -> "SET $setNumber · EXTRA"
+        else -> "EXERCISE $exerciseNumber OF $movementsTotal · SET $setNumber OF $setsPlanned"
+    }
+}
+
+/** US-54: the other-exercises section label — a rename only, not a filter change (US-45 stands). */
+internal fun otherExercisesSectionLabel(orderIsAPlan: Boolean): String = if (orderIsAPlan) "THEN" else "ALSO TODAY"
 
 /** "Target 3 × 8 · 105 lb" for the current movement, or null when it has no target (US-13). */
 private fun targetLine(
