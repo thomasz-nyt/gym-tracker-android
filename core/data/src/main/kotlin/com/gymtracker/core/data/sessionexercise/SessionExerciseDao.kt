@@ -24,9 +24,13 @@ interface SessionExerciseDao {
     @Insert
     suspend fun insert(sessionExercise: SessionExerciseEntity)
 
-    /** US-02c. The row's sets go with it via `ON DELETE CASCADE` on `sets`. */
+    /**
+     * US-02c. The row's sets go with it via `ON DELETE CASCADE` on `sets`. Returns the number
+     * of rows actually removed (0 or 1) — US-57's outbox enqueues a delete only when this
+     * deleted something.
+     */
     @Query("DELETE FROM session_exercises WHERE id = :id")
-    suspend fun delete(id: String)
+    suspend fun delete(id: String): Int
 
     /**
      * Every appearance across any of the member's sessions (US-40, ADR-0034).

@@ -8,6 +8,7 @@ import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -19,6 +20,7 @@ import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -55,9 +57,10 @@ class SetRepositoryTest {
                     ApplicationProvider.getApplicationContext(),
                     GymTrackerDatabase::class.java,
                 ).build()
-        sets = RoomSetRepository(database.setDao())
-        sessions = RoomSessionRepository(database.sessionDao())
-        sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao())
+        val codec = SyncPayloadCodec(Json { ignoreUnknownKeys = true })
+        sets = RoomSetRepository(database.setDao(), database, codec)
+        sessions = RoomSessionRepository(database.sessionDao(), database, codec)
+        sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao(), database, codec)
     }
 
     @After

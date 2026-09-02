@@ -217,6 +217,34 @@ is no way to answer "what did I do on Tuesday, and at what weight".
   full three-state detail this story's "distinguishes: synced / pending / error" asks for,
   including *when* it last synced, lives in Settings, where a member can go look for it.
 
+### US-57 — Every syncable write leaves a durable trace of itself
+Added 2026-09-01, the first built slice of M2. See `adr/0043-the-sync-engine.md`'s amendment
+for what changed writing this against the real DAOs. This is the outbox half of US-10 —
+"changes queue and sync when connectivity returns, surviving app kill" — built and tested with
+no `SyncWorker`, no network client, and no Supabase project, since none of that exists yet and
+none of it is needed to prove the queue itself is correct.
+
+- Every write to `sessions`, `session_exercises`, `sets`, `routines`, or `routine_items` — every
+  insert, update, and delete, including the raw-SQL updates already in `SessionDao` and
+  `RoutineDao` — leaves exactly one row in `sync_queue` in the same Room transaction as the
+  write itself. A rolled-back transaction leaves neither the write nor the queue row.
+- A delete leaves a queue row naming the operation, even though the row it describes no longer
+  exists to be read back from — `sync_queue` is what lets a deletion be reconstructed once the
+  row itself cannot be.
+- A cascade-deleted child (a session's sets and session-exercises, a routine's items) leaves no
+  queue row of its own; the one row for the parent delete is sufficient, since the same cascade
+  chain exists in Postgres.
+- `exercises` is unaffected — catalog rows carry no `sync_state` and are explicitly excluded
+  from the outbox, the same as they are from a backup (`data-model.md`).
+- A restore (US-41) enqueues every row it writes, exactly like an ordinary write — no special
+  case for how the row arrived.
+- Nothing observable to a member changes. No new UI, no status indicator — `SyncIndicatorChip`
+  is out of scope for this story specifically, because nothing yet drains the queue, and a
+  pending count that can only climb and never fall would be a screen making a claim the app
+  cannot keep.
+- `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited — every logging write runs
+  through the DAOs this story touches, so this is the story's own regression gate.
+
 ### US-11 — Export and delete
 - I can export all my data as JSON to a file.
 - I can delete my account; all my rows are removed and this is verified by a test.

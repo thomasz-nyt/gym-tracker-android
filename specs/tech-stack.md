@@ -44,7 +44,7 @@ hard part and are native on both sides anyway).
 | Compose UI | `createComposeRule`, semantics-based assertions, no screenshot-diff at first |
 | E2E | A small instrumented smoke suite: log a set → see it in history → see it on the chart |
 | Backend | pgTAP or SQL assertions for RLS policies; Deno test for Edge Functions |
-| Backend CI tooling | Supabase CLI, run as `supabase db reset && supabase db test` against its own local Postgres — no live Supabase project needed. Activated 2026-08-29 as a CI job (M2); `specs/testing-strategy.md` has listed `supabase db test` as a gate since M0 without a job to run it. Not a Gradle dependency and not in `gradle/libs.versions.toml` — `supabase-kt` (the app's own client, listed above) arrives separately, with M2's auth PR |
+| Backend CI tooling | Supabase CLI, run as `supabase db reset && supabase db test` against its own local Postgres — no live Supabase project needed. **Planned, not yet activated**: PR #68 (2026-08-29, specs-only) stated this as done, but no `supabase/` directory and no CI job exist yet — corrected 2026-09-01. `specs/testing-strategy.md` has listed `supabase db test` as a gate since M0 without a job to run it; it lands with M2's server-side PR. Not a Gradle dependency and not in `gradle/libs.versions.toml` — `supabase-kt` (the app's own client, listed above) arrives separately, with M2's auth PR |
 
 ## Module layout
 

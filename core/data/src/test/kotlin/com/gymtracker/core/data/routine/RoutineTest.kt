@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.CatalogAssetReader
 import com.gymtracker.core.data.exercise.CatalogSeeder
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.Routine
@@ -61,8 +62,9 @@ class RoutineTest {
                         ApplicationProvider.getApplicationContext(),
                         GymTrackerDatabase::class.java,
                     ).build()
-            routines = RoomRoutineRepository(database.routineDao())
-            items = RoomRoutineItemRepository(database.routineItemDao())
+            val codec = SyncPayloadCodec(json)
+            routines = RoomRoutineRepository(database.routineDao(), database, codec)
+            items = RoomRoutineItemRepository(database.routineItemDao(), database, codec)
             CatalogSeeder(
                 dao = database.exerciseDao(),
                 assets = CatalogAssetReader { bundled.byteInputStream() },

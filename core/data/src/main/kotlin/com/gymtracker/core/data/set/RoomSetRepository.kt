@@ -1,5 +1,11 @@
 package com.gymtracker.core.data.set
 
+import androidx.room.withTransaction
+import com.gymtracker.core.data.database.GymTrackerDatabase
+import com.gymtracker.core.data.sync.SyncEntityNames
+import com.gymtracker.core.data.sync.SyncPayloadCodec
+import com.gymtracker.core.data.sync.syncDeleteEntry
+import com.gymtracker.core.data.sync.syncWriteEntry
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -11,12 +17,22 @@ import kotlinx.coroutines.flow.map
 import java.time.Instant
 import javax.inject.Inject
 
-/** [SetRepository] over Room. */
+/**
+ * [SetRepository] over Room.
+ *
+ * Every write also leaves a `sync_queue` row in the same transaction (US-57, ADR-0043) — see
+ * [com.gymtracker.core.data.session.RoomSessionRepository]'s KDoc for why that needs [database]
+ * and [codec] alongside [dao].
+ */
 class RoomSetRepository
     @Inject
     constructor(
         private val dao: SetDao,
+        private val database: GymTrackerDatabase,
+        private val codec: SyncPayloadCodec,
     ) : SetRepository {
+        private val syncQueue get() = database.syncQueueDao()
+
         override fun observeForSessionExercise(sessionExerciseId: SessionExerciseId): Flow<List<ExerciseSet>> =
             dao.observeForSessionExercise(sessionExerciseId.value).map { rows -> rows.map { it.toDomain() } }
 
@@ -41,12 +57,28 @@ class RoomSetRepository
             dao.maxSetIndex(sessionExerciseId.value) + 1
 
         override suspend fun add(set: ExerciseSet) {
-            dao.insert(set.toEntity())
+            val entity = set.toEntity()
+            val payload = codec.encode(entity)
+            database.withTransaction {
+                dao.insert(entity)
+                syncQueue.insert(syncWriteEntry(SyncEntityNames.SETS, entity.id, payload))
+            }
         }
 
         override suspend fun update(set: ExerciseSet) {
-            dao.update(set.toEntity())
+            val entity = set.toEntity()
+            val payload = codec.encode(entity)
+            database.withTransaction {
+                dao.update(entity)
+                syncQueue.insert(syncWriteEntry(SyncEntityNames.SETS, entity.id, payload))
+            }
         }
 
-        override suspend fun delete(id: String): ExerciseSet? = dao.deleteAndReturn(id)?.toDomain()
+        override suspend fun delete(id: String): ExerciseSet? =
+            database
+                .withTransaction {
+                    val existing = dao.deleteAndReturn(id)
+                    if (existing != null) syncQueue.insert(syncDeleteEntry(SyncEntityNames.SETS, id))
+                    existing
+                }?.toDomain()
     }

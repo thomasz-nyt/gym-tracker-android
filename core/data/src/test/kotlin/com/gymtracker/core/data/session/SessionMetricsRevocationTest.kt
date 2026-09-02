@@ -3,11 +3,13 @@ package com.gymtracker.core.data.session
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.gymtracker.core.data.database.GymTrackerDatabase
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -44,7 +46,7 @@ class SessionMetricsRevocationTest {
                     GymTrackerDatabase::class.java,
                 ).build()
         dao = database.sessionDao()
-        repository = RoomSessionRepository(dao)
+        repository = RoomSessionRepository(dao, database, SyncPayloadCodec(Json { ignoreUnknownKeys = true }))
     }
 
     @After

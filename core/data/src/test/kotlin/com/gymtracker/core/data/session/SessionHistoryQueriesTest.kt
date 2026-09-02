@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
 import com.gymtracker.core.data.set.RoomSetRepository
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
@@ -17,6 +18,7 @@ import com.gymtracker.core.domain.session.RestoreSession
 import com.gymtracker.core.domain.session.SessionHistory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -50,9 +52,10 @@ class SessionHistoryQueriesTest {
                     ApplicationProvider.getApplicationContext(),
                     GymTrackerDatabase::class.java,
                 ).build()
-        sessions = RoomSessionRepository(database.sessionDao())
-        sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao())
-        sets = RoomSetRepository(database.setDao())
+        val codec = SyncPayloadCodec(Json { ignoreUnknownKeys = true })
+        sessions = RoomSessionRepository(database.sessionDao(), database, codec)
+        sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao(), database, codec)
+        sets = RoomSetRepository(database.setDao(), database, codec)
     }
 
     @After

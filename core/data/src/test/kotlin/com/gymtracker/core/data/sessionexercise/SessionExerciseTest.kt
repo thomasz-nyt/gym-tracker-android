@@ -10,6 +10,7 @@ import com.gymtracker.core.data.exercise.CatalogSeeder
 import com.gymtracker.core.data.exercise.RoomExerciseCatalog
 import com.gymtracker.core.data.session.RoomSessionRepository
 import com.gymtracker.core.data.set.RoomSetRepository
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.MovementTarget
@@ -78,9 +79,10 @@ class SessionExerciseTest {
                         ApplicationProvider.getApplicationContext(),
                         GymTrackerDatabase::class.java,
                     ).build()
-            sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao())
-            sessions = RoomSessionRepository(database.sessionDao())
-            sets = RoomSetRepository(database.setDao())
+            val codec = SyncPayloadCodec(json)
+            sessionExercises = RoomSessionExerciseRepository(database.sessionExerciseDao(), database, codec)
+            sessions = RoomSessionRepository(database.sessionDao(), database, codec)
+            sets = RoomSetRepository(database.setDao(), database, codec)
             catalog = RoomExerciseCatalog(database.exerciseDao(), json)
             CatalogSeeder(
                 dao = database.exerciseDao(),

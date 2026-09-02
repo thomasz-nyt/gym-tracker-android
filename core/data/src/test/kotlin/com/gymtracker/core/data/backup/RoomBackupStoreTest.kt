@@ -16,6 +16,7 @@ import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.data.session.SessionEntity
 import com.gymtracker.core.data.sessionexercise.SessionExerciseEntity
 import com.gymtracker.core.data.set.SetEntity
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.TestData
 import com.gymtracker.core.domain.backup.BackupContents
 import com.gymtracker.core.domain.model.ExerciseId
@@ -25,6 +26,7 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -71,6 +73,7 @@ class RoomBackupStoreTest {
                 unitPreference = DataStoreUnitPreference(preferences("unit.preferences_pb")),
                 restTimerStore = DataStoreRestTimerStore(preferences("rest.preferences_pb")),
                 currentMember = currentMember,
+                codec = SyncPayloadCodec(Json { ignoreUnknownKeys = true }),
             )
     }
 
@@ -234,6 +237,7 @@ class RoomBackupStoreTest {
                     unitPreference = unit,
                     restTimerStore = rest,
                     currentMember = DataStoreCurrentMember(preferences("member2.preferences_pb")),
+                    codec = SyncPayloadCodec(Json { ignoreUnknownKeys = true }),
                 )
 
             val contents = storeWithPreferences.read(alice)
