@@ -106,8 +106,9 @@ anything mid-set.
 ## M2 — Accounts, household, sync
 
 Stories: US-07 … US-11, plus US-57 (added 2026-09-01, the outbox itself, factored out of the
-"Offline queue" checkbox below once it turned out to need its own PR). US-15 moved to M2a; see
-that section for why.
+"Offline queue" checkbox below once it turned out to need its own PR) and US-58 (added
+2026-09-02, the adopt-once re-key factored out of the "Auth" checkbox below the same way).
+US-15 moved to M2a; see that section for why.
 
 **Building in slices, starting with the one piece that needs nothing outside this machine.**
 M2 needs a Supabase project, credentials and (for RLS/pgTAP) a local Postgres this environment
@@ -127,7 +128,9 @@ it, and the wrong answer there is destructive.
 
 - [ ] Supabase project, migrations in `supabase/migrations/`
 - [ ] Auth: sign up, sign in, sign out. Optional — every M1–M5a feature keeps working with no
-      account, and a device adopts its local rows into an account exactly once (ADR-0042)
+      account, and a device adopts its local rows into an account exactly once (ADR-0042).
+      **The adoption half is closed** (US-58, 2026-09-02) — see the landed-entry below; sign
+      up/in/out itself still needs a live Supabase project this environment does not have
 - [ ] `households` + `profiles`; invite a member by code
 - [ ] RLS policies on every table + pgTAP tests proving cross-household reads fail
 - [ ] Sync engine: local-first, WorkManager, last-write-wins per row with
@@ -185,6 +188,23 @@ delete rows in the outbox, for whatever a synced device already had that isn't i
 file? This slice's answer is no special case in either direction beyond what's stated above:
 the *inserted* rows enqueue, the *wiped* rows do not. Revisit once a `SyncWorker` exists and a
 real restore-while-signed-in scenario can be tested end to end.
+
+**The adopt-once re-key landed 2026-09-02 (US-58), still with no Supabase project to sign into.**
+`AccountAdoption` (`:core:data/member/RoomAccountAdoption.kt`), following `BackupStore`'s own
+precedent exactly — a domain port implemented directly over `GymTrackerDatabase` rather than a
+thin use case composed from the existing repositories, since there is no separate business rule
+above "re-key once" the way `ImportBackup` layers a refusal on top of `BackupStore.replaceAll`.
+`adopt(signedInAs)` re-assigns every `sessions`/`routines` row the device's current member id
+owns, in one transaction, and enqueues a fresh `sync_queue` row for each — re-keying a row's
+owner is itself a write, and US-57's outbox does not get a pass for this one. `has_completed
+_first_sign_in`, the permanent per-install flag ADR-0042 names, lives alongside
+`local_member_id` in the same DataStore file, exactly as that ADR specifies; a second call
+re-assigns nothing but still moves the device's current member id to the newly-adopted one, so
+a second sign-in on a shared device sees a correctly empty view. `CurrentMember.restore` — built
+for US-41's backup restore — turned out to be exactly the right primitive for the identity
+overwrite this needed too, so nothing new was added there. Still no `supabase-kt`, no Settings
+"Sign in to sync" row, no wiring into an actual sign-in flow — `AccountAdoption` is the contract
+a future one calls. All four gates green plus `verifyDomainHasNoAndroidDeps`.
 
 ---
 
