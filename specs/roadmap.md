@@ -105,7 +105,16 @@ anything mid-set.
 
 ## M2 — Accounts, household, sync
 
-Stories: US-07 … US-11. US-15 moved to M2a; see that section for why.
+Stories: US-07 … US-11, plus US-57 (added 2026-09-01, the outbox itself, factored out of the
+"Offline queue" checkbox below once it turned out to need its own PR). US-15 moved to M2a; see
+that section for why.
+
+**Building in slices, starting with the one piece that needs nothing outside this machine.**
+M2 needs a Supabase project, credentials and (for RLS/pgTAP) a local Postgres this environment
+does not have. The local outbox does not: `sync_queue`, its DAO, and an enqueue in every
+syncable DAO write are pure Room, verifiable end-to-end with the existing four gates plus a
+real device install. It is also the dependency Turn 5 file `05` (set corrections, deferred past
+M2) names explicitly — "until M2's sync engine has landed in every DAO call site."
 
 **Postponed until after M3** (2026-08-01) so the offline core could be finished before
 accounts and sync arrived. **Taken up 2026-08-29**, once every milestone that could still run

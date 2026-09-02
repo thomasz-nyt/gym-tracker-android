@@ -142,3 +142,52 @@ signed in, the same no-op-is-silent contract `HealthMetricsSource` and
 - Revisit the topBar-sharing decision if a third global signal ever needs the same slot;
   two independently-absent elements already share it comfortably, but a third would need
   its own layout decision this ADR does not make.
+
+## Amendment, 2026-09-01 (US-57): the outbox, built, and three things this ADR got wrong
+
+This ADR's Decision section, above, said `payload_json` is "built from the row exactly as
+`BackupCodec` already serialises it for export." Writing the outbox found that this does not
+work, plus two smaller gaps the Decision section did not anticipate. All three are settled
+here, before US-57's code, per `CLAUDE.md`'s "write the ADR before the code."
+
+**`payload_json` needs its own codec, not `BackupCodec`.** `BackupCodec`
+(`core/data/.../backup/BackupCodec.kt`) is deliberately domain-shaped: its own KDoc explains
+this is because Room moved v7 → v9 in a week and "a column-shaped file would let every
+migration invalidate every backup already on disk." Consequently its DTOs drop `updated_at`
+and `sync_state` entirely (`data-model.md`'s own text: "both are M2 bookkeeping" and
+deliberately excluded from what travels in a backup) and hoist `user_id` to one
+`BackupPayloadDto.memberId` field rather than carrying it per row. `sync_queue`'s payload needs
+the opposite of all three: `updated_at` is the field last-write-wins is keyed on, and a row
+reaching Postgres needs its own `user_id` to satisfy RLS. **Decision:** a second, sync-only
+codec (`SyncPayloadCodec`, `core/data/.../sync/`) serialises the Room entity directly —
+row-shaped, on purpose. `BackupCodec`'s objection to a row-shaped format does not transfer:
+queue rows are transient, written and drained within days, not a file a member keeps on disk
+across migrations the way a backup is. The two codecs share no code and the shipped US-40/US-41
+backup format is untouched by this amendment.
+
+**A restore enqueues every row it writes, with no special case.** `RoomBackupStore.replaceAll`
+(US-41) wipes and re-inserts a member's entire history — sessions, sets, routines — inside one
+Room transaction. Once the outbox enqueues at the DAO level, a restore queues that whole
+history at once. This ADR did not consider restore at all when it was written. **Decision:**
+enqueue it anyway, no bypass. A restored row is, from a server's point of view, genuinely new
+data; a bypass would leave a restored device looking synced while the household actually sees
+nothing, which is data loss with an honest-looking status chip on top — worse than a large
+queue. This makes the retention/compaction gap the Consequences section already named more
+pressing than this ADR originally implied, without this amendment inventing a rule for it.
+
+**A cascade delete enqueues the parent only.** `sets` and `session_exercises` are `ON DELETE
+CASCADE` in Room, and `data-model.md`'s Postgres schema mirrors the same chain
+(`sessions → session_exercises → sets`, `routines → routine_items`). The Decision section's
+"one INSERT alongside every existing write" phrasing did not say whether a cascaded child needs
+its own queue row. It does not: one row for the parent delete is sufficient, since the server
+side cascades identically once the parent delete arrives, and enqueuing every child would make
+`sync_queue` grow by however many sets a session happened to have for no gain. Recorded here so
+a future reader does not "fix" the missing child rows as a bug.
+
+**A related gap found and fixed the same PR, not originally in this ADR's scope:**
+`RoutineDao.rename` and `RoutineItemDao.setPosition` bumped `updated_at` but never set
+`sync_state = 'PENDING'` — a bug that predates this ADR. Read literally, "one INSERT alongside
+every existing `sync_state = 'PENDING'` write" would have propagated the gap into the outbox
+silently: a renamed routine or a reordered routine item would take a fresh `updated_at`,
+enqueue nothing, and never sync. Both call sites now set `sync_state = 'PENDING'` like every
+other write in the codebase, and both are wrapped in the outbox like every other write.
