@@ -14,9 +14,12 @@ interface CurrentMember {
     suspend fun id(): UserId
 
     /**
-     * Overwrites the stored id (US-41, ADR-0034) — restoring a backup's identity rather than
+     * Overwrites the stored id — restoring a backup's identity (US-41, ADR-0034) rather than
      * rewriting the rows under a freshly generated one, which is the whole reason a restored
-     * backup is visible to any screen: every read filters on this id.
+     * backup is visible to any screen: every read filters on this id. [AccountAdoption] (US-58,
+     * ADR-0042) reuses this same overwrite for a second reason — moving the device's current
+     * member id to a newly-signed-in account — since both are exactly the same operation: point
+     * every future read at a different id, never generate one.
      *
      * The one deliberate exception to [id]'s "generated once and never regenerated" — see
      * `DataStoreCurrentMember`'s own KDoc.
