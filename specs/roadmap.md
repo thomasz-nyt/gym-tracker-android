@@ -132,7 +132,11 @@ it, and the wrong answer there is destructive.
 - [ ] RLS policies on every table + pgTAP tests proving cross-household reads fail
 - [ ] Sync engine: local-first, WorkManager, last-write-wins per row with
       `updated_at`, conflict cases documented (ADR-0043)
-- [ ] Offline queue survives app kill (`sync_queue`, ADR-0043)
+- [x] Offline queue survives app kill (`sync_queue`, ADR-0043). Closed 2026-09-01 (US-57) — see
+      the landed-entry below. Only the local half of this box: the table exists, is Room-backed
+      like every other table so it survives a kill by construction, and every syncable write
+      leaves the right row in it. Nothing drains it yet; that is the still-unchecked "Sync
+      engine" box above, not this one.
 - [ ] Sync status — synced / pending / error — visible without opening Settings (US-10),
       sharing `GymTrackerNavHost`'s `topBar` slot with `LiveHeartRateChip` and silent when
       synced (ADR-0043); the full three-state detail lives in Settings
@@ -153,6 +157,34 @@ export of every member table through the Storage Access Framework, which is what
 constitution §5 promised it independent of accounts. What M2 still owes US-11 is the half an
 export cannot provide on its own: deleting the account and every row that belongs to it,
 server-side, with a test proving the rows are actually gone rather than just orphaned.
+
+**The local outbox landed 2026-09-01 (US-57).** Migration v9 → v10 adds `sync_queue`,
+additive only — no existing table changes, so a device mid-workout upgrades with every row it
+already had untouched. `SyncPayloadCodec` serialises each Room entity row-shaped rather than
+reusing `BackupCodec`, whose domain-shaped DTOs drop `updated_at` (the column last-write-wins
+is keyed on) and hoist `user_id` into one envelope field instead of carrying it per row — see
+ADR-0043's amendment for the two other things this slice found the ADR's original text got
+wrong (the payload shape, and whether a restore's rows enqueue). Every session, session
+exercise, set, routine and routine-item write now leaves exactly one row in the queue, in the
+same `database.withTransaction` as the write itself; a cascade delete enqueues only its parent,
+and a restore (US-41) enqueues every row it writes with no special case. Found and fixed along
+the way: `RoutineDao.rename` and `RoutineItemDao.setPosition` bumped `updated_at` but never set
+`sync_state = 'PENDING'`, a pre-existing bug this story's own outbox would otherwise have
+silently inherited — a renamed routine or reordered item would never have synced. 34 new tests
+(`SyncQueueDaoTest`, `SyncPayloadCodecTest`, `OutboxEnqueueTest`), all against real Room, per
+`specs/testing-strategy.md`'s "Repository + sync | Fake remote, real Room, assert queue
+behaviour." All four gates green plus `verifyDomainHasNoAndroidDeps`. **Deliberately out of
+scope:** no `SyncWorker`, no network client, no `SyncIndicatorChip` — a status chip with
+nothing draining the queue could only ever climb, which is a screen making a claim the build
+cannot keep. Nothing observable changes for a member; verify by installing over a real workout
+in progress and confirming the v9 → v10 migration runs clean.
+
+**One question this slice raised and left open, on purpose:** `replaceAll` (US-41) wipes a
+member's existing local rows before re-inserting the backup's — does that wipe need its own
+delete rows in the outbox, for whatever a synced device already had that isn't in the restored
+file? This slice's answer is no special case in either direction beyond what's stated above:
+the *inserted* rows enqueue, the *wiped* rows do not. Revisit once a `SyncWorker` exists and a
+real restore-while-signed-in scenario can be tested end to end.
 
 ---
 
