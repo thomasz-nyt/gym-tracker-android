@@ -156,11 +156,18 @@ this is because Room moved v7 → v9 in a week and "a column-shaped file would l
 migration invalidate every backup already on disk." Consequently its DTOs drop `updated_at`
 and `sync_state` entirely (`data-model.md`'s own text: "both are M2 bookkeeping" and
 deliberately excluded from what travels in a backup) and hoist `user_id` to one
-`BackupPayloadDto.memberId` field rather than carrying it per row. `sync_queue`'s payload needs
-the opposite of all three: `updated_at` is the field last-write-wins is keyed on, and a row
-reaching Postgres needs its own `user_id` to satisfy RLS. **Decision:** a second, sync-only
-codec (`SyncPayloadCodec`, `core/data/.../sync/`) serialises the Room entity directly —
-row-shaped, on purpose. `BackupCodec`'s objection to a row-shaped format does not transfer:
+`BackupPayloadDto.memberId` field rather than carrying it per row — the whole envelope
+describes one member, which is true of a backup file and not true of a queue that drains one
+row at a time, independently, in any order. `sync_queue`'s payload needs at least `updated_at`
+back, since that is the column last-write-wins is keyed on and `BackupCodec` drops it on
+purpose. **Decision:** a second, sync-only codec (`SyncPayloadCodec`, `core/data/.../sync/`)
+serialises each Room entity directly, field-for-field — row-shaped, on purpose, carrying
+exactly the columns that table's own Postgres mirror in `data-model.md` §Postgres has (which
+is not `user_id` uniformly: `sessions` and `routines` carry it directly and their RLS checks
+it against the row; `session_exercises`, `sets` and `routine_items` carry none in either
+schema; their RLS instead joins up to the owning `sessions`/`routines` row and checks
+`auth.uid()` there — the payload does not need to fabricate a column neither schema has).
+`BackupCodec`'s objection to a row-shaped format does not transfer:
 queue rows are transient, written and drained within days, not a file a member keeps on disk
 across migrations the way a backup is. The two codecs share no code and the shipped US-40/US-41
 backup format is untouched by this amendment.
