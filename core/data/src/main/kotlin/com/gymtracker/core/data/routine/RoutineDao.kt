@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import kotlinx.coroutines.flow.Flow
 
 /** Queries over `routines` (US-29). */
@@ -22,16 +23,27 @@ interface RoutineDao {
     @Insert
     suspend fun insert(routine: RoutineEntity)
 
-    @Query("UPDATE routines SET name = :name, updated_at = :updatedAt WHERE id = :id")
+    /**
+     * US-57: previously left `sync_state` untouched, so a renamed routine bumped `updated_at`
+     * but never re-entered the outbox's `sync_state = 'PENDING'` convention every other write in
+     * this codebase follows — found writing the outbox (ADR-0043's amendment). Fixed here.
+     */
+    @Query(
+        "UPDATE routines SET name = :name, updated_at = :updatedAt, sync_state = '$SYNC_STATE_PENDING' WHERE id = :id",
+    )
     suspend fun rename(
         id: String,
         name: String,
         updatedAt: Long,
     )
 
-    /** The items go with it via `ON DELETE CASCADE`. No session is touched (ADR-0020). */
+    /**
+     * The items go with it via `ON DELETE CASCADE`. No session is touched (ADR-0020). Returns
+     * the number of rows actually removed (0 or 1) — US-57's outbox enqueues a delete only when
+     * this deleted something.
+     */
     @Query("DELETE FROM routines WHERE id = :id")
-    suspend fun delete(id: String)
+    suspend fun delete(id: String): Int
 
     /** Every routine the member has, in order (US-40, ADR-0034) — [observeRoutines] read once. */
     @Query("SELECT * FROM routines WHERE user_id = :userId ORDER BY position ASC")
@@ -45,14 +57,25 @@ interface RoutineDao {
     suspend fun insertAll(routines: List<RoutineEntity>)
 }
 
-/** Queries over `routine_items` — a separate table, so a separate DAO. */
+/**
+ * Queries over `routine_items` — a separate table, so a separate DAO.
+ *
+ * US-57's [find] pushed this one query past detekt's interface threshold. Suppressed for the
+ * same reason `SetDao` and `SessionDao` already are: a DAO is a query surface, not a class with
+ * behaviour, and this one has exactly one responsibility — reading and writing `routine_items`.
+ */
 @Dao
+@Suppress("TooManyFunctions")
 interface RoutineItemDao {
     @Query("SELECT * FROM routine_items WHERE routine_id = :routineId ORDER BY position ASC")
     fun observeItems(routineId: String): Flow<List<RoutineItemEntity>>
 
     @Query("SELECT * FROM routine_items WHERE routine_id = :routineId ORDER BY position ASC")
     suspend fun itemsOf(routineId: String): List<RoutineItemEntity>
+
+    /** One row by id — US-57's outbox re-reads a row after [setPosition] to build its payload. */
+    @Query("SELECT * FROM routine_items WHERE id = :id")
+    suspend fun find(id: String): RoutineItemEntity?
 
     @Query("SELECT COALESCE(MAX(position), 0) FROM routine_items WHERE routine_id = :routineId")
     suspend fun maxPosition(routineId: String): Int
@@ -64,10 +87,21 @@ interface RoutineItemDao {
     @Update
     suspend fun update(item: RoutineItemEntity)
 
+    /**
+     * Returns the number of rows actually removed (0 or 1) — US-57's outbox enqueues a delete
+     * only when this deleted something.
+     */
     @Query("DELETE FROM routine_items WHERE id = :id")
-    suspend fun delete(id: String)
+    suspend fun delete(id: String): Int
 
-    @Query("UPDATE routine_items SET position = :position, updated_at = :updatedAt WHERE id = :id")
+    /**
+     * US-57: previously left `sync_state` untouched, the same gap [RoutineDao.rename] had —
+     * found and fixed the same way (ADR-0043's amendment).
+     */
+    @Query(
+        "UPDATE routine_items SET position = :position, updated_at = :updatedAt, " +
+            "sync_state = '$SYNC_STATE_PENDING' WHERE id = :id",
+    )
     suspend fun setPosition(
         id: String,
         position: Int,

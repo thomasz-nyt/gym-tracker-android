@@ -16,12 +16,14 @@ import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.sessionexercise.SessionExerciseEntity
 import com.gymtracker.core.data.set.SetDao
 import com.gymtracker.core.data.set.SetEntity
+import com.gymtracker.core.data.sync.SyncQueueDao
+import com.gymtracker.core.data.sync.SyncQueueEntity
 
 /**
  * The local database, which is the source of truth for the UI (constitution §2).
  *
- * `sync_queue` from `data-model.md` arrives with M2, the story that needs it. Every other table
- * `data-model.md` describes for M0–M3a is already an entity below.
+ * `sync_queue` arrived at v10 (US-57, ADR-0043) — the first M2 slice built. Every other table
+ * `data-model.md` describes for M0–M3b is already an entity below.
  */
 @Database(
     entities = [
@@ -31,8 +33,9 @@ import com.gymtracker.core.data.set.SetEntity
         SetEntity::class,
         RoutineEntity::class,
         RoutineItemEntity::class,
+        SyncQueueEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -48,6 +51,8 @@ abstract class GymTrackerDatabase : RoomDatabase() {
 
     abstract fun routineItemDao(): RoutineItemDao
 
+    abstract fun syncQueueDao(): SyncQueueDao
+
     companion object {
         const val NAME = "gym-tracker.db"
 
@@ -62,6 +67,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V7_ROUTINES = 7
         private const val V8_TARGETS = 8
         private const val V9_ROUTINE_ORIGIN = 9
+        private const val V10_SYNC_QUEUE = 10
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -287,6 +293,35 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE `sessions` ADD COLUMN `routine_name` TEXT")
                     db.execSQL("ALTER TABLE `sessions` ADD COLUMN `routine_id` TEXT")
+                }
+            }
+
+        /**
+         * Adds `sync_queue` (US-57, ADR-0043): the outbox every syncable write now enqueues a
+         * row into, in the same transaction as the write itself.
+         *
+         * Additive only, and the only migration since v6 that adds a table rather than a
+         * column — no existing table changes, so a device mid-workout upgrades with every row
+         * it already had untouched and an empty queue, exactly as if it had always been signed
+         * out (ADR-0042: this engine is a no-op for a member who has never signed in).
+         */
+        val MIGRATION_9_10 =
+            object : Migration(V9_ROUTINE_ORIGIN, V10_SYNC_QUEUE) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `sync_queue` (
+                            `id` TEXT NOT NULL,
+                            `entity` TEXT NOT NULL,
+                            `entity_id` TEXT NOT NULL,
+                            `op` TEXT NOT NULL,
+                            `payload_json` TEXT,
+                            `created_at` INTEGER NOT NULL,
+                            `attempts` INTEGER NOT NULL,
+                            PRIMARY KEY(`id`)
+                        )
+                        """.trimIndent(),
+                    )
                 }
             }
     }

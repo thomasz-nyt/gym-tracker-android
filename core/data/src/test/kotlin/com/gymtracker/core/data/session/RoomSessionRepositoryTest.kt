@@ -4,11 +4,13 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import com.gymtracker.core.data.database.GymTrackerDatabase
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -40,7 +42,8 @@ class RoomSessionRepositoryTest {
                     ApplicationProvider.getApplicationContext(),
                     GymTrackerDatabase::class.java,
                 ).build()
-        repository = RoomSessionRepository(database.sessionDao())
+        repository =
+            RoomSessionRepository(database.sessionDao(), database, SyncPayloadCodec(Json { ignoreUnknownKeys = true }))
     }
 
     @After

@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.routine.RoomRoutineRepository
+import com.gymtracker.core.data.sync.SyncPayloadCodec
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineOrigin
@@ -14,6 +15,7 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -48,8 +50,9 @@ class SessionRoutineOriginTest {
                     ApplicationProvider.getApplicationContext(),
                     GymTrackerDatabase::class.java,
                 ).build()
-        sessions = RoomSessionRepository(database.sessionDao())
-        routines = RoomRoutineRepository(database.routineDao())
+        val codec = SyncPayloadCodec(Json { ignoreUnknownKeys = true })
+        sessions = RoomSessionRepository(database.sessionDao(), database, codec)
+        routines = RoomRoutineRepository(database.routineDao(), database, codec)
     }
 
     @After

@@ -10,6 +10,9 @@ import com.gymtracker.core.data.sessionexercise.toDomain
 import com.gymtracker.core.data.sessionexercise.toEntity
 import com.gymtracker.core.data.set.toDomain
 import com.gymtracker.core.data.set.toEntity
+import com.gymtracker.core.data.sync.SyncEntityNames
+import com.gymtracker.core.data.sync.SyncPayloadCodec
+import com.gymtracker.core.data.sync.syncWriteEntry
 import com.gymtracker.core.domain.backup.BackupContents
 import com.gymtracker.core.domain.backup.BackupStore
 import com.gymtracker.core.domain.member.CurrentMember
@@ -26,6 +29,11 @@ import javax.inject.Inject
  * repository in this codebase is scoped to a single table and takes a single DAO, but this one
  * is deliberately not: it spans all five backed-up tables, and [replaceAll] needs
  * `database.withTransaction` regardless, so the database is the natural thing to hold.
+ *
+ * [replaceAll] enqueues every row it restores, exactly like an ordinary write — US-57's own
+ * decision, not a special case for how the row arrived (ADR-0043's amendment). It does **not**
+ * enqueue a delete for whatever [replaceAll] wipes beforehand; that question is named, not
+ * answered, in this session's own notes — see the M2 roadmap entry.
  */
 class RoomBackupStore
     @Inject
@@ -34,6 +42,7 @@ class RoomBackupStore
         private val unitPreference: UnitPreference,
         private val restTimerStore: RestTimerStore,
         private val currentMember: CurrentMember,
+        private val codec: SyncPayloadCodec,
     ) : BackupStore {
         override suspend fun read(memberId: UserId): BackupContents {
             val userId = memberId.value
@@ -63,15 +72,43 @@ class RoomBackupStore
                 database.sessionDao().deleteAllForUser(userId)
                 database.routineDao().deleteAllForUser(userId)
 
-                database.sessionDao().insertAll(contents.sessions.map { it.toEntity() })
-                database.sessionExerciseDao().insertAll(contents.sessionExercises.map { it.toEntity() })
-                database.setDao().insertAll(contents.sets.map { it.toEntity() })
-                database.routineDao().insertAll(contents.routines.map { it.toEntity() })
-                database.routineItemDao().insertAll(contents.routineItems.map { it.toEntity() })
+                val sessions = contents.sessions.map { it.toEntity() }
+                database.sessionDao().insertAll(sessions)
+                sessions.forEach { enqueueRestoredRow(SyncEntityNames.SESSIONS, it.id, codec.encode(it)) }
+
+                val sessionExercises = contents.sessionExercises.map { it.toEntity() }
+                database.sessionExerciseDao().insertAll(sessionExercises)
+                sessionExercises.forEach {
+                    enqueueRestoredRow(
+                        SyncEntityNames.SESSION_EXERCISES,
+                        it.id,
+                        codec.encode(it),
+                    )
+                }
+
+                val sets = contents.sets.map { it.toEntity() }
+                database.setDao().insertAll(sets)
+                sets.forEach { enqueueRestoredRow(SyncEntityNames.SETS, it.id, codec.encode(it)) }
+
+                val routines = contents.routines.map { it.toEntity() }
+                database.routineDao().insertAll(routines)
+                routines.forEach { enqueueRestoredRow(SyncEntityNames.ROUTINES, it.id, codec.encode(it)) }
+
+                val routineItems = contents.routineItems.map { it.toEntity() }
+                database.routineItemDao().insertAll(routineItems)
+                routineItems.forEach { enqueueRestoredRow(SyncEntityNames.ROUTINE_ITEMS, it.id, codec.encode(it)) }
             }
 
             currentMember.restore(contents.memberId)
             unitPreference.set(contents.unit)
             restTimerStore.setDefaultRest(contents.restDefault)
+        }
+
+        private suspend fun enqueueRestoredRow(
+            entity: String,
+            entityId: String,
+            payloadJson: String,
+        ) {
+            database.syncQueueDao().insert(syncWriteEntry(entity, entityId, payloadJson))
         }
     }

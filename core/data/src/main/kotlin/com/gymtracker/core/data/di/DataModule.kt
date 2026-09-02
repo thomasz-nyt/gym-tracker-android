@@ -30,6 +30,7 @@ import com.gymtracker.core.data.sessionexercise.RoomSessionExerciseRepository
 import com.gymtracker.core.data.sessionexercise.SessionExerciseDao
 import com.gymtracker.core.data.set.RoomSetRepository
 import com.gymtracker.core.data.set.SetDao
+import com.gymtracker.core.data.sync.SyncQueueDao
 import com.gymtracker.core.data.warmup.DataStoreWarmUpTimerStore
 import com.gymtracker.core.domain.backup.AppVersion
 import com.gymtracker.core.domain.backup.BackupDecoder
@@ -135,6 +136,9 @@ object DataModule {
 
     @Provides
     fun routineItemDao(database: GymTrackerDatabase): RoutineItemDao = database.routineItemDao()
+
+    @Provides
+    fun syncQueueDao(database: GymTrackerDatabase): SyncQueueDao = database.syncQueueDao()
 
     @Provides
     fun createRoutine(routines: RoutineRepository): CreateRoutine =

@@ -71,8 +71,12 @@ interface SessionDao {
     @Update(entity = SessionEntity::class)
     suspend fun saveMetrics(patch: SessionMetricsPatch)
 
+    /**
+     * Returns the number of rows actually removed (0 or 1) — US-57's outbox enqueues a delete
+     * only when this deleted something, the same technique [clearMetricsForUser] already uses.
+     */
     @Query("DELETE FROM sessions WHERE id = :id")
-    suspend fun delete(id: String)
+    suspend fun delete(id: String): Int
 
     /**
      * US-23, ADR-0040: clears every metrics column the member has imported, returning the
@@ -100,6 +104,14 @@ interface SessionDao {
     /** US-23: how many of the member's sessions carry imported metrics. Counts the active one. */
     @Query("SELECT COUNT(*) FROM sessions WHERE user_id = :userId AND $HAS_METRICS")
     suspend fun countWithMetrics(userId: String): Int
+
+    /**
+     * The ids [clearMetricsForUser] is about to clear, read *before* that update runs — US-57's
+     * outbox needs to know which rows changed so it can enqueue one row per session, and
+     * `HAS_METRICS` matches nothing once the clear itself has already run.
+     */
+    @Query("SELECT id FROM sessions WHERE user_id = :userId AND $HAS_METRICS")
+    suspend fun idsWithMetrics(userId: String): List<String>
 
     private companion object {
         /**
