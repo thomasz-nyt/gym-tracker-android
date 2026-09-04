@@ -37,6 +37,11 @@ import com.gymtracker.core.designsystem.theme.GymTextRoles
  *   if you managed a different number." as a second line every stepper paid for. Additive: null
  *   changes nothing for an existing caller, so `SetSheets.kt`'s own uses of [supporting] (the
  *   kg conversion, "Records this many identical sets.") are unaffected.
+ * @param readOnly for the one caller (Settings' rest default) whose [onValueChange] was already
+ *   a deliberate no-op — a small, bounded number where the steppers cover the whole range, so
+ *   typing was never wired to anything. The field used to render as an ordinary editable
+ *   [OutlinedTextField] anyway, cursor and all, which is the actual bug: it looked like typing
+ *   would do something. `false` for every existing caller, so nothing else changes.
  */
 @Composable
 fun StepperField(
@@ -49,6 +54,7 @@ fun StepperField(
     supporting: String? = null,
     trailingLabel: String? = null,
     keyboardType: KeyboardType = KeyboardType.Number,
+    readOnly: Boolean = false,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -66,6 +72,7 @@ fun StepperField(
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
+                readOnly = readOnly,
                 placeholder = placeholder?.let { { Text(it) } },
                 singleLine = true,
                 textStyle =

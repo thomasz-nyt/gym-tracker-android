@@ -1,8 +1,10 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -95,6 +97,20 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun defaultRestFieldDoesNotOfferAnActionItSilentlyIgnores() {
+        // The field's own comment already says typing was never wired to anything — a rest
+        // default is small and bounded, and the +/- steppers cover the whole range US-05 needs.
+        // The bug is that it still *rendered* as an ordinary editable OutlinedTextField, cursor
+        // and all, inviting a tap-to-type that would then do nothing. This asserts the field is
+        // now honestly read-only rather than only behaviourally so.
+        awaitHome()
+        compose.onNodeWithText(SETTINGS_BUTTON).performClick()
+        awaitSettingsScreen()
+
+        compose.onNodeWithText(DEFAULT_REST_VALUE).assert(hasSetTextAction().not())
+    }
+
+    @Test
     fun backReturnsToTrainHome() {
         awaitHome()
         compose.onNodeWithText(SETTINGS_BUTTON).performClick()
@@ -130,5 +146,8 @@ class SettingsScreenTest {
         const val EXPORT_DATA = "Export data"
         const val IMPORT_DATA = "Import data"
         const val BACK = "Back"
+
+        /** DataStoreRestTimerStore's own default (US-05), read fresh in the isolated test DB. */
+        const val DEFAULT_REST_VALUE = "60"
     }
 }
