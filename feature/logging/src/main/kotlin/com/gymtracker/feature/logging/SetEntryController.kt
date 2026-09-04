@@ -222,6 +222,32 @@ class SetEntryController(
     }
 }
 
+/**
+ * Whether [SetEntryController.confirm] would actually write anything right now.
+ *
+ * "Save set" used to enable on reps and sets alone, while [SetEntryController.validated] (the
+ * function that decides what a tap actually does) also rejected an unparseable weight or RPE.
+ * The gap between the two meant typing `abc` into either field left the button enabled and
+ * tapping it silently did nothing. This is the single predicate both now share, read through the
+ * same parsing rule `validated` uses, so the button's enabled state and the write it promises
+ * cannot drift apart again.
+ */
+internal fun SetEntry.canSave(): Boolean {
+    val parsedReps = reps.toIntOrNull()
+    val parsedSets = sets.toIntOrNull()
+    val typedWeight = weight.trim()
+    val weightUnusable = typedWeight.isNotEmpty() && typedWeight.toDoubleOrNull() == null
+    val typedRpe = rpe.trim()
+    val rpeUnusable = typedRpe.isNotEmpty() && typedRpe.toDoubleOrNull() == null
+
+    return parsedReps != null &&
+        parsedReps >= 1 &&
+        parsedSets != null &&
+        parsedSets >= 1 &&
+        !weightUnusable &&
+        !rpeUnusable
+}
+
 // The stepper arithmetic these use lives in SetSteppers.kt, shared with US-04's editor so a
 // corrected set and a freshly logged one cannot disagree about what one press means.
 

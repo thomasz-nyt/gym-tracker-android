@@ -80,9 +80,10 @@ internal fun SetEntrySheet(
         PrimaryActionButton(
             text = "Save set",
             onClick = callbacks.onConfirm,
-            enabled =
-                entry.reps.toIntOrNull()?.let { it >= 1 } == true &&
-                    entry.sets.toIntOrNull()?.let { it >= 1 } == true,
+            // The same predicate SetEntryController.confirm() checks before writing anything —
+            // see SetEntry.canSave's doc. Reps/sets alone used to gate this button, so an
+            // unparseable weight or RPE left it enabled and tapping it silently did nothing.
+            enabled = entry.canSave(),
             modifier =
                 Modifier
                     .padding(horizontal = GymDimens.ScreenPadding)
@@ -136,7 +137,9 @@ internal fun SetEditSheet(
         PrimaryActionButton(
             text = "Save changes",
             onClick = callbacks.onSave,
-            enabled = edit.reps.toIntOrNull()?.let { it >= 1 } == true,
+            // See SetEntry.canSave's doc: reps alone used to gate this button, so an unparseable
+            // weight or RPE left it enabled and tapping it silently did nothing.
+            enabled = edit.canSave(),
             modifier =
                 Modifier
                     .padding(horizontal = GymDimens.ScreenPadding)
