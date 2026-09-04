@@ -1321,6 +1321,66 @@ stray buzz, not harmless as a countdown left running on a lock screen — which 
 fixed here rather than filed. The fix is structural: `restEndsAt` is now the sole trigger for
 scheduling *and* dismissal, so there is no longer a call site that can forget.
 
+**A UI/UX and trainer-fundamentals review, 2026-09-03, and its first slice: five confirmed
+bugs, fixed.** Requested directly, with M2 explicitly set aside for this pass — it needs
+Supabase credentials this environment does not have, and none of what follows touches a table
+M2 reads, the same narrow exception M3a/M3b/M3c/M4a/M4b and every Turn 5 file already ran on.
+The review mapped every screen's tap paths, empty states, and dead ends against
+`specs/constitution.md` and the design-system's own enforcement tests, then triaged the
+findings: five were confirmed, reproducible bugs (fixed here); a sixth (Settings/Routines
+reachable only with no session running, so rest duration can't be changed mid-workout) turned
+out to be ADR-0030's own deliberate choice, not an oversight, and is left for its own pass
+rather than reopened in a bug-fix sweep. Tap-count friction (13 taps to build a routine with one
+targeted movement) and trainer-level gaps (RPE never read back, no warm-up ramp, exercise-swap
+and supersets already scoped as "designed, not built" below) are deliberately not this pass —
+see the maintainer's own choice to lead with bugs first, over both.
+
+1. **`SKIP REST` survived only while a set existed to be next.** `RestingBody` gated the whole
+   `RestSecondaryRow` — the only control that ends a running rest — behind `upNext != null`.
+   `upNext` is null whenever nothing is logged in the session (`DetermineUpNextSet`'s own
+   contract), which a set deleted out from under an already-running rest produces directly:
+   the rest itself does not stop when its set does. The result was a genuine dead end — no
+   skip, no log, nothing but backgrounding the app — violating US-05's "I can dismiss or skip
+   it" with no exception named anywhere. Reproduced end to end (`RestingWithNoUpNextTest`,
+   deleting the set through the same `SetRepository` the app writes through — not a
+   hypothetical once M2's sync engine lands, since a second household device deleting the same
+   row mid-rest is exactly this shape) and fixed by keeping `SKIP REST` rendered whenever a
+   rest is running; `Up next` and the log button, which need a real set to describe, stay
+   conditional exactly as before.
+2. **"Save set" / "Save changes" stayed enabled on unparseable input.** `SetEntryController.
+   confirm()` and `SetEditController.save()` already refused to write an unparseable weight or
+   RPE — `validated()` returns null — but neither sheet's own `enabled` predicate checked for
+   it, only reps and sets. Typing `abc` into Weight or RPE left the button enabled and tapping
+   it silently did nothing. `canSave()` (`SetSaveabilityTest`) is the one predicate the button
+   and the write now share, so the two cannot drift apart again.
+3. **The warm-up's `THEN` named the newest exercise, not the plan's first.** US-53 promises
+   "the next exercise **in the session's plan**," but `WarmUpStep`'s caller read
+   `exercises.firstOrNull()` against US-02b's newest-first *display* order
+   (`rows.asReversed()`), naming whichever exercise had been added most recently instead.
+   `firstExerciseInPlanOrder` (`WarmUpNextExerciseTest`) reads `SessionExercise.position`
+   directly, independent of the list's own order.
+4. **`Delete routine` fired on one tap, with no undo and no confirmation** — the one
+   destructive action in the app that got neither (contrast US-06a's five-second undo on a
+   deleted workout). Amended into US-29 before any code, per `CLAUDE.md`; `DeleteRoutineAction`
+   (`RoutineEditorScreen.kt`) holds the confirmation as local, transient UI state, the same
+   shape `ActiveSession`'s own `confirmingFinish` already uses, so `RoutineEditorViewModelTest`
+   needed no change at all. `RoutineDeletionTest`'s existing one-tap-deletes case now confirms
+   through the dialog — the acceptance criterion it pinned changed, which is why the test
+   changed with it — plus two new cases: one tap alone opens the confirmation without deleting
+   anything, and cancelling leaves the routine untouched.
+5. **The rest-default field looked editable and silently wasn't.** Its own comment already
+   documented the choice — a rest default is small and bounded, so the steppers were always
+   meant to be the only way to change it — but the field still rendered as an ordinary editable
+   `OutlinedTextField`, cursor and all, inviting a tap-to-type that did nothing. `StepperField`
+   gains an additive `readOnly` param (`false` for every existing caller); Settings' rest
+   default is the one caller that sets it true. `SettingsScreenTest` pins that the field no
+   longer offers a `SetText` semantics action.
+
+All five: test-first per `CLAUDE.md`, all four gates green, and the full instrumented suite (50
+tests, 5 skipped as designed — the pre-existing conditional-feature gates plus
+`InsetConsumptionTest` — 0 failed) run on `Medium_Phone_API_36.1(AVD)` after each fix.
+`TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited throughout.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason

@@ -200,3 +200,18 @@ class SetEditController(
         val UNDO_WINDOW: Duration = Duration.ofSeconds(5)
     }
 }
+
+/**
+ * Whether [SetEditController.save] would actually write anything right now — see
+ * [SetEntry.canSave]'s doc for why this predicate exists as its own thing rather than living
+ * only inside [SetEditController.validated].
+ */
+internal fun SetEdit.canSave(): Boolean {
+    val parsedReps = reps.trim().toIntOrNull()
+    val typedWeight = weight.trim()
+    val weightUnusable = typedWeight.isNotEmpty() && typedWeight.toDoubleOrNull() == null
+    val typedRpe = rpe.trim()
+    val rpeUnusable = typedRpe.isNotEmpty() && typedRpe.toDoubleOrNull() == null
+
+    return parsedReps != null && parsedReps >= 1 && !weightUnusable && !rpeUnusable
+}

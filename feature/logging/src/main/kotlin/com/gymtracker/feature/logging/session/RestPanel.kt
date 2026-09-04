@@ -192,6 +192,16 @@ internal fun RestingBody(
                 modifier =
                     Modifier.padding(horizontal = GymDimens.CompactScreenPadding, vertical = GymDimens.Gap),
             )
+        } else {
+            // US-05: "I can dismiss or skip it. It never blocks logging the next set." upNext is
+            // null whenever nothing is logged in this session right now (`DetermineUpNextSet`'s
+            // own contract) — which a set deleted out from under an already-running rest produces
+            // directly, since the rest itself does not stop when its set does. Without this
+            // branch SKIP REST vanished along with Up next and the log button, leaving no control
+            // on screen at all: a dead end this app has never had anywhere else. Up next and the
+            // log button both need a real set to describe and stay absent; SKIP REST needs
+            // nothing but a rest to leave, so it is the one control that always renders.
+            RestSecondaryRow(onSkipRest = onSkipRest, onAdjust = onAdjust)
         }
     }
 }

@@ -375,6 +375,12 @@ dishonest.
   exercise may appear twice, as it may in a session (US-02).
 - I can rename it, remove a movement, reorder the movements, and delete the routine.
   Deleting it removes its items and touches no session, past or present.
+- **Added 2026-09-03, from the UI/UX audit:** deleting a routine asks for confirmation
+  first. Unlike a deleted workout or a deleted set (ADR-0012), a routine has no undo —
+  it is gone the moment the button is tapped — so a confirm step is the only safety net
+  it gets. This does not reopen ADR-0019's destructive-action rule: delete still lives
+  inside the editor that owns the thing being deleted, the confirmation is just the one
+  extra step that rule never promised not to add.
 - Starting a routine creates a session and copies its movements into it **in order**.
   From that moment it is an ordinary session: US-02a/b/c, US-03, US-04 and US-05a all
   work on it unchanged, and editing today never edits the routine.

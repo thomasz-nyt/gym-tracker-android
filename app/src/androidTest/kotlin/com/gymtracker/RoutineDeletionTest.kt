@@ -2,6 +2,10 @@ package com.gymtracker
 
 import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -25,6 +29,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import javax.inject.Inject
+import kotlin.test.assertTrue
 
 /**
  * ADR-0019 on the Routines tab: a destructive control never shares a surface with a
@@ -32,8 +37,14 @@ import javax.inject.Inject
  * row onto a second line to fit it (redesign audit finding 04). It now lives in the routine
  * editor instead.
  *
- * The two rules this pins: the Routines list never renders "Delete routine" at all, and
- * deleting from inside the editor returns to a list that no longer has the routine in it.
+ * US-29 (amended 2026-09-03): a routine has no undo the way a deleted workout or set does, so
+ * "Delete routine" now asks for confirmation first rather than firing on the one tap — the gap
+ * this file's own second test used to paper over by treating "one tap, then it is gone" as
+ * correct.
+ *
+ * The rules this pins: the Routines list never renders "Delete routine" at all, one tap on it in
+ * the editor opens a confirmation rather than deleting anything, cancelling leaves the routine
+ * untouched, and confirming returns to a list that no longer has it.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -86,6 +97,48 @@ class RoutineDeletionTest {
     }
 
     @Test
+    fun tappingDeleteRoutineOpensAConfirmationInsteadOfDeletingImmediately() {
+        awaitRoutinesTab()
+        compose.onNodeWithText(ROUTINES_TAB).performClick()
+        awaitRoutineOnScreen()
+        compose.onNodeWithContentDescription("Edit $ROUTINE_NAME").performClick()
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Delete routine").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        compose.onNodeWithText("Delete routine").performClick()
+
+        // The confirmation dialog is up, and — the actual bug — nothing has been deleted yet:
+        // the editor is still open on this routine's own name field.
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Delete $ROUTINE_NAME?").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(ROUTINE_NAME).assertIsDisplayed()
+    }
+
+    @Test
+    fun cancellingTheConfirmationKeepsTheRoutine() {
+        awaitRoutinesTab()
+        compose.onNodeWithText(ROUTINES_TAB).performClick()
+        awaitRoutineOnScreen()
+        compose.onNodeWithContentDescription("Edit $ROUTINE_NAME").performClick()
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Delete routine").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Delete routine").performClick()
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Cancel").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        compose.onNodeWithText("Cancel").performClick()
+
+        // Back in the untouched editor — the name field still reads the routine's own name —
+        // and the routine itself was never asked to delete.
+        compose.onNodeWithText(ROUTINE_NAME).assertIsDisplayed()
+        assertTrue(routineStillExists(), "cancelling must not delete anything")
+    }
+
+    @Test
     fun deletingFromTheEditorReturnsToAListWithoutTheRoutine() {
         awaitRoutinesTab()
         compose.onNodeWithText(ROUTINES_TAB).performClick()
@@ -99,6 +152,12 @@ class RoutineDeletionTest {
         }
 
         compose.onNodeWithText("Delete routine").performClick()
+        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
+            compose.onAllNodesWithText("Delete $ROUTINE_NAME?").fetchSemanticsNodes().isNotEmpty()
+        }
+        // "Delete" also matches the row button that got us here, so scope to the dialog's own
+        // text — the confirmation title is unique enough that its sibling button is unambiguous.
+        compose.onNode(hasText("Delete") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
 
         // A device-shared database may hold other routines, so "the list is now empty" is not
         // a safe signal — only that this one is gone, and that navigation landed back on a
@@ -110,6 +169,9 @@ class RoutineDeletionTest {
         }
         compose.onNodeWithText("New routine").assertIsDisplayed()
     }
+
+    private fun routineStillExists(): Boolean =
+        runBlocking { routines.observeRoutines(currentMember.id()).first() }.any { it.id == ROUTINE_ID }
 
     private fun assertEqualsZeroNodes(
         text: String,

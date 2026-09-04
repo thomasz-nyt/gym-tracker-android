@@ -169,16 +169,7 @@ internal fun SettingsScreen(
 
             UnitToggle(unit = state.unit, onUnitChanged = onUnitChanged)
 
-            StepperField(
-                label = "Default rest (seconds)",
-                value = state.restDefaultSeconds.toString(),
-                // Step-only: a rest default is a small, bounded number, so +/- covers the whole
-                // range US-05 needs. Typing is not wired to anything, the same as a read-only
-                // field would be, rather than adding a parse-and-validate path for a two-digit
-                // number nobody needs to type.
-                onValueChange = {},
-                onStep = onRestDefaultStepped,
-            )
+            RestDefaultField(seconds = state.restDefaultSeconds, onStepped = onRestDefaultStepped)
 
             ExportSection(
                 isExporting = state.isExporting,
@@ -250,6 +241,28 @@ private fun SettingsDialogs(
             onDismiss = onForgetMetricsDeclined,
         )
     }
+}
+
+/**
+ * Split out of [SettingsScreen] to keep that function under detekt's length ceiling, the same
+ * reason [SettingsDialogs] already is.
+ *
+ * Step-only: a rest default is small and bounded, so +/- covers the whole range US-05 needs.
+ * `readOnly = true` is what keeps that a promise rather than an accident — see
+ * [StepperField]'s own `readOnly` doc.
+ */
+@Composable
+private fun RestDefaultField(
+    seconds: Long,
+    onStepped: (Int) -> Unit,
+) {
+    StepperField(
+        label = "Default rest (seconds)",
+        value = seconds.toString(),
+        onValueChange = {},
+        onStep = onStepped,
+        readOnly = true,
+    )
 }
 
 @Composable

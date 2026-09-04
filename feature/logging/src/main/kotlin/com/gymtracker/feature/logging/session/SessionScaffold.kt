@@ -282,7 +282,7 @@ private fun ActiveSession(
     // ADR-0045: the running warm-up is a full-screen step, not content drawn alongside the
     // session — this branch is the entire reason "no state where both are visible" holds.
     if (warmUp.elapsed != null) {
-        WarmUpStep(warmUp = warmUp, nextExerciseName = exercises.firstOrNull()?.exercise?.name)
+        WarmUpStep(warmUp = warmUp, nextExerciseName = firstExerciseInPlanOrder(exercises)?.exercise?.name)
         return
     }
 
@@ -339,6 +339,18 @@ private fun ActiveSession(
 
     FinishConfirmation(confirmingFinish, onFinishWorkout) { confirmingFinish = it }
 }
+
+/**
+ * The first exercise **in the session's plan** (US-53): the lowest [SessionExercise.position],
+ * independent of the order [exercises] itself arrives in.
+ *
+ * [ActiveSession]'s own `exercises` parameter is US-02b's newest-first *display* order
+ * (`rows.asReversed()`, set in `ActiveSessionViewModel`) — right for the plan list on screen,
+ * wrong for "the first movement," which is what [WarmUpStep]'s `THEN` row names. Reading
+ * `exercises.firstOrNull()` directly named whichever exercise was added most recently instead.
+ */
+internal fun firstExerciseInPlanOrder(exercises: List<SessionExerciseRow>): SessionExerciseRow? =
+    exercises.minByOrNull { it.sessionExercise.position }
 
 /** Split out of [ActiveSession] to keep that function under detekt's length ceiling. */
 @Composable
