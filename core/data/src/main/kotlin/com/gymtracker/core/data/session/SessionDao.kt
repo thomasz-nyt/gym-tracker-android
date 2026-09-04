@@ -113,6 +113,22 @@ interface SessionDao {
     @Query("SELECT id FROM sessions WHERE user_id = :userId AND $HAS_METRICS")
     suspend fun idsWithMetrics(userId: String): List<String>
 
+    /**
+     * US-58's re-key: every session [oldUserId] owns becomes [newUserId]'s, in one statement.
+     * Marks each row pending like any other write — `AccountAdoption` reads [allForUser] before
+     * calling this to build the outbox payloads, since a raw `UPDATE` returns a row count, not
+     * the rows themselves.
+     */
+    @Query(
+        "UPDATE sessions SET user_id = :newUserId, updated_at = :updatedAt, " +
+            "sync_state = '$SYNC_STATE_PENDING' WHERE user_id = :oldUserId",
+    )
+    suspend fun reassignOwner(
+        oldUserId: String,
+        newUserId: String,
+        updatedAt: Long,
+    ): Int
+
     private companion object {
         /**
          * The member's active session. "Only one active session per member" is enforced by the

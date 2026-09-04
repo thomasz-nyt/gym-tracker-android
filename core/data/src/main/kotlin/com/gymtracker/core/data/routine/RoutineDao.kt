@@ -55,6 +55,22 @@ interface RoutineDao {
 
     @Insert
     suspend fun insertAll(routines: List<RoutineEntity>)
+
+    /**
+     * US-58's re-key: every routine [oldUserId] owns becomes [newUserId]'s, in one statement —
+     * `routine_items` needs no equivalent, since it carries no `user_id` of its own and is
+     * reached through the routine that just moved. See `SessionDao.reassignOwner`'s KDoc for why
+     * `AccountAdoption` reads [allForUser] before calling this rather than after.
+     */
+    @Query(
+        "UPDATE routines SET user_id = :newUserId, updated_at = :updatedAt, " +
+            "sync_state = '$SYNC_STATE_PENDING' WHERE user_id = :oldUserId",
+    )
+    suspend fun reassignOwner(
+        oldUserId: String,
+        newUserId: String,
+        updatedAt: Long,
+    ): Int
 }
 
 /**

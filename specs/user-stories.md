@@ -245,6 +245,33 @@ none of it is needed to prove the queue itself is correct.
 - `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited — every logging write runs
   through the DAOs this story touches, so this is the story's own regression gate.
 
+### US-58 — A device adopts its local rows into an account exactly once
+Added 2026-09-02. The domain/data half of US-07's own "on a device's first-ever sign-in, its
+existing local rows are adopted into the newly-signed-in account" — see ADR-0042 for why this
+is a re-key gated by a permanent per-install flag, not a confirmation dialog. Deliberately
+backend-agnostic: no `supabase-kt` client, no Settings "Sign in to sync" row — neither exists
+yet, since M2 is still waiting on a live Supabase project. `AccountAdoption` is the contract a
+future sign-in flow calls with whatever id gets authenticated; this story builds and tests that
+contract in isolation.
+
+- On this install's first-ever call to adopt an id, every row the device's current member id
+  owns in `sessions` and `routines` is re-assigned to the newly-adopted id, in one transaction.
+  `session_exercises`, `sets` and `routine_items` are untouched directly — none of the three
+  carries a `user_id` of its own in either schema (ADR-0043's amendment), and are reached
+  through the parent row that just moved.
+- Each re-assigned row also leaves a fresh `sync_queue` row (US-57) — re-keying a row's owner
+  is itself a write that needs to reach the server once one exists.
+- This install is marked as having adopted an account, permanently, once the re-key transaction
+  commits. Every call after that, on this install, re-assigns nothing — existing local rows are
+  left exactly where they are, under whatever id already owns them.
+- Either way — first adoption or not — the device's current member id becomes the newly-adopted
+  id going forward, so a member who has already adopted once, signing in as someone else on a
+  shared device, sees a correctly empty view rather than the previous local data.
+- A reinstall starts the flag at "never adopted" again, matching `local_member_id`'s own
+  reinstall behaviour — this is install-scoped DataStore state (ADR-0005), not backed up
+  (ADR-0034).
+- No UI, no network client, and nothing wires this into an actual sign-in flow yet.
+
 ### US-11 — Export and delete
 - I can export all my data as JSON to a file.
 - I can delete my account; all my rows are removed and this is verified by a test.
