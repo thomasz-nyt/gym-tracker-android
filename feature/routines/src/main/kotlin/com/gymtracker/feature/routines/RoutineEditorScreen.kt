@@ -22,6 +22,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -164,19 +167,69 @@ internal fun RoutineEditorScreen(
 
             PrimaryActionButton(text = "Add exercise", onClick = onAddExercise)
 
-            // Destructive, so it is outlined and never shares a surface with a save (ADR-0019)
-            // — "Add exercise" above is this screen's one constructive action. Living here
-            // rather than on the Routines list row is also what fixes that row wrapping onto a
-            // second line to fit it (redesign audit finding 04).
-            OutlinedButton(
-                onClick = onDeleteRoutine,
-                shape = MaterialTheme.shapes.large,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
-            ) {
-                Text("Delete routine")
-            }
+            DeleteRoutineAction(routineName = state.name, onDeleteRoutine = onDeleteRoutine)
         }
+    }
+}
+
+/**
+ * "Delete routine" and its confirmation, split out of [RoutineEditorScreen] to keep that
+ * function under detekt's length ceiling — the same idiom `SessionScaffold.kt`'s
+ * `FinishConfirmation` uses.
+ *
+ * Whether the confirmation is up is local, transient UI state, the same shape
+ * `ActiveSession`'s own `confirmingFinish` is: nothing outside this screen needs to know, so it
+ * does not belong in the ViewModel's `uiState`.
+ *
+ * US-29 (amended 2026-09-03): a routine has no undo the way a deleted workout or set does
+ * (ADR-0012), so this confirmation is the one safety net it gets before the button below
+ * becomes permanent.
+ */
+@Composable
+private fun DeleteRoutineAction(
+    routineName: String,
+    onDeleteRoutine: () -> Unit,
+) {
+    var confirming by remember { mutableStateOf(false) }
+
+    // Destructive, so it is outlined and never shares a surface with a save (ADR-0019) —
+    // "Add exercise" above is this screen's one constructive action. Living here rather than on
+    // the Routines list row is also what fixes that row wrapping onto a second line to fit it
+    // (redesign audit finding 04).
+    OutlinedButton(
+        onClick = { confirming = true },
+        shape = MaterialTheme.shapes.large,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        modifier = Modifier.fillMaxWidth().sizeIn(minHeight = GymDimens.MinTouchTarget),
+    ) {
+        Text("Delete routine")
+    }
+
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Delete $routineName?") },
+            text = { Text("It and its movements are gone for good. No session, past or present, is touched.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirming = false
+                        onDeleteRoutine()
+                    },
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { confirming = false },
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                ) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
