@@ -136,6 +136,17 @@ prescription option ADR-0009 rejected. "Rep" in the original request means *set*
 - **Added 2026-08-14:** the screen's visual treatment is US-39's, not this story's — these
   acceptance criteria are the unchanged behavioural source of truth; US-39 only changes how it
   looks and adds `+`/`−` steppers to the rep count.
+- **Amended 2026-09-05, from the gym floor:** the **weight is editable before I finish each set
+  too**, not only the rep count. A `Weight` stepper sits above `Reps` on the running screen — the
+  same `+`/`−` increment set entry uses (2.5 kg / 5 lb, snapped), typeable, blank for a bodyweight
+  set — and the hero and `LOG SET n` read the field, so the number on screen is the number that
+  is written. What I lift is what is logged: 135 for the first set and 145 for the second writes
+  135 and 145. Set 1 starts at the start dialog's weight; **every later set starts at the weight
+  of the set I just finished**, not the dialog's — the last set is the best prefill for the next,
+  US-37's rule applied inside one exercise — while the rep count still snaps back to the target
+  after every set, as before. A weight that will not read disables `LOG SET n` rather than
+  writing anything, the same way a blank rep count does. The start dialog is unchanged, and
+  `TwoTapSetLoggingTest`, `OneTapSetLoggingTest` and `GuidedFlowScreenTest` pass unedited.
 
 ### US-06 — End a session and see history
 - Ending a session sets `ended_at` and returns me to home.

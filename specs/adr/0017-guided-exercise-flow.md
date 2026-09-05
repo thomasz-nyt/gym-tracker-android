@@ -115,3 +115,21 @@ exercise from a "Start exercise" button, and it introduces no new persisted doma
   again, from a worse position than this one — because each of them is the abstraction, where
   this is a lens. **Revisit if** a request arrives to save a target for next time: that is the
   prescription entity from option 1, and it should reopen ADR-0009 rather than extend this.
+
+## Amendment — 2026-09-05: the weight is editable before each set too
+
+Reported from the gym floor: once the flow had begun, the rep count could be corrected before each
+set but the weight could not — it was fixed at whatever the start dialog said, for every set. The
+Decision above already gives the rule that decides this: *the target is a prefill, never a
+promise*. Writing 135 when 145 was on the bar fabricates a logged value exactly as writing 12 reps
+when 9 were managed does (constitution §2.4), so the load joins the rep count as a field the member
+corrects before `Log set n`, with the same stepper and the same increment set entry uses.
+
+One difference between the two, on purpose. The rep count still snaps back to the target after
+every set: the target is the plan for the whole exercise, and a set of 9 does not make the next
+set's plan 9. The weight carries forward from the set just written: the plan's weight was only ever
+the *first* set's prefill (it came from the last time this exercise was done, per US-03), and once
+a set has actually been lifted in this exercise, that set is the better prefill — US-37's own rule,
+applied inside one exercise. It is derived from the rows, like `setsDone`, not held in memory, so a
+kill mid-exercise resumes at the right weight. Nothing here changes what is stored where: the plan
+in DataStore is unchanged in shape, and every set is still written through `LogSets` as it happens.

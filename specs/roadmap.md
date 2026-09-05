@@ -1470,6 +1470,32 @@ into `Dates.kt` on its third caller, the same threshold `Durations.kt` used. Tes
 open movement; nothing on one never done). All four gates green locally; the instrumented
 additions ran on CI's emulator only.
 
+**From the gym floor, 2026-09-05: the weight is editable set by set in guided mode (US-05a
+amended).** Reported by the maintainer after a session: once an exercise is started, the rep count
+can be corrected before each set but the weight is fixed at whatever the start dialog said — so a
+first set that turned out light, a second at a heavier plate, or a drop set had no honest way to be
+logged without leaving the flow. ADR-0017's own rule already covers it: "the target is a prefill,
+never a promise", and writing 135 when 145 was on the bar fabricates a value exactly as writing 12
+reps when 9 were managed does (constitution §2.4). `GuidedController` now carries the load for the
+set about to be finished the way it carries the rep count — typeable, stepped by
+`SetEntryController.stepWeight`'s increment rule (2.5 kg / 5 lb, snapped, blank rather than zero
+below one step) — and `finishSet` writes what the screen shows, read off the same rendered state
+rather than off the plan, so the two cannot disagree. One asymmetry, deliberate: after a set the
+rep count snaps back to the target (unchanged), but the weight **carries forward from the set just
+written** — derived from the rows, like `setsDone`, so a kill mid-exercise resumes at the right
+weight — because the last set is the best prefill for the next (US-37's rule, applied inside one
+exercise). `GuidedRunning` gains `weight` (the field, in the member's unit) beside `weightKg` (what
+will be written), and `canLogSet()` is the one predicate the button and the write share, the same
+fix `SetEntry.canSave()` made for the sheet. No ADR: no store, table or boundary changes — ADR-0017
+carries a dated amendment note instead. Tests first: seven `GuidedFlowTest` cases (the dialog's
+weight is set 1's prefill, a typed weight is what is written, a step moves by one increment of the
+member's unit, carry-forward beside the rep reset, bodyweight stays bodyweight, an unreadable
+weight logs nothing, a fresh ViewModel over the same stores resumes at the carried weight), and
+`GuidedWeightEditTest` (instrumented — `+` on the running screen changes `LOG SET 1`'s detail and
+the set that is written). `GuidedFlowScreenTest`, `TwoTapSetLoggingTest` and
+`OneTapSetLoggingTest` unedited. All four gates green locally; the instrumented addition ran on
+CI's emulator only.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
