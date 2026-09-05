@@ -20,6 +20,7 @@ import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.member.KeepScreenOnPreference
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionId
@@ -102,6 +103,7 @@ class SettingsViewModelTest {
         fileReader: BackupFileReader = BackupFileReader { "raw" },
         unitPreference: FakeUnitPreference = FakeUnitPreference(),
         restTimerStore: FakeRestTimerStore = FakeRestTimerStore(),
+        keepScreenOnPreference: FakeKeepScreenOnPreference = FakeKeepScreenOnPreference(),
         healthMetricsSource: FakeHealthMetricsSource = FakeHealthMetricsSource(),
         healthIntegration: FakeHealthIntegration = FakeHealthIntegration(),
     ) = SettingsViewModel(
@@ -119,6 +121,7 @@ class SettingsViewModelTest {
         sessions = sessions,
         unitPreference = unitPreference,
         restTimerStore = restTimerStore,
+        keepScreenOnPreference = keepScreenOnPreference,
         healthMetricsSource = healthMetricsSource,
         healthIntegration = healthIntegration,
         forgetHealthMetrics = ForgetHealthMetrics(sessions),
@@ -397,6 +400,29 @@ class SettingsViewModelTest {
 
             assertEquals(WeightUnit.KG, viewModel.uiState.value.unit)
             assertEquals(WeightUnit.KG, unitPreference.current())
+        }
+
+    @Test
+    fun `starts reading whether the screen stays on during a workout, which defaults to on`() =
+        runTest {
+            // US-59: on unless the member says otherwise — the opposite default from the two
+            // opt-in integrations below it on the screen, deliberately.
+            assertEquals(true, viewModel().uiState.value.keepScreenOn)
+
+            val turnedOff = viewModel(keepScreenOnPreference = FakeKeepScreenOnPreference(initial = false))
+            assertEquals(false, turnedOff.uiState.value.keepScreenOn)
+        }
+
+    @Test
+    fun `turning keep-screen-on off is written through and reflected immediately`() =
+        runTest {
+            val preference = FakeKeepScreenOnPreference()
+            val viewModel = viewModel(keepScreenOnPreference = preference)
+
+            viewModel.onKeepScreenOnToggled(false)
+
+            assertEquals(false, viewModel.uiState.value.keepScreenOn)
+            assertEquals(false, preference.current())
         }
 
     @Test
@@ -725,6 +751,20 @@ class SettingsViewModelTest {
 
         override suspend fun markNotificationPermissionAsked() {
             asked.value = true
+        }
+    }
+
+    private class FakeKeepScreenOnPreference(
+        initial: Boolean = true,
+    ) : KeepScreenOnPreference {
+        private val state = MutableStateFlow(initial)
+
+        override fun observe(): Flow<Boolean> = state
+
+        override suspend fun current(): Boolean = state.value
+
+        override suspend fun set(enabled: Boolean) {
+            state.value = enabled
         }
     }
 
