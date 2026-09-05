@@ -165,7 +165,7 @@ class PastWorkoutDetailTest {
         const val WEEKLY_VOLUME_ROW = "Weekly volume by muscle"
         const val WEEKLY_VOLUME_SUBTITLE = "By muscle. Weight moved: sets × reps × load."
 
-        const val EXERCISE = "Barbell Bench Press"
+        const val EXERCISE = "Barbell Bench Press - Medium Grip"
         val PAST_SESSION = SessionId("past-workout-detail-test")
         val PAST_EXERCISE = SessionExerciseId("past-workout-detail-test-bench")
         const val FIRST_SET = "past-workout-detail-test-set-1"
