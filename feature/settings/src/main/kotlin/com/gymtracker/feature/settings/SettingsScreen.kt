@@ -366,9 +366,10 @@ private fun HealthSection(
         // "Health Connect" rather than an unnamed "off, switch", and tapping the label works.
         // Found by US-23's own instrumented test failing on device — the dialog this story adds
         // is reachable only through this control, and the control could not be operated by
-        // anything but a precise tap on the switch. `HeartRateBandSection`'s toggle below has
-        // the identical defect and is deliberately left for M7's accessibility pass, which owns
-        // the sweep; this one is fixed here because US-23 cannot be tested without it.
+        // anything but a precise tap on the switch. `HeartRateBandSection`'s row below had the
+        // identical defect, left for M7's accessibility sweep at the time and closed by the
+        // 2026-09-04 review instead: a 48dp label that does nothing when tapped is not worth
+        // carrying for a milestone that has not started.
         Row(
             modifier =
                 Modifier
@@ -406,6 +407,29 @@ private fun HealthSection(
 }
 
 /**
+ * `toggleable` on the row with the Switch passing `onCheckedChange = null`, exactly as
+ * [HealthSection]'s row: one node named "Live heart rate", operable by its label (US-46, closed
+ * by the 2026-09-04 review — see the comment on [HealthSection]'s row for the history).
+ */
+@Composable
+private fun LiveHeartRateToggleRow(
+    enabled: Boolean,
+    onToggled: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                .toggleable(value = enabled, onValueChange = onToggled, role = Role.Switch),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text("Live heart rate", style = MaterialTheme.typography.titleSmall)
+        Switch(checked = enabled, onCheckedChange = null)
+    }
+}
+
+/**
  * US-46, ADR-0039. Renders nothing while [availability] is [HeartRateBandAvailability.Unavailable]
  * — the same absence rule [HealthSection] follows, for the same reason: below API 31 or with no
  * Bluetooth adapter, there is nothing this section could offer.
@@ -420,13 +444,7 @@ private fun HeartRateBandSection(
     if (state.availability == HeartRateBandAvailability.Unavailable) return
 
     Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Live heart rate", style = MaterialTheme.typography.titleSmall)
-            Switch(checked = state.enabled, onCheckedChange = onToggled)
-        }
+        LiveHeartRateToggleRow(enabled = state.enabled, onToggled = onToggled)
         Text(
             text =
                 "Reads live heart rate directly from a paired band during a workout — " +

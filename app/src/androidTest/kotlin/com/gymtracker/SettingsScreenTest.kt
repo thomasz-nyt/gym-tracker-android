@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -19,6 +20,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -111,6 +113,24 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun liveHeartRateRowIsOperableByItsLabel() {
+        // Found by the 2026-09-04 review. `HealthSection`'s row was made `toggleable` for US-23
+        // and its own comment named this row as carrying "the identical defect", left for M7's
+        // sweep: only a precise tap on the Switch itself did anything, and TalkBack read an
+        // unnamed "off, switch" beside a label that was not part of it. Fixed the same way.
+        awaitHome()
+        compose.onNodeWithText(SETTINGS_BUTTON).performClick()
+        awaitSettingsScreen()
+
+        // The section is absent by design below API 31 or with no Bluetooth adapter (US-46);
+        // that absence is its own rule, asserted elsewhere, not something to fail here.
+        val rows = compose.onAllNodesWithText(LIVE_HEART_RATE).fetchSemanticsNodes()
+        assumeTrue("no live-heart-rate section on this device, so no row to check", rows.isNotEmpty())
+
+        compose.onNodeWithText(LIVE_HEART_RATE).performScrollTo().assert(isToggleable())
+    }
+
+    @Test
     fun backReturnsToTrainHome() {
         awaitHome()
         compose.onNodeWithText(SETTINGS_BUTTON).performClick()
@@ -145,6 +165,7 @@ class SettingsScreenTest {
         const val SETTINGS_TITLE = "Settings"
         const val EXPORT_DATA = "Export data"
         const val IMPORT_DATA = "Import data"
+        const val LIVE_HEART_RATE = "Live heart rate"
         const val BACK = "Back"
 
         /** DataStoreRestTimerStore's own default (US-05), read fresh in the isolated test DB. */
