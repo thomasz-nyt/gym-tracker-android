@@ -1421,6 +1421,27 @@ only on CI's emulator** — the environment this slice was built in has no emula
 verification is listed in the PR for the maintainer rather than claimed here. `TwoTapSetLoggingTest`
 and `OneTapSetLoggingTest` are untouched.
 
+**Tier 1 of the review, first pair, 2026-09-05: the screen stays on, and a one-tap log can be
+taken back (US-59, US-35).** Two gym-floor gaps the first two slices left standing, taken together
+because both are small and neither touches a table. **US-59 is new:** a phone on the floor beside
+the bench locked itself halfway through a two-minute rest — the most-glanced element in the app
+(ADR-0023) going dark — so the running session (the session screen, its rest, the warm-up step,
+the guided screen) now asks the Compose host view to keep the screen on, released the moment
+`activeSession` is null or the app leaves the foreground; a Settings toggle, `Keep the screen on
+during a workout`, default on, device-local (ADR-0005), neither synced nor backed up. A
+`ScreenAwakeViewModel` carries that one signal to the route rather than becoming a seventh branch
+on `ActiveSessionViewModel`'s `combine`, per that class's own doc. **US-35 gains the undo** every
+other accident on the session screen already had (ADR-0012's five seconds): `OneTapLogController`
+wraps `LogUpNextSet` — the write and the rest stay that use case's, shared with the notification's
+`LOG SET` (US-56) — and `Undo` deletes the row and ends the rest it started, since a rest earned
+by a set that no longer exists is a countdown to nothing; the record banner for that set goes with
+it. Only the on-screen button's log is undoable; the notification's has no bar to offer one. No ADR
+for either: the storage is ADR-0005's, the window is ADR-0012's, and a window flag is not an
+architecture decision. Tests first — `OneTapLogUndoTest` (four controller cases), two
+`SettingsViewModelTest` cases, `KeepScreenOnTest` and `OneTapUndoTest` (instrumented);
+`TwoTapSetLoggingTest` and `OneTapSetLoggingTest` unedited. All four gates green locally; the
+instrumented additions ran on CI's emulator only, and the PR lists what to verify on a device.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason

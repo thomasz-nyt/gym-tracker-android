@@ -719,6 +719,13 @@ log, not just open the sheet US-03 already has.
   (ADR-0023, unchanged).
 - `TwoTapSetLoggingTest` must pass **unedited** — it exercises `Add set` → `Save set`, a path
   this story adds to, not alters.
+- **Added 2026-09-05, from the UI/UX and trainer review:** a one-tap log can be taken back for
+  five seconds — a `Set logged · Undo` bar, ADR-0012's window, the same one a deleted set gets.
+  Undo deletes the row that tap wrote and ends the rest it started, since a rest earned by a
+  set that no longer exists is a countdown to nothing; a record banner announced for that set
+  goes with it. Only the most recent one-tap log is undoable, and only the on-screen button's —
+  the notification's `LOG SET` (US-56) has no bar to offer one. `Add set` → `Save set` is
+  unchanged, and so are `TwoTapSetLoggingTest` and `OneTapSetLoggingTest`.
 
 ---
 
@@ -1005,6 +1012,24 @@ on a screen you are not looking at.
 **Not decided here.** `+30s` and an audio cue at 0:10/0:00 are both listed in
 `specs/roadmap.md` as needing the maintainer's call, and both stayed open when this story was
 written. The notification has room for a third action; that is not an argument for filling it.
+
+### US-59 — The screen stays on while a workout runs
+Added 2026-09-05, the first story of the UI/UX and trainer review's gym-floor tier. A phone on the
+floor beside the bench locks itself halfway through a two-minute rest, and every set then starts
+with an unlock and a hunt for the app. The rest countdown is the most-glanced element in the app
+(ADR-0023), and it was going dark. No ADR: the storage is ADR-0005's, and a window flag is not an
+architecture decision.
+
+- While a workout is running — the session screen, its rest, the warm-up step and the guided
+  screen — the app holds the screen on. Nothing else about the phone's timeout changes.
+- Off the running session — Train home with no workout, Exercises, Progress, Settings, a
+  finished workout's summary — the hold is released. So is it the moment the app leaves the
+  foreground: it is a window property, not a wake lock, and it needs no permission.
+- A Settings toggle, `Keep the screen on during a workout`, default **on**. Off, the phone's own
+  timeout applies throughout, workout or not. The setting is device-local (ADR-0005), neither
+  synced nor backed up — it describes this phone, not the member.
+- Changing the setting takes effect at once, including for a workout already running.
+- `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 
 ---
 
