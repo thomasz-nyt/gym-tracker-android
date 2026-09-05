@@ -68,6 +68,13 @@ data class TargetEditorState(
     val sets: String,
     val reps: String,
     val weight: String,
+    /**
+     * Why the last save was refused, one line per field that could not be read — empty until a
+     * save is attempted on an unusable form, and cleared by the next keystroke. Found by the
+     * 2026-09-04 review: `onSave` already refused an unparseable form correctly and then said
+     * nothing, so the dialog just stayed open with no signal why (US-30).
+     */
+    val errors: List<String> = emptyList(),
 )
 
 /** Everything the routine editor renders. */

@@ -80,7 +80,12 @@ class TargetEditorController(
         }
     }
 
-    /** One handler for the whole form; pass only the field that changed. */
+    /**
+     * One handler for the whole form; pass only the field that changed.
+     *
+     * Any keystroke clears [TargetEditorState.errors]: the reason a save was refused describes
+     * the form as it was, and a form being retyped is a different form.
+     */
     fun onFieldChanged(
         sets: String? = null,
         reps: String? = null,
@@ -92,6 +97,7 @@ class TargetEditorController(
                     sets = sets ?: current.sets,
                     reps = reps ?: current.reps,
                     weight = weight ?: current.weight,
+                    errors = emptyList(),
                 )
             }
     }
@@ -102,16 +108,25 @@ class TargetEditorController(
      * Each field is independently optional (US-30: "3 x 8, load unrecorded is a plan"), so a
      * blank field is a valid, present-but-unset part of the target rather than a reason to
      * reject the whole form — only a field that was *typed* and does not parse, or parses
-     * outside the valid range, blocks the save. Silently doing nothing on an invalid save
-     * (rather than surfacing an error) matches `SetEntryController.confirm`'s own handling of
-     * an unusable form.
+     * outside the valid range, blocks the save. A refused save leaves the editor open and says
+     * which field it could not read ([TargetEditorState.errors]); it used to do nothing at all,
+     * which the 2026-09-04 review found is the same defect PR #74 fixed on the set sheet, in a
+     * dialog that reaches its write through a button that cannot be disabled ahead of time the
+     * way `Save set` now is (an `AlertDialog`'s confirm button has no `enabled` of its own here).
      */
     fun onSave() {
-        val editor = state.value
-        val parsed = editor?.parsed()
-        val id = routineId()
-        if (editor == null || parsed == null || id == null) return
+        val editor = state.value ?: return
+        val problems = editor.problems()
+        if (problems.isNotEmpty()) {
+            state.value = editor.copy(errors = problems)
+        } else {
+            save(editor)
+        }
+    }
 
+    private fun save(editor: TargetEditorState) {
+        val id = routineId() ?: return
+        val parsed = editor.parsed() ?: return
         scope.launch {
             val item = items.itemsOf(id).firstOrNull { it.id == editor.itemId } ?: return@launch
             setRoutineItemTarget(item, parsed)
@@ -136,29 +151,41 @@ class TargetEditorController(
 
     /**
      * @return the target [this] describes, in canonical kilograms (ADR-0006), or null if any
-     *   typed field does not parse or clears the floor.
+     *   typed field does not parse or clears the floor — the same fields [problems] names.
      */
     private fun TargetEditorState.parsed(): MovementTarget? {
+        if (problems().isNotEmpty()) return null
         val parsedSets = sets.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
         val parsedReps = reps.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
-        val typedWeight = weight.trim()
-        val parsedWeight = typedWeight.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
-
-        val setsUnusable = sets.isNotBlank() && (parsedSets == null || parsedSets < MIN_TARGET_SETS)
-        val repsUnusable = reps.isNotBlank() && (parsedReps == null || parsedReps < MIN_TARGET_REPS)
-        val weightUnusable = typedWeight.isNotEmpty() && (parsedWeight == null || parsedWeight < 0)
-
-        return if (setsUnusable || repsUnusable || weightUnusable) {
-            null
-        } else {
-            val weightKg = parsedWeight?.let { UnitConverter.toKilograms(it, unit) }
-            MovementTarget(parsedSets, parsedReps, weightKg)
-        }
+        val parsedWeight = weight.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+        val weightKg = parsedWeight?.let { UnitConverter.toKilograms(it, unit) }
+        return MovementTarget(parsedSets, parsedReps, weightKg)
     }
+
+    /**
+     * One line per typed field that cannot be read as the number it should be, in field order,
+     * or empty when the form is saveable. A blank field is never a problem (US-30).
+     */
+    private fun TargetEditorState.problems(): List<String> =
+        buildList {
+            val parsedSets = sets.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+            val parsedReps = reps.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+            val typedWeight = weight.trim()
+            val parsedWeight = typedWeight.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+
+            if (sets.isNotBlank() && (parsedSets == null || parsedSets < MIN_TARGET_SETS)) add(SETS_PROBLEM)
+            if (reps.isNotBlank() && (parsedReps == null || parsedReps < MIN_TARGET_REPS)) add(REPS_PROBLEM)
+            if (typedWeight.isNotEmpty() && (parsedWeight == null || parsedWeight < 0)) add(LOAD_PROBLEM)
+        }
 
     private companion object {
         const val MIN_TARGET_SETS = 1
         const val MIN_TARGET_REPS = 1
+
+        /** What the dialog shows for each unreadable field; asserted literally by the unit test. */
+        const val SETS_PROBLEM = "Sets needs a whole number, 1 or more."
+        const val REPS_PROBLEM = "Reps needs a whole number, 1 or more."
+        const val LOAD_PROBLEM = "Load needs a number, 0 or more."
 
         /** The catalog's ranking is per member; this form does not rank, it only needs a name. */
         val ANY_MEMBER = UserId("")
