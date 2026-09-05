@@ -1052,6 +1052,27 @@ is visible next to this week's — `135 × 8 @8` and `135 × 8 @10` are differen
 - The two-tap path is untouched — the chips add no step to `Add set` → `Save set`.
   `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 
+### US-61 — What I did last time, in full, while I log
+Added 2026-09-05, the UI/UX and trainer review's second trainer-level gap. ADR-0023 put "the
+number to beat" on the rest panel — last time's *last* set. A trainer paces progressive overload
+against the whole of last time: three sets of eight at 135 is a different starting point from
+eight, seven, five, and the app had that history and showed one row of it. The rest lived in
+Progress, two screens away from the bench.
+
+- The open movement shows everything the member lifted the last time they did it, in order,
+  under its name and target: a `LAST TIME · TUE 4 AUG` kicker and one line, `135 lb × 8 @8  ·
+  135 lb × 8  ·  135 lb × 7 @9` — every set, with its RPE where one was recorded (US-60).
+- "Last time" is the most recent earlier appearance of the movement, the same rule the rest
+  panel's comparison uses (`lastSetOfBefore`): today's own sets are the rows already on screen,
+  never "last time". A movement never done before shows no block at all — absence, not an empty
+  label (US-13, constitution §2.4).
+- History, never a target: the kicker names the day, and the line sits beside (never merged
+  with) any `Target …` line the movement carries (US-30's rule, unchanged).
+- Read from the sets the app already has — two repository reads the rest panel already makes,
+  no new query, no column — so it is correct for every session ever logged.
+- `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited — nothing about logging a set
+  changes; this is a line of history under the movement.
+
 ---
 
 ## M4a — Rep, animated

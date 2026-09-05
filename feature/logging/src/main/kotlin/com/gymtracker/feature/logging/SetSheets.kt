@@ -26,10 +26,6 @@ import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * Set entry (US-03), as a bottom sheet with a stepper on every number (ADR-0016).
@@ -350,7 +346,3 @@ private fun SetEntry.prefillSummary(unit: WeightUnit): String =
         .takeIf { it.isNotBlank() }
         ?.let { "$it ${unit.name.lowercase()} × $reps" }
         ?: "$reps reps"
-
-/** The same "EEE d MMM" convention the rest panel's comparison line already uses. */
-private fun Instant.asDay(): String =
-    DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault()).format(this)

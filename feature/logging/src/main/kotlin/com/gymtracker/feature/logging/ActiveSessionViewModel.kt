@@ -38,6 +38,8 @@ import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.DeleteSet
 import com.gymtracker.core.domain.set.LogSets
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.PreviousPerformance
+import com.gymtracker.core.domain.set.PreviousPerformanceOf
 import com.gymtracker.core.domain.set.ResolveSetPrefill
 import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.SetPrefill
@@ -105,6 +107,11 @@ data class SessionUiState(
      * write with one tap, and the screen falls back to `Add set` alone).
      */
     val nextLoggableSet: UpNextSet? = null,
+    /**
+     * Everything the member lifted the last time they did the open exercise, in full (US-61) —
+     * null when they never have, or nothing is open. History to pace against, never a target.
+     */
+    val lastTime: PreviousPerformance? = null,
     /** Whether the exercise just removed from the session can still be put back (US-02c). */
     val canUndoRemoval: Boolean = false,
     /** Whether the set just logged in one tap can still be taken back (US-35). */
@@ -180,6 +187,8 @@ private data class SessionData(
     /** Which row is open — see the computation site for why this is not [SessionProgress.current]. */
     val openSessionExerciseId: SessionExerciseId?,
     val nextLoggableSet: UpNextSet?,
+    /** The open exercise's last time, in full (US-61). */
+    val lastTime: PreviousPerformance?,
 )
 
 /**
@@ -209,6 +218,7 @@ private data class SessionComputed(
     val progress get() = data.progress
     val openSessionExerciseId get() = data.openSessionExerciseId
     val nextLoggableSet get() = data.nextLoggableSet
+    val lastTime get() = data.lastTime
 }
 
 /**
@@ -285,6 +295,13 @@ class ActiveSessionViewModel
 
         /** Choosing which exercise is open lives in its own state holder; see [ExerciseSelectionController]. */
         val selection = ExerciseSelectionController()
+
+        /**
+         * Built from [sets] rather than injected, like `LogUpNextSet` below: a fourth read over
+         * the same repository, not a new dependency, and one more constructor parameter would
+         * churn every test file that builds this ViewModel by hand for no test of its own.
+         */
+        private val previousPerformanceOf = PreviousPerformanceOf(sets)
 
         /** Set entry lives in its own state holder; see [SetEntryController]. */
         val setEntry =
@@ -483,6 +500,13 @@ class ActiveSessionViewModel
                         ?: rows.firstOrNull()
                 val history =
                     currentRow?.let { row -> prefillFromLastSet(row.sessionExercise.exerciseId, memberId, unit) }
+                // US-61: the whole of last time for the open exercise — same "earlier session
+                // only" rule as the rest panel's comparison below, since today's sets are the rows
+                // already on screen.
+                val lastTime =
+                    currentRow?.let { row ->
+                        previousPerformanceOf(row.sessionExercise.exerciseId, memberId, row.sessionExercise.sessionId)
+                    }
                 val target = currentRow?.sessionExercise?.target
                 // US-37 (ADR-0031): history wins over the target when both exist. The 3x12
                 // floor ResolveSetPrefill adds is for the set-entry sheet's empty boxes, not
@@ -524,6 +548,7 @@ class ActiveSessionViewModel
                     progress = progress,
                     openSessionExerciseId = currentRow?.sessionExercise?.id,
                     nextLoggableSet = nextLoggableSet,
+                    lastTime = lastTime,
                 )
             }
 
@@ -586,6 +611,7 @@ class ActiveSessionViewModel
                     progress = computed.progress,
                     openSessionExerciseId = computed.openSessionExerciseId,
                     nextLoggableSet = computed.nextLoggableSet,
+                    lastTime = computed.lastTime,
                     justSetRecord = record,
                 )
             }
