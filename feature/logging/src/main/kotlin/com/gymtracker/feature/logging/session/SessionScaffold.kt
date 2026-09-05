@@ -84,6 +84,7 @@ internal fun SessionBody(
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
     onUndoSetDelete: () -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
+    onUndoOneTapLog: () -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     onFinishSummaryDismissed: () -> Unit,
@@ -130,6 +131,8 @@ internal fun SessionBody(
                     onUndoSetDelete = onUndoSetDelete,
                     upNext = state.upNext,
                     onLogNextSet = onLogNextSet,
+                    canUndoOneTapLog = state.canUndoOneTapLog,
+                    onUndoOneTapLog = onUndoOneTapLog,
                     onSkipRest = onSkipRest,
                     onFinishWorkout = onFinishWorkout,
                     onSelectExercise = onSelectExercise,
@@ -274,6 +277,8 @@ private fun ActiveSession(
     onUndoSetDelete: () -> Unit,
     upNext: UpNextSet?,
     onLogNextSet: (UpNextSet) -> Unit,
+    canUndoOneTapLog: Boolean,
+    onUndoOneTapLog: () -> Unit,
     onSkipRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     onSelectExercise: (SessionExerciseId) -> Unit,
@@ -295,6 +300,7 @@ private fun ActiveSession(
 
         if (canUndoRemoval) RemovalUndoBar(onUndoRemoval)
         if (canUndoSetDelete) SetDeleteUndoBar(onUndoSetDelete)
+        if (canUndoOneTapLog) OneTapLogUndoBar(onUndoOneTapLog)
 
         if (restRemaining != null) {
             RestingBody(

@@ -37,6 +37,32 @@ internal fun RemovalUndoBar(onUndo: () -> Unit) {
     }
 }
 
+/**
+ * US-35's five-second window for a set logged in one tap, worded like the other three so all four
+ * read alike. Undo deletes the row that tap wrote and ends the rest it started.
+ */
+@Composable
+internal fun OneTapLogUndoBar(onUndo: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = GymDimens.Gap),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Set logged", style = MaterialTheme.typography.bodyMedium)
+            TextButton(
+                onClick = onUndo,
+                modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+            ) {
+                Text("Undo")
+            }
+        }
+    }
+}
+
 /** US-04's five-second window, worded like the other two so all three read alike. */
 @Composable
 internal fun SetDeleteUndoBar(onUndo: () -> Unit) {
