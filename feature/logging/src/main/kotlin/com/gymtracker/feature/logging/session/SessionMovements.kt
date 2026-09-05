@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.GymLoadRow
 import com.gymtracker.core.designsystem.component.GymText
@@ -32,11 +33,13 @@ import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SetIntervals
+import com.gymtracker.core.domain.set.PreviousPerformance
 import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.feature.logging.SessionExerciseRow
+import com.gymtracker.feature.logging.asDay
 import com.gymtracker.feature.logging.asMinutesSeconds
 import java.time.Duration
 
@@ -88,6 +91,7 @@ internal fun SessionPlan(
     exercises: List<SessionExerciseRow>,
     openSessionExerciseId: SessionExerciseId?,
     nextLoggableSet: UpNextSet?,
+    lastTime: PreviousPerformance?,
     unit: WeightUnit,
     orderIsAPlan: Boolean,
     onAddSet: (SessionExerciseRow) -> Unit,
@@ -114,6 +118,7 @@ internal fun SessionPlan(
                     movementsTotal = planOrder.size,
                     unit = unit,
                     intervals = intervals,
+                    lastTime = lastTime,
                     onRemoveExercise = onRemoveExercise,
                     onStartExercise = onStartExercise,
                     onEditSet = onEditSet,
@@ -243,6 +248,7 @@ private fun CurrentMovement(
     movementsTotal: Int,
     unit: WeightUnit,
     intervals: Map<String, Duration>,
+    lastTime: PreviousPerformance?,
     onRemoveExercise: (SessionExerciseId) -> Unit,
     onStartExercise: (SessionExerciseRow) -> Unit,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
@@ -269,6 +275,7 @@ private fun CurrentMovement(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            lastTime?.let { LastTimeBlock(it, unit) }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
@@ -396,6 +403,42 @@ private fun LoggedSets(
         }
     }
 }
+
+/**
+ * Everything the member lifted the last time they did this movement (US-61) — the whole of it, in
+ * order, with each set's effort where one was recorded. The rest panel compares the next set
+ * against last time's *last* set (ADR-0023); this is the rest of that story, because progressive
+ * overload is paced against all of last time, not its final row. History, never a target: the
+ * kicker names the day, and every number here is one someone lifted.
+ */
+@Composable
+private fun LastTimeBlock(
+    lastTime: PreviousPerformance,
+    unit: WeightUnit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+        GymText(
+            text = "LAST TIME · ${lastTime.performedAt.asDay().uppercase()}",
+            role = GymTextRoles.LabelCaps,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = lastTime.describe(unit),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** "135 lb × 8 @8  ·  135 lb × 8  ·  135 lb × 7 @9" — every set, in order, its effort where recorded. */
+private fun PreviousPerformance.describe(unit: WeightUnit): String =
+    sets.joinToString("  ·  ") { set ->
+        val weight = WeightFormatter.format(set.weightKg, unit).primary
+        val effort = set.rpe?.let { " ${RpeFormatter.at(it)}" }.orEmpty()
+        "$weight × ${set.reps}$effort"
+    }
 
 /**
  * One other movement in the session: index, name, and either its target (not yet started) or
