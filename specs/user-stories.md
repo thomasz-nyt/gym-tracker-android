@@ -314,6 +314,9 @@ that do not exist and one assumed a backend that does not — see ADR-0014 and A
   tapping a result still adds it directly. **US-02's path gains no taps.**
 - Equipment the source never recorded reads as "Not specified", not as "Other"
   (constitution §2, ADR-0015).
+- **Added 2026-09-04, from the UI/UX review:** when nothing matches, the empty result itself
+  offers `Clear search and filters`, which resets both. The count row's `Clear` stays; a way
+  back belongs where the emptiness is shown, not only in the row above it.
 
 ### US-13 — See how a machine works
 - The exercise detail screen lists primary and secondary muscles worked.
@@ -324,6 +327,10 @@ that do not exist and one assumed a backend that does not — see ADR-0014 and A
 - Everything on the screen ships in the app, so it is **fully usable in airplane
   mode on first launch**, with nothing to cache first.
 - GIF and video playback move to M2 with the Storage bucket they need (ADR-0014).
+- **Added 2026-09-04, from the UI/UX review:** where the catalog records aliases (ADR-0015),
+  the detail screen lists them — `Also called: ohp, overhead press, military press` — so a
+  member who found the movement by typing an alias can see the match confirmed. The 855
+  exercises with none show nothing in their place, the same absence pattern as the photo.
 
 ### US-14 — Link out to a video
 - The detail screen offers a YouTube **search** for the exercise, opened in the
@@ -437,6 +444,11 @@ plan they wanted.
   never become a PR.
 - The two-tap path is untouched: `TwoTapSetLoggingTest` must pass **unedited**. A prefill
   is a prefill whatever its source.
+- **Added 2026-09-04, from the UI/UX review:** a save the editor refuses — a typed field that
+  is not a number, a set or rep count below 1, a negative load — leaves the dialog open and
+  says which field it could not read, one line per field, cleared by the next keystroke. A
+  blank field is still never a problem. It used to refuse silently, the same defect PR #74
+  fixed on the set sheet's `Save set`.
 
 ### US-32 — A session remembers the routine it was started from
 See `adr/0028-a-session-remembers-its-routine.md`. History reads "Sun 9 Aug, 13:53" today;
@@ -834,6 +846,10 @@ you-tap.md` for why it replaces the set row's checkmark rather than sitting besi
   audit already made once about the history summary line.
 - Constitution §2.4: an interval is never estimated or interpolated — absent, not guessed, when
   there is no earlier set to measure from.
+- **Added 2026-09-04, from the UI/UX review:** a past workout's detail (US-06b) shows the same
+  interval on each set row, computed the same way over the whole session. It had shown none —
+  the active session carried the number since Turn 3 and the screen that shows the same
+  session the next day never caught up.
 
 ### US-45 — Switch back to an exercise the machine took away
 Added 2026-08-17, reported live during testing. See `adr/0037-choosing-which-exercise-is-open.md`.
@@ -1121,6 +1137,10 @@ first — this is not Health Connect, and not the same read as US-22.
   advertising the Bluetooth Heart Rate service and lets the member choose one.
 - Denying either permission leaves the rest of the app fully working.
 - The chosen device is remembered device-locally (not synced, not backed up).
+- **Added 2026-09-04, from the UI/UX review:** the `Live heart rate` row in Settings is one
+  named switch — tapping its label toggles it, and TalkBack reads "Live heart rate" rather than
+  an unnamed "off, switch" beside a label — the same `toggleable` row `Health Connect` got for
+  US-23, which at the time named this row as carrying the identical defect.
 
 ### US-47 — Live heart rate, everywhere
 - While a reading exists, the current BPM is visible from every screen in the app,

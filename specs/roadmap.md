@@ -1381,6 +1381,46 @@ tests, 5 skipped as designed — the pre-existing conditional-feature gates plus
 `InsetConsumptionTest` — 0 failed) run on `Medium_Phone_API_36.1(AVD)` after each fix.
 `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited throughout.
 
+**The review's second slice, 2026-09-04: six more confirmed gaps, fixed.** Same terms as the
+first — nothing here touches a table, a migration or anything M2 reads; every fix is test-first;
+and each is filed as an amendment to the story it belongs to rather than a new one. The same
+day, the maintainer chose the scope for the rest of the review: the gym-floor core-loop tier,
+the trainer-model tier and the setup-friction tier of the proposal (custom household exercises
+deferred), plus the calls this file had been carrying as open — `+30s` **yes**, a cue at 0:10
+and 0:00 **yes, as a haptic pulse with an optional tone behind a Settings toggle**, set types
+(warm-up, drop, failure) **yes**, and a per-exercise setup note **yes, persistent, no per-session
+note**. Each lands as its own story below as it ships; the two rest-timer entries under "needs
+the maintainer's call" are therefore decided, and move out of that list when their stories land.
+
+1. **The target editor refused an unreadable save silently** (US-30). `TargetEditorController.
+   onSave` returned without saving on `abc` or a negative load — correctly — and said nothing,
+   so the dialog stayed open with no signal why. PR #74's fix 2 again, in a dialog whose
+   `AlertDialog` confirm button has no `enabled` to gate ahead of time the way `Save set` now
+   is. `TargetEditorState.errors` names each unreadable field, one line each, cleared by the
+   next keystroke (`RoutineEditorViewModelTest`, two new cases).
+2. **`Live heart rate` was a switch you had to hit exactly** (US-46). `HealthSection`'s row
+   became `toggleable` for US-23 and its own comment named this row as carrying "the identical
+   defect", left for M7's sweep. Closed the same way (`SettingsScreenTest.
+   liveHeartRateRowIsOperableByItsLabel`, skipped where the device has no adapter — US-46's own
+   absence rule, not this test's to fail).
+3. **Aliases were searchable and invisible** (US-12, US-13, ADR-0015). Eighteen exercises carry
+   hand-authored aliases that search matched and no screen ever showed; the detail screen lists
+   them as `Also called: …`, absent for the 855 without (`CatalogDetailsTest`).
+4. **A past workout's detail showed no set-to-set interval** (US-44). `PastLoggedSets` copied
+   `LoggedSets` "row for row" before Turn 3 gave the latter an interval, and was never brought
+   back in line — the same session read `+1:30` mid-workout and nothing the next day
+   (`PastWorkoutDetailTest`, two sets seeded exactly ninety seconds apart).
+5. **Weekly volume spelled multiplication with the letter `x`** where every load line in the
+   app writes `×` (`PastWorkoutDetailTest`).
+6. **The empty catalog result had no way back where the emptiness showed** (US-12). "Nothing
+   matches. Try fewer filters." named the remedy without offering it; it now carries `Clear
+   search and filters` beneath, and the count row's `Clear` stays (`CatalogDetailsTest`).
+
+All six test-first per `CLAUDE.md`; all four gates green. **The instrumented additions have run
+only on CI's emulator** — the environment this slice was built in has no emulator, so on-device
+verification is listed in the PR for the maintainer rather than claimed here. `TwoTapSetLoggingTest`
+and `OneTapSetLoggingTest` are untouched.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
