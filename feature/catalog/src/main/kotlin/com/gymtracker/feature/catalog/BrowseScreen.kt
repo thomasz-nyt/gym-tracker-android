@@ -138,12 +138,25 @@ internal fun BrowseScreen(
             ResultCount(state, onClearFilters)
 
             if (state.results.isEmpty() && !state.isLoading) {
-                Text(
-                    text = "Nothing matches. Try fewer filters.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
+                // The way back belongs where the emptiness is shown (found by the 2026-09-04
+                // review): the count row's own `Clear` stays, but with the list empty the eye
+                // lands here, on a sentence that named the remedy and did not offer it.
+                Column(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "Nothing matches. Try fewer filters.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (state.isNarrowed) {
+                        TextButton(onClick = onClearFilters, modifier = Modifier.sizeIn(minHeight = MIN_TOUCH_TARGET)) {
+                            Text("Clear search and filters")
+                        }
+                    }
+                }
             } else {
                 Results(
                     results = state.results,

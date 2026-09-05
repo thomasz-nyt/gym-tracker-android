@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -122,6 +123,8 @@ internal fun ExerciseDetailScreen(
                 RepMascot(modifier = Modifier.height(GymDimens.MascotInline))
             }
 
+            Aliases(exercise.aliases)
+
             MovementPhoto(exercise.imageAsset)
 
             MuscleTags(exercise)
@@ -148,6 +151,25 @@ internal fun ExerciseDetailScreen(
             }
         }
     }
+}
+
+/**
+ * ADR-0015's hand-authored aliases were searchable (US-12) but never shown anywhere, so a member
+ * who typed "ohp" and landed here had nothing confirming the match was the one they meant (found
+ * by the 2026-09-04 review). Absent — not an empty line — for the 855 exercises that have none,
+ * US-13's own absence pattern.
+ */
+@Composable
+private fun Aliases(aliases: List<String>) {
+    if (aliases.isEmpty()) return
+
+    Text(
+        text = "Also called: ${aliases.joinToString()}",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** Bundled for the starter set only; the rest show nothing rather than a placeholder. */
