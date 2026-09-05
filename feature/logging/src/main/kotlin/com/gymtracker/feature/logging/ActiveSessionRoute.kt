@@ -163,10 +163,12 @@ private fun ActiveSessionViewModel.guidedActions() =
     GuidedActions(
         onStartExercise = ::onStartExercise,
         onStartNext = ::onStartNextExercise,
-        onWeightChanged = { guided.changeSetup(weight = it) },
+        onSetupWeightChanged = { guided.changeSetup(weight = it) },
         onSetupWeightStepped = guided::stepSetupWeight,
         onSetupRepsChanged = { guided.changeSetup(reps = it) },
         onSetupRepsStepped = guided::stepSetupReps,
+        onWeightChanged = guided::changeWeight,
+        onWeightStepped = guided::stepWeight,
         onRepsChanged = guided::changeReps,
         onRepsStepped = guided::stepReps,
         onSetsChanged = { guided.changeSetup(sets = it) },
@@ -187,13 +189,18 @@ private fun ActiveSessionViewModel.guidedActions() =
 data class GuidedActions(
     val onStartExercise: (SessionExerciseRow) -> Unit = {},
     val onStartNext: (SessionExerciseRow) -> Unit = {},
-    val onWeightChanged: (String) -> Unit = {},
+    /** The weight typed in the start dialog — the first set's prefill. */
+    val onSetupWeightChanged: (String) -> Unit = {},
     /** Steps the start dialog's weight by one increment of the member's unit. */
     val onSetupWeightStepped: (Int) -> Unit = {},
     /** The target typed in the start dialog. */
     val onSetupRepsChanged: (String) -> Unit = {},
     /** Steps that same target by -1 or +1, before the flow has begun. */
     val onSetupRepsStepped: (Int) -> Unit = {},
+    /** The load actually on the bar for the set about to be finished (US-05a, amended 2026-09-05). */
+    val onWeightChanged: (String) -> Unit = {},
+    /** Steps that load by one increment of the member's unit, from what the screen shows. */
+    val onWeightStepped: (Int) -> Unit = {},
     /** The count actually managed on the set about to be finished — not the same thing. */
     val onRepsChanged: (String) -> Unit = {},
     /** Steps that same count by -1 or +1 (ADR-0033), sharing [onFinishSet]'s own fallback. */
@@ -306,6 +313,8 @@ private fun GuidedRoute(
         running = running,
         unit = state.unit,
         restRemaining = state.restRemaining,
+        onWeightChanged = guided.onWeightChanged,
+        onWeightStepped = guided.onWeightStepped,
         onRepsChanged = guided.onRepsChanged,
         onRepsStepped = guided.onRepsStepped,
         onFinishSet = guided.onFinishSet,

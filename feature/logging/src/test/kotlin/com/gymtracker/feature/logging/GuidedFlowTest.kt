@@ -554,4 +554,122 @@ class GuidedFlowTest {
                 assertEquals("", checkNotNull(expectMostRecentItem().guided.setup).weight, "a bodyweight set, not 0")
             }
         }
+
+    // US-05a as amended 2026-09-05, from the gym floor: the weight joins the rep count as a field
+    // corrected before each set. Same increment rule as set entry (2.5 kg / 5 lb, snapped), same
+    // "what is on screen is what is written" guarantee — finishSet reads the rendered state, not
+    // the plan — and one deliberate asymmetry: reps snap back to the target after a set, the
+    // weight carries forward from the set just written (US-37's rule inside one exercise).
+
+    @Test
+    fun `the start dialog's weight is the first set's prefill, shown in the member's unit`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, weight = "135")
+
+            viewModel.uiState.test {
+                val running = checkNotNull(expectMostRecentItem().guided.running)
+                assertEquals("135", running.weight, "the field reads pounds, the member's unit")
+                assertEquals(61.23, running.weightKg!!, 0.01, "what LOG SET 1 will write, in kilograms")
+            }
+        }
+
+    @Test
+    fun `an edited weight is what gets logged, not the start dialog's`() =
+        runTest {
+            // Constitution §2.4 again: 145 on the bar and 135 in the row is a fabricated value,
+            // exactly as 12 written for 9 managed is.
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, weight = "135")
+
+            viewModel.guided.changeWeight("145")
+            viewModel.guided.finishSet()
+
+            assertEquals(65.77, sets.all.single().weightKg!!, 0.01, "145 lb in canonical kilograms")
+        }
+
+    @Test
+    fun `stepping the weight moves by one increment of the member's unit, from the number on screen`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            units.set(WeightUnit.LB)
+            beginGuided(viewModel, weight = "135")
+
+            viewModel.guided.stepWeight(1)
+
+            viewModel.uiState.test {
+                assertEquals("140", checkNotNull(expectMostRecentItem().guided.running).weight, "135 lb + 5 lb")
+            }
+            viewModel.guided.finishSet()
+            assertEquals(63.5, sets.all.single().weightKg!!, 0.01, "140 lb in canonical kilograms")
+        }
+
+    @Test
+    fun `the weight carries forward to the next set, where the rep count snaps back to the target`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, weight = "135", targetReps = "12")
+
+            viewModel.guided.changeWeight("145")
+            viewModel.guided.changeReps("9")
+            viewModel.guided.finishSet()
+
+            viewModel.uiState.test {
+                val running = checkNotNull(expectMostRecentItem().guided.running)
+                assertEquals("145", running.weight, "the set just lifted is the next set's prefill (US-37)")
+                assertEquals("12", running.reps, "the target is the plan for every set (unchanged)")
+            }
+        }
+
+    @Test
+    fun `a blank weight writes a bodyweight set, and the next set stays bodyweight`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, weight = "135")
+
+            viewModel.guided.changeWeight("")
+            viewModel.guided.finishSet()
+
+            assertNull(sets.all.single().weightKg, "absent, not zero (constitution §2)")
+            viewModel.uiState.test {
+                val running = checkNotNull(expectMostRecentItem().guided.running)
+                assertEquals("", running.weight)
+                assertNull(running.weightKg)
+            }
+        }
+
+    @Test
+    fun `a weight that will not read logs nothing`() =
+        runTest {
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            beginGuided(viewModel, weight = "135")
+
+            viewModel.guided.changeWeight("abc")
+            viewModel.uiState.test {
+                assertEquals(false, checkNotNull(expectMostRecentItem().guided.running).canLogSet())
+            }
+            viewModel.guided.finishSet()
+
+            assertEquals(emptyList(), sets.all)
+        }
+
+    @Test
+    fun `a fresh ViewModel over the same stores resumes at the carried weight, not the dialog's`() =
+        runTest {
+            // Derived from the rows, like setsDone — so a kill mid-exercise lands back on the
+            // weight actually being lifted rather than on the start dialog's.
+            val repository = FakeSessions(listOf(session("s1")))
+            val first = viewModel(repository)
+            beginGuided(first, weight = "135")
+            first.guided.changeWeight("145")
+            first.guided.finishSet()
+
+            val resumed = viewModel(repository)
+
+            resumed.uiState.test {
+                val running = checkNotNull(expectMostRecentItem().guided.running)
+                assertEquals(1, running.setsDone)
+                assertEquals("145", running.weight)
+            }
+        }
 }
