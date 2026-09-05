@@ -88,7 +88,10 @@ internal fun WeeklyVolumeScreen(
         ) {
             Text("Weekly volume", style = MaterialTheme.typography.titleLarge)
             Text(
-                text = "By muscle. Weight moved: sets x reps x load.",
+                // "×", the sign every other load line in the app already uses ("135 lb × 8"),
+                // not the letter x — one screen spelling multiplication differently reads as
+                // a typo (found by the 2026-09-04 review).
+                text = "By muscle. Weight moved: sets × reps × load.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
