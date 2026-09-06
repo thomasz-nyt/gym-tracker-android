@@ -27,6 +27,7 @@ import org.junit.Before
 import org.junit.Test
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -396,6 +397,61 @@ class RoutineEditorViewModelTest {
 
             viewModel.uiState.test {
                 assertNull(expectMostRecentItem().movements.single().target, "0 sets is not a valid target")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a refused save says which fields it could not read, and saves nothing`() =
+        runTest {
+            // Found by the 2026-09-04 UI/UX review, the same class of defect PR #74 fixed on the
+            // set sheet ("Save set stayed enabled on unparseable input"): the test above proves
+            // the write was refused, but the dialog then stayed open saying nothing at all, so
+            // a member had no way to tell a refused save from a tap that did not register.
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "abc", reps = "8", weight = "-5")
+            viewModel.target.onSave()
+
+            viewModel.target.editor.test {
+                val editor = expectMostRecentItem()
+                assertNotNull(editor, "a refused save leaves the editor open")
+                assertEquals(
+                    listOf("Sets needs a whole number, 1 or more.", "Load needs a number, 0 or more."),
+                    editor.errors,
+                    "one line per unreadable field, in field order; reps was fine and is not named",
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().movements.single().target, "nothing was saved")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `typing again clears the reason a save was refused`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "abc")
+            viewModel.target.onSave()
+
+            viewModel.target.onFieldChanged(sets = "3")
+
+            viewModel.target.editor.test {
+                assertEquals(
+                    emptyList<String>(),
+                    expectMostRecentItem()?.errors,
+                    "the reason described a form that no longer exists",
+                )
                 cancelAndIgnoreRemainingEvents()
             }
         }

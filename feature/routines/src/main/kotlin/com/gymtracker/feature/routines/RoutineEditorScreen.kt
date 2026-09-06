@@ -386,6 +386,23 @@ private fun MovementTarget.asTargetLine(unit: WeightUnit): String {
 }
 
 /**
+ * Why Save did nothing, one line per field it could not read (US-30). Absent until a save is
+ * refused, and gone again on the next keystroke — the same place-and-lifetime a field's own
+ * supporting text would have, without the three fields each needing to know the others' state.
+ */
+@Composable
+private fun RefusalReasons(errors: List<String>) {
+    errors.forEach { problem ->
+        Text(
+            text = problem,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            maxLines = 2,
+        )
+    }
+}
+
+/**
  * Sets, edits or clears one movement's target (US-30).
  *
  * Three plain text fields rather than the stepper the session screen uses for logging a set:
@@ -434,6 +451,7 @@ private fun TargetEditorDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                RefusalReasons(editor.errors)
             }
         },
         confirmButton = {

@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -49,6 +50,7 @@ import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionSummary
+import com.gymtracker.core.domain.session.SetIntervals
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Duration
@@ -137,6 +139,12 @@ internal fun WorkoutDetailScreen(
         ) {
             WorkoutHeader(detail.summary, unit)
 
+            // US-44's set-to-set interval, session-wide as on the active screen (the walk to the
+            // next machine counts), read over `performed_at` — so it is correct for every past
+            // workout, not only those logged after this shipped. The active session had shown
+            // it since Turn 3 and this screen never did (found by the 2026-09-04 review).
+            val intervals = remember(detail) { SetIntervals.of(detail.exercises.flatMap { it.sets }) }
+
             if (detail.exercises.isEmpty()) {
                 Text(
                     text = "No exercises were added to this workout.",
@@ -149,7 +157,7 @@ internal fun WorkoutDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
                 ) {
                     items(detail.exercises, key = { it.sessionExercise.id.value }) { performed ->
-                        PerformedExerciseCard(performed, unit, onEditSet)
+                        PerformedExerciseCard(performed, unit, intervals, onEditSet)
                         GymDivider()
                     }
                 }
@@ -201,11 +209,16 @@ private fun WorkoutHeader(
     }
 }
 
-/** One exercise: what it was, and every set logged against it. */
+/**
+ * One exercise: what it was, and every set logged against it.
+ *
+ * [intervals] is the whole session's set-to-set gaps ([SetIntervals.of]), keyed by set id.
+ */
 @Composable
 private fun PerformedExerciseCard(
     performed: PerformedExercise,
     unit: WeightUnit,
+    intervals: Map<String, Duration>,
     onEditSet: (PerformedExercise, ExerciseSet) -> Unit,
 ) {
     Row(
@@ -236,7 +249,7 @@ private fun PerformedExerciseCard(
                 // ADR-0004 makes this representable: added, then never used.
                 Text("No sets logged", style = MaterialTheme.typography.bodyMedium)
             } else {
-                PastLoggedSets(performed.sets, unit) { set -> onEditSet(performed, set) }
+                PastLoggedSets(performed.sets, unit, intervals) { set -> onEditSet(performed, set) }
                 Text(
                     text = performed.describeTotals(unit),
                     style = MaterialTheme.typography.bodyMedium,
@@ -252,12 +265,15 @@ private fun PerformedExerciseCard(
  *
  * Copies `LoggedSets` in `ActiveSessionScreen.kt` row for row — same label, same content
  * description, same tap target — because a past set and an active one are corrected through the
- * same editor and must be indistinguishable in how they read.
+ * same editor and must be indistinguishable in how they read. That now includes US-44's
+ * interval: "+1:30" since the set before it, session-wide, absent on the first set and on bulk
+ * entries exactly as `LoggedSets` renders it.
  */
 @Composable
 private fun PastLoggedSets(
     sets: List<ExerciseSet>,
     unit: WeightUnit,
+    intervals: Map<String, Duration>,
     onEditSet: (ExerciseSet) -> Unit,
 ) {
     Column {
@@ -270,6 +286,7 @@ private fun PastLoggedSets(
                         append("   ${weight.primary}")
                         weight.secondary?.let { append("  ·  $it") }
                         set.rpe?.let { append("   RPE $it") }
+                        intervals[set.id]?.let { append("   +${it.asMinutesSeconds()}") }
                     },
                 style = MaterialTheme.typography.titleMedium,
                 modifier =
