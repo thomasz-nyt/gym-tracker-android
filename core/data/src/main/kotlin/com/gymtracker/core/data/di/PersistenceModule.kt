@@ -41,6 +41,7 @@ object PersistenceModule {
                 GymTrackerDatabase.MIGRATION_7_8,
                 GymTrackerDatabase.MIGRATION_8_9,
                 GymTrackerDatabase.MIGRATION_9_10,
+                GymTrackerDatabase.MIGRATION_10_11,
             ).build()
 
     @Provides

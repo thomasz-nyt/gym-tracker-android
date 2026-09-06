@@ -71,6 +71,7 @@ data class RoutineItemEntity(
     @ColumnInfo(name = "target_sets") val targetSets: Int? = null,
     @ColumnInfo(name = "target_reps") val targetReps: Int? = null,
     @ColumnInfo(name = "target_weight_kg") val targetWeightKg: Double? = null,
+    @ColumnInfo(name = "target_rest_seconds") val targetRestSeconds: Int? = null,
 )
 
 internal fun RoutineEntity.toDomain(): Routine =
@@ -125,16 +126,18 @@ internal fun RoutineItem.toEntity(updatedAt: Long = Instant.now().toEpochMilli()
         targetSets = target?.sets,
         targetReps = target?.reps,
         targetWeightKg = target?.weightKg,
+        targetRestSeconds = target?.restSeconds,
     )
 
 /**
  * Reconstructs a [MovementTarget], or null if every column is null — the row carries no plan,
  * not a plan of all-nulls (US-13's absence pattern, kept even though the domain type could
- * technically represent both).
+ * technically represent both). The rest counts as a column (ADR-0050): "bench, take two
+ * minutes" is a plan.
  */
 internal fun RoutineItemEntity.toTarget(): MovementTarget? =
-    if (targetSets == null && targetReps == null && targetWeightKg == null) {
+    if (listOfNotNull(targetSets, targetReps, targetWeightKg, targetRestSeconds).isEmpty()) {
         null
     } else {
-        MovementTarget(sets = targetSets, reps = targetReps, weightKg = targetWeightKg)
+        MovementTarget(sets = targetSets, reps = targetReps, weightKg = targetWeightKg, restSeconds = targetRestSeconds)
     }
