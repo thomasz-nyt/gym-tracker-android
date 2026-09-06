@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
@@ -37,6 +38,14 @@ data class GuidedSetup(
 /**
  * An exercise being walked through, as the screen renders it.
  *
+ * @property weight the load for the set about to be finished, as the field shows it — in the
+ *   member's unit, blank for a bodyweight set (US-05a, amended 2026-09-05). Set 1 starts at the
+ *   start dialog's weight; every later set starts at the weight of the set just written, because
+ *   the last set is the best prefill for the next (US-37's rule inside one exercise). Editable,
+ *   for the same reason [reps] is: 135 in the row when 145 was on the bar is a fabricated value.
+ * @property weightKg what [weight] will write, in canonical kilograms — null for a bodyweight
+ *   set, and also null while the field will not read; [canLogSet] tells the two apart. Untyped,
+ *   it is the carried kilograms exactly, never round-tripped through the member's unit.
  * @property setsDone how many of [targetSets] are logged. Derived from the rows in the
  *   database, never counted in memory, so a kill mid-exercise resumes where it left off.
  * @property reps the count for the set about to be finished, prefilled with [targetReps] and
@@ -50,6 +59,7 @@ data class GuidedSetup(
 data class GuidedRunning(
     val row: SessionExerciseRow,
     val exerciseName: String,
+    val weight: String,
     val weightKg: Double?,
     val targetSets: Int,
     val targetReps: Int,
@@ -65,6 +75,29 @@ data class GuidedRunning(
 data class GuidedState(
     val setup: GuidedSetup? = null,
     val running: GuidedRunning? = null,
+)
+
+/**
+ * Whether `Log set n` would actually write anything right now: the rep count reads as a whole
+ * number of at least one, and the weight is blank (bodyweight) or reads as a number. The one
+ * predicate the button's enabled state and [GuidedController.finishSet] share — the same fix
+ * `SetEntry.canSave()` made for the sheet, so the two cannot drift apart.
+ */
+internal fun GuidedRunning.canLogSet(): Boolean {
+    val typedWeight = weight.trim()
+    val weightReads = typedWeight.isEmpty() || typedWeight.toDoubleOrNull()?.let { it >= 0.0 } == true
+    return weightReads && reps.toIntOrNull()?.let { it >= 1 } == true
+}
+
+/**
+ * What the member has typed over the set about to be finished, if anything (US-05a). Null means
+ * untouched: the rep count falls back to the target and the weight to the set just written (or
+ * the plan's, for set 1) — see [runningExercise]. Cleared after every set, so those fallbacks are
+ * what each new set starts from.
+ */
+private data class TypedSet(
+    val reps: String? = null,
+    val weight: String? = null,
 )
 
 /**
@@ -102,11 +135,17 @@ class GuidedController(
     private val scope: CoroutineScope,
 ) {
     private val setup = MutableStateFlow<GuidedSetup?>(null)
-    private val typedReps = MutableStateFlow<String?>(null)
+    private val typed = MutableStateFlow(TypedSet())
 
     val state: Flow<GuidedState> =
-        combine(setup, planStore.plan, exercises, typedReps) { pending, plan, rows, typed ->
-            GuidedState(setup = pending, running = plan?.let { runningExercise(it, rows, typed, clock) })
+        combine(
+            setup,
+            planStore.plan,
+            exercises,
+            typed,
+            unitPreference.observe(),
+        ) { pending, plan, rows, typedSet, unit ->
+            GuidedState(setup = pending, running = plan?.let { runningExercise(it, rows, typedSet, unit, clock) })
         }
 
     /**
@@ -204,8 +243,8 @@ class GuidedController(
 
         scope.launch {
             val unit = unitPreference.current()
-            val typed = pending.weight.trim()
-            val typedWeight = typed.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+            val entered = pending.weight.trim()
+            val typedWeight = entered.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
 
             planStore.setPlan(
                 GuidedPlan(
@@ -220,27 +259,49 @@ class GuidedController(
                 ),
             )
             setup.value = null
-            typedReps.value = null
+            typed.value = TypedSet()
         }
     }
 
     /** Corrects the rep count for the set about to be finished. */
     fun changeReps(reps: String) {
-        typedReps.value = reps
+        typed.update { it.copy(reps = reps) }
     }
 
     /**
      * Steps the rep count for the set about to be finished (ADR-0033, ADR-0016).
      *
-     * Shares [finishSet]'s own fallback — the typed value if there is one, else the target —
-     * so a step before any typing moves from the number on screen, not from zero. The floor is
-     * [String.stepWholeNumber]'s, the same one set entry and set correction already share.
+     * Steps from what the screen shows — [GuidedRunning.reps], which is already the typed value
+     * if there is one, else the target — so a step before any typing moves from the number on
+     * screen, not from zero. The floor is [String.stepWholeNumber]'s, the same one set entry and
+     * set correction already share.
      */
     fun stepReps(direction: Int) {
         scope.launch {
-            val plan = planStore.plan.first() ?: return@launch
-            val from = typedReps.value ?: plan.targetReps.toString()
-            typedReps.value = from.stepWholeNumber(direction)
+            val running = state.first().running ?: return@launch
+            typed.update { it.copy(reps = running.reps.stepWholeNumber(direction)) }
+        }
+    }
+
+    /** Corrects the load for the set about to be finished (US-05a, amended 2026-09-05). */
+    fun changeWeight(weight: String) {
+        typed.update { it.copy(weight = weight) }
+    }
+
+    /**
+     * Steps the load for the set about to be finished by one increment of the member's unit —
+     * [SetEntryController.stepWeight]'s exact rule (2.5 kg / 5 lb, snapped onto the increment so
+     * a weight carried over from a set typed in the other unit steps cleanly, floored at blank
+     * rather than zero: a bodyweight set, not a claim the bar weighs nothing). From what the
+     * screen shows, like [stepReps].
+     */
+    fun stepWeight(direction: Int) {
+        scope.launch {
+            val running = state.first().running ?: return@launch
+            val increment = unitPreference.current().weightIncrement()
+            val from = running.weight.trim().toDoubleOrNull() ?: 0.0
+            val stepped = snap(from, increment, direction)
+            typed.update { it.copy(weight = if (stepped <= 0.0) "" else trimNumber(stepped)) }
         }
     }
 
@@ -248,26 +309,27 @@ class GuidedController(
      * Writes the set that was just performed and starts the rest (US-05).
      *
      * One set, one `performed_at`. The rest starts only after the write returns, so a save
-     * that failed cannot leave a timer counting down for a set that does not exist.
+     * that failed cannot leave a timer counting down for a set that does not exist. What is
+     * written is exactly what the screen shows — [GuidedRunning.weightKg] and [GuidedRunning.reps],
+     * read off the same rendered state, gated by the same [canLogSet] as the button — so the
+     * number on screen and the number in the row cannot disagree (constitution §2.4).
      */
     fun finishSet() {
         scope.launch {
-            val plan = planStore.plan.first() ?: return@launch
-            val typed = typedReps.value ?: plan.targetReps.toString()
-            val reps = typed.toIntOrNull()?.takeIf { it >= 1 } ?: return@launch
+            val running = state.first().running?.takeIf { it.canLogSet() } ?: return@launch
 
             performSet(
-                plan.sessionExerciseId,
+                running.row.sessionExercise.id,
                 SetInput(
-                    // Already canonical kilograms; the plan stored it converted, so it is
-                    // handed back in KG rather than round-tripped through the member's unit.
-                    weight = plan.weightKg,
+                    // Already canonical kilograms — carried or converted once in runningExercise,
+                    // so it is handed back in KG rather than round-tripped through the member's unit.
+                    weight = running.weightKg,
                     unit = WeightUnit.KG,
-                    reps = reps,
+                    reps = running.reps.toInt(),
                     rpe = null,
                 ),
             )
-            typedReps.value = null
+            typed.value = TypedSet()
         }
     }
 
@@ -275,7 +337,7 @@ class GuidedController(
     fun stop() {
         scope.launch {
             planStore.setPlan(null)
-            typedReps.value = null
+            typed.value = TypedSet()
         }
     }
 
@@ -291,7 +353,7 @@ class GuidedController(
     ) {
         scope.launch {
             planStore.setPlan(null)
-            typedReps.value = null
+            typed.value = TypedSet()
             start(row, prefill)
         }
     }
@@ -320,7 +382,8 @@ class GuidedController(
 private fun runningExercise(
     plan: GuidedPlan,
     rows: List<SessionExerciseRow>,
-    typed: String?,
+    typed: TypedSet,
+    unit: WeightUnit,
     clock: Clock,
 ): GuidedRunning? {
     val row = rows.firstOrNull { it.sessionExercise.id == plan.sessionExerciseId } ?: return null
@@ -328,17 +391,37 @@ private fun runningExercise(
     val logged = row.sets.takeLast(done)
     val weighted = logged.mapNotNull { set -> set.weightKg?.let { it * set.reps } }
 
+    // US-05a (amended 2026-09-05): the load carried into the set about to be finished is the set
+    // just written — read off the rows, like `done`, so a kill mid-exercise resumes at the weight
+    // actually being lifted — and the plan's only for set 1. Whatever the member has typed over
+    // it wins, converted once here; untyped, the carried kilograms pass through exactly.
+    val carriedKg = if (done > 0) logged.last().weightKg else plan.weightKg
+    val weight = typed.weight ?: carriedKg?.let { trimNumber(UnitConverter.fromKilograms(it, unit)) }.orEmpty()
+
     return GuidedRunning(
         row = row,
         exerciseName = row.exercise?.name ?: row.sessionExercise.exerciseId.value,
-        weightKg = plan.weightKg,
+        weight = weight,
+        weightKg = if (typed.weight == null) carriedKg else weight.asKilograms(unit),
         targetSets = plan.targetSets,
         targetReps = plan.targetReps,
         setsDone = done,
-        reps = typed ?: plan.targetReps.toString(),
+        reps = typed.reps ?: plan.targetReps.toString(),
         isComplete = done >= plan.targetSets,
         volumeKg = if (weighted.isEmpty()) null else weighted.sum(),
         elapsed = Duration.between(plan.startedAt, clock.instant()),
         nextUp = rows.firstOrNull { it.sessionExercise.id != row.sessionExercise.id && it.sets.isEmpty() },
     )
 }
+
+/**
+ * The kilograms a typed weight will write: null for blank (a bodyweight set) and for text that
+ * will not read as a non-negative number — [GuidedRunning.canLogSet] tells those two apart, and
+ * keeps the second from ever reaching `performSet`.
+ */
+private fun String.asKilograms(unit: WeightUnit): Double? =
+    trim()
+        .takeIf { it.isNotEmpty() }
+        ?.toDoubleOrNull()
+        ?.takeIf { it >= 0.0 }
+        ?.let { UnitConverter.toKilograms(it, unit) }

@@ -15,6 +15,9 @@ import java.time.Instant
  * @property targetSets and [targetReps] are a prefill for each set, never a promise about what
  *   was performed. The rep count is editable before every set, because writing 12 when 9 were
  *   managed would fabricate a logged value (constitution §2.4).
+ * @property weightKg the *first* set's prefill only, and editable before every set for the same
+ *   reason (US-05a, amended 2026-09-05). From set two on, the set just written is the prefill —
+ *   read off the rows, not stored here — so this field never changes once the flow has begun.
  * @property setsAtStart how many sets this exercise already had when the flow began, so
  *   progress is a subtraction rather than a guess. An exercise half-logged by hand and then
  *   started guided does not read as already finished.

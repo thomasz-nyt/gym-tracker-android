@@ -57,7 +57,8 @@ import java.time.Duration
  * Everything on screen is still one of three things: what you are lifting, which set you are
  * on, and the one button that ends it. The rep count is a field rather than a label because the
  * target is a prefill and not a promise — logging 12 when 9 were managed would fabricate a
- * value (constitution §2.4).
+ * value (constitution §2.4). Since 2026-09-05 the weight is a field for the same reason (US-05a,
+ * amended): 135 in the row when 145 was on the bar is the same fabrication.
  *
  * The root is a `LazyColumn`, not a `Column`, on a small enough screen that this content does
  * not always fit — `SessionMovements.kt`'s `BottomLogBar` already documents why: a bare
@@ -69,6 +70,8 @@ internal fun GuidedExerciseScreen(
     running: GuidedRunning,
     unit: WeightUnit,
     restRemaining: Duration?,
+    onWeightChanged: (String) -> Unit,
+    onWeightStepped: (Int) -> Unit,
     onRepsChanged: (String) -> Unit,
     onRepsStepped: (Int) -> Unit,
     onFinishSet: () -> Unit,
@@ -91,7 +94,18 @@ internal fun GuidedExerciseScreen(
                         MidSetHeader(running, unit)
                     }
                 }
-                item { GuidedControls(running, unit, onRepsChanged, onRepsStepped, onFinishSet, onStop) }
+                item {
+                    GuidedControls(
+                        running = running,
+                        unit = unit,
+                        onWeightChanged = onWeightChanged,
+                        onWeightStepped = onWeightStepped,
+                        onRepsChanged = onRepsChanged,
+                        onRepsStepped = onRepsStepped,
+                        onFinishSet = onFinishSet,
+                        onStop = onStop,
+                    )
+                }
             }
         }
     }
@@ -210,11 +224,13 @@ private fun RestHero(
     }
 }
 
-/** The set-progress dots, the rep stepper, and the log/stop row — shared by both non-complete states. */
+/** The set-progress dots, the weight and rep steppers, and the log/stop row — shared by both non-complete states. */
 @Composable
 private fun GuidedControls(
     running: GuidedRunning,
     unit: WeightUnit,
+    onWeightChanged: (String) -> Unit,
+    onWeightStepped: (Int) -> Unit,
     onRepsChanged: (String) -> Unit,
     onRepsStepped: (Int) -> Unit,
     onFinishSet: () -> Unit,
@@ -226,6 +242,8 @@ private fun GuidedControls(
         verticalArrangement = Arrangement.spacedBy(GymDimens.Gap),
     ) {
         SegmentBar(total = running.targetSets, done = running.setsDone)
+
+        WeightField(running, unit, onWeightChanged, onWeightStepped)
 
         StepperField(
             label = "Reps",
@@ -248,7 +266,9 @@ private fun GuidedControls(
                 eyebrow = "LOG SET ${running.setsDone + 1}",
                 detail = logButtonDetail(weight, running.reps),
                 onClick = onFinishSet,
-                enabled = running.reps.toIntOrNull()?.let { it >= 1 } == true,
+                // The same predicate finishSet itself is gated by, so the button never promises
+                // a write the controller would refuse (a blank rep count, a weight that won't read).
+                enabled = running.canLogSet(),
                 modifier = Modifier.weight(1f),
             )
             OutlinedButton(
@@ -260,6 +280,31 @@ private fun GuidedControls(
             }
         }
     }
+}
+
+/**
+ * The load for the set about to be finished (US-05a, amended 2026-09-05): the same stepper, the
+ * same increment and the same blank-means-bodyweight rule as set entry's, above the rep count it
+ * used to sit fixed beside. The other unit reads underneath as it does on the sheet and in the
+ * start dialog, so a number typed here means what it means there; absent for a bodyweight set
+ * and while the field will not read, rather than a conversion of nothing.
+ */
+@Composable
+private fun WeightField(
+    running: GuidedRunning,
+    unit: WeightUnit,
+    onWeightChanged: (String) -> Unit,
+    onWeightStepped: (Int) -> Unit,
+) {
+    StepperField(
+        label = "Weight (${unit.name.lowercase()})",
+        value = running.weight,
+        onValueChange = onWeightChanged,
+        onStep = onWeightStepped,
+        placeholder = "Bodyweight",
+        supporting = running.weightKg?.let { WeightFormatter.format(it, unit).secondary },
+        keyboardType = KeyboardType.Decimal,
+    )
 }
 
 /** "LOG SET n" button's detail line — the reading unit only, matching `RestPanel.kt`'s. */
@@ -433,6 +478,8 @@ private fun GuidedMidSetPreview() {
             running = previewRunning(),
             unit = WeightUnit.LB,
             restRemaining = null,
+            onWeightChanged = {},
+            onWeightStepped = {},
             onRepsChanged = {},
             onRepsStepped = {},
             onFinishSet = {},
@@ -450,6 +497,8 @@ private fun GuidedRestingPreview() {
             running = previewRunning(),
             unit = WeightUnit.LB,
             restRemaining = Duration.ofSeconds(45),
+            onWeightChanged = {},
+            onWeightStepped = {},
             onRepsChanged = {},
             onRepsStepped = {},
             onFinishSet = {},
@@ -472,6 +521,8 @@ private fun GuidedRestingNarrowWorstCasePreview() {
             running = previewRunning(exerciseName = WORST_CASE_NAME, weightKg = null),
             unit = WeightUnit.LB,
             restRemaining = Duration.ofSeconds(45),
+            onWeightChanged = {},
+            onWeightStepped = {},
             onRepsChanged = {},
             onRepsStepped = {},
             onFinishSet = {},
@@ -491,6 +542,8 @@ private fun GuidedCompletePreview() {
             running = previewRunning(setsDone = 3, isComplete = true),
             unit = WeightUnit.LB,
             restRemaining = null,
+            onWeightChanged = {},
+            onWeightStepped = {},
             onRepsChanged = {},
             onRepsStepped = {},
             onFinishSet = {},
@@ -514,6 +567,7 @@ private fun previewRunning(
     return GuidedRunning(
         row = row,
         exerciseName = exerciseName,
+        weight = if (weightKg == null) "" else "135",
         weightKg = weightKg,
         targetSets = 3,
         targetReps = 12,
