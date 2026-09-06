@@ -96,6 +96,13 @@ class RpeChipsTest {
             sessions.observeActiveSession(member).first()?.let { sessions.deleteSession(it.id) }
             listOf(LAST_WEEK, TODAY_SESSION).forEach { sessions.deleteSession(it) }
             restTimerStore.setRestEndsAt(null)
+            // On this emulator image, RestController.shouldAskForNotifications() still triggers
+            // Android's system permission dialog on the first rest of a session even though
+            // GrantPermissionRule has already granted it at the OS level — the check reads an
+            // app-level "have we asked" flag, not the OS grant state. That dialog is a different
+            // window the Compose semantics tree cannot see past. Marking it already-asked skips
+            // the request path entirely, the state a real member's second-ever workout is in.
+            restTimerStore.markNotificationPermissionAsked()
 
             sessions.startSession(
                 WorkoutSession(
