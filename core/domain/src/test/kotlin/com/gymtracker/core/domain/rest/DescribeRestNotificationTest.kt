@@ -17,6 +17,7 @@ import com.gymtracker.core.domain.session.FakeSessionRepository
 import com.gymtracker.core.domain.sessionexercise.FakeSessionExerciseRepository
 import com.gymtracker.core.domain.set.FakeSetRepository
 import com.gymtracker.core.domain.set.PrefillFromLastSet
+import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -182,4 +183,32 @@ class DescribeRestNotificationTest {
             state.value = unit
         }
     }
+
+    // US-56 as amended (2026-09-05): the shade has no screen around its buttons, so the log action
+    // says what it will write.
+
+    @Test
+    fun `the log action names the load and the reps it will write, in the member's unit`() {
+        val notice = RestNotice(upNext = upNext(weight = 135.0, reps = 8), exerciseName = "Bench", unit = WeightUnit.LB)
+
+        assertEquals("LOG 135 LB × 8", notice.logLabel())
+    }
+
+    @Test
+    fun `a bodyweight movement's log action names the reps alone`() {
+        val notice = RestNotice(upNext = upNext(weight = null, reps = 12), exerciseName = "Dips", unit = WeightUnit.LB)
+
+        assertEquals("LOG 12 REPS", notice.logLabel(), "never LOG BODYWEIGHT × 12")
+    }
+
+    private fun upNext(
+        weight: Double?,
+        reps: Int,
+    ) = UpNextSet(
+        sessionExerciseId = SessionExerciseId("se-1"),
+        exerciseId = bench,
+        setNumber = 2,
+        prefill = SetPrefill(weight = weight, reps = reps),
+        comparison = null,
+    )
 }

@@ -62,10 +62,13 @@ class RestNotification
                         .setOngoing(true)
                         .setSilent(true)
                         .setPriority(NotificationCompat.PRIORITY_LOW)
+                        // Phone face-up on the floor: the countdown and its actions read from
+                        // the lock screen without an unlock (US-56 as amended).
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .apply {
                             // Absent rather than disabled when there is nothing to log: an
                             // action that does nothing is worse than one that is not offered.
-                            if (notice != null) addAction(action(LOG_SET_LABEL, RestActionReceiver.ACTION_LOG_SET))
+                            if (notice != null) addAction(action(notice.logLabel(), RestActionReceiver.ACTION_LOG_SET))
                             addAction(action(SKIP_REST_LABEL, RestActionReceiver.ACTION_SKIP_REST))
                             // US-56 left this slot free pending the maintainer's call; ADR-0049 fills it.
                             addAction(action(EXTEND_REST_LABEL, RestActionReceiver.ACTION_EXTEND_REST))
@@ -88,17 +91,29 @@ class RestNotification
             // Same reason they are different ids at all: see the channel note below.
             dismissResting()
 
+            // Nothing to lift next — no session any more, or its last set was deleted — means
+            // nothing to say (US-56 as amended). The fallback this used to post instead, "Time for
+            // your next set.", was the notification members saw after finishing a workout.
+            if (notice == null) return
+
             post(
                 id = REST_OVER_ID,
                 notification =
                     builder(REST_OVER_CHANNEL)
                         .setContentTitle("Rest over")
-                        .setContentText(notice?.setLine() ?: "Time for your next set.")
+                        .setContentText(notice.setLine())
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        // ADR-0049's cue owns the pulse and the optional tone; a second buzz from
+                        // this channel right behind it was two signals for one moment. Silent
+                        // also means no heads-up: the cue is the alert, this is the surface.
+                        .setSilent(true)
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                        // A member who walked away mid-workout should not find this waiting
+                        // the next morning; the in-app state is unaffected either way.
+                        .setTimeoutAfter(REST_OVER_TIMEOUT_MILLIS)
                         .setAutoCancel(true)
-                        .apply {
-                            if (notice != null) addAction(action(LOG_SET_LABEL, RestActionReceiver.ACTION_LOG_SET))
-                        }.build(),
+                        .addAction(action(notice.logLabel(), RestActionReceiver.ACTION_LOG_SET))
+                        .build(),
             )
         }
 
@@ -197,10 +212,10 @@ class RestNotification
             const val RESTING_CHANNEL = "rest-running"
             const val REST_OVER_CHANNEL = "rest-timer"
 
-            private const val LOG_SET_LABEL = "LOG SET"
             private const val SKIP_REST_LABEL = "SKIP REST"
             private const val EXTEND_REST_LABEL = "+30S"
             private const val OPEN_REQUEST = 10
+            private const val REST_OVER_TIMEOUT_MILLIS = 10L * 60 * 1000
             private const val IMMUTABLE_UPDATE =
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         }
