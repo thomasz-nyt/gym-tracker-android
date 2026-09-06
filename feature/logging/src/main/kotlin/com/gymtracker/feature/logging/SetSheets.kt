@@ -2,18 +2,18 @@ package com.gymtracker.feature.logging
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.component.StepperField
 import com.gymtracker.core.designsystem.theme.GymDimens
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -193,15 +194,7 @@ private fun SetEditFields(
             onStep = callbacks.onRepsStepped,
         )
 
-        OutlinedTextField(
-            value = edit.rpe,
-            onValueChange = callbacks.onRpeChanged,
-            label = { Text("RPE (optional)") },
-            placeholder = { Text("—") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        RpeChips(selected = edit.rpe, onSelected = callbacks.onRpeChanged)
     }
 }
 
@@ -272,18 +265,56 @@ private fun SetEntryFields(
             supporting = "Records this many identical sets.",
         )
 
-        // Optional (US-03), and left as a plain field: RPE is typed occasionally and
-        // deliberately, so it does not earn a stepper. Blank means not recorded, which is
-        // not a claim that the set was easy — constitution §2, absence is not a value.
-        OutlinedTextField(
-            value = entry.rpe,
-            onValueChange = callbacks.onRpeChanged,
-            label = { Text("RPE (optional)") },
-            placeholder = { Text("—") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth(),
+        RpeChips(selected = entry.rpe, onSelected = callbacks.onRpeChanged)
+    }
+}
+
+/**
+ * RPE as one tap, not a keyboard (US-60).
+ *
+ * US-03 left RPE a plain decimal field because it is "typed occasionally and deliberately" — and
+ * then it was typed almost never, because a keyboard between sets is exactly the cost ADR-0016
+ * built steppers to avoid. The valid values are eleven half steps from 5 to 10
+ * ([RpeFormatter.scale]), which is a row of chips, not a number to type: tap one to record it, tap
+ * it again to clear it. Blank stays blank — not recorded is not a claim the set was easy
+ * (constitution §2.4). [selected] is the sheet's own string, so a stored `8.0` and a tapped `8`
+ * are compared as numbers, not spellings.
+ *
+ * **Each chip reads `@8`, `@8.5` — never a bare number.** Found on the emulator, not by
+ * inspection: a bare "8" chip is the exact same text as a reps count of 8, and with the reps
+ * field prefilled to 8 (a very common rep count) the two are indistinguishable on screen — which
+ * is exactly what broke `TwoTapSetLoggingTest`'s own prefill assertion, proof the ambiguity is
+ * real for a member reading the sheet, not only for a test. `@` is the same lifting notation
+ * this class's own read-back already uses everywhere a set is shown ([RpeFormatter.at]).
+ */
+@Composable
+private fun RpeChips(
+    selected: String,
+    onSelected: (String) -> Unit,
+) {
+    val selectedValue = selected.trim().toDoubleOrNull()
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
+        Text(
+            text = "RPE (optional)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+            verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
+        ) {
+            RpeFormatter.scale.forEach { value ->
+                val isSelected = selectedValue == value
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelected(if (isSelected) "" else RpeFormatter.number(value)) },
+                    label = { Text(RpeFormatter.at(value)) },
+                    // ADR-0019: FilterChip reads CornerFull unless told otherwise (Shape.kt's trap).
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+                )
+            }
+        }
     }
 }
 
