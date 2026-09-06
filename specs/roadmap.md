@@ -1493,8 +1493,9 @@ member's unit, carry-forward beside the rep reset, bodyweight stays bodyweight, 
 weight logs nothing, a fresh ViewModel over the same stores resumes at the carried weight), and
 `GuidedWeightEditTest` (instrumented — `+` on the running screen changes `LOG SET 1`'s detail and
 the set that is written). `GuidedFlowScreenTest`, `TwoTapSetLoggingTest` and
-`OneTapSetLoggingTest` unedited. All four gates green locally; the instrumented addition ran on
-CI's emulator only.
+`OneTapSetLoggingTest` unedited. All four gates green locally; the instrumented addition compiles
+and runs on CI's emulator once the PR retargets to `main` — `ci.yml` runs that job for PRs to `main`
+only, so a stacked PR gets build, lint, unit tests and the APK until then.
 
 **Designed, not built, and needing a user story first:**
 
