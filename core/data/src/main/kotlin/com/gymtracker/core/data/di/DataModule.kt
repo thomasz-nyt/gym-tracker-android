@@ -18,6 +18,7 @@ import com.gymtracker.core.data.machineguide.AndroidMachineGuideAssetReader
 import com.gymtracker.core.data.machineguide.BundledMachineGuideRepository
 import com.gymtracker.core.data.machineguide.MachineGuideAssetReader
 import com.gymtracker.core.data.member.DataStoreCurrentMember
+import com.gymtracker.core.data.member.DataStoreKeepScreenOnPreference
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.member.RoomAccountAdoption
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
@@ -54,6 +55,7 @@ import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.machineguide.MachineGuideRepository
 import com.gymtracker.core.domain.member.AccountAdoption
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.member.KeepScreenOnPreference
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
@@ -459,6 +461,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun unitPreference(impl: DataStoreUnitPreference): UnitPreference
+
+    @Binds
+    abstract fun keepScreenOnPreference(impl: DataStoreKeepScreenOnPreference): KeepScreenOnPreference
 
     @Binds
     abstract fun healthIntegration(impl: DataStoreHealthIntegration): HealthIntegration

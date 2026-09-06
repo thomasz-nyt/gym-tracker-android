@@ -16,6 +16,7 @@ import com.gymtracker.core.domain.health.HealthPermission
 import com.gymtracker.core.domain.health.HealthStatus
 import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.member.CurrentMember
+import com.gymtracker.core.domain.member.KeepScreenOnPreference
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.SessionRepository
@@ -69,6 +70,8 @@ data class SettingsUiState(
     val importSucceeded: ImportSuccessUi? = null,
     val unit: WeightUnit = WeightUnit.LB,
     val restDefaultSeconds: Long = DEFAULT_REST_SECONDS,
+    /** US-59: whether the screen is held on while a workout runs. Defaults on. */
+    val keepScreenOn: Boolean = true,
     /**
      * US-20: the device/account gate, independent of [healthIntegrationEnabled] (ADR-0038).
      * `SettingsScreen` renders no health UI at all while this is [HealthStatus.Unavailable] —
@@ -135,6 +138,7 @@ class SettingsViewModel
         sessions: SessionRepository,
         private val unitPreference: UnitPreference,
         private val restTimerStore: RestTimerStore,
+        private val keepScreenOnPreference: KeepScreenOnPreference,
         private val healthMetricsSource: HealthMetricsSource,
         private val healthIntegration: HealthIntegration,
         private val forgetHealthMetrics: ForgetHealthMetrics,
@@ -165,6 +169,11 @@ class SettingsViewModel
                 }
             }
             viewModelScope.launch {
+                keepScreenOnPreference.observe().collect { enabled ->
+                    _uiState.update { it.copy(keepScreenOn = enabled) }
+                }
+            }
+            viewModelScope.launch {
                 // status() is independent of the toggle (ADR-0038) — re-read here so the section
                 // can decide whether to render at all, and again whenever the toggle itself
                 // changes, since a member flipping it is the other moment the picture can change.
@@ -174,6 +183,11 @@ class SettingsViewModel
                     }
                 }
             }
+        }
+
+        /** US-59: the next workout, and any already running, follows the new setting at once. */
+        fun onKeepScreenOnToggled(enabled: Boolean) {
+            viewModelScope.launch { keepScreenOnPreference.set(enabled) }
         }
 
         fun onExport(destination: String) {

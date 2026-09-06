@@ -107,6 +107,8 @@ data class SessionUiState(
     val nextLoggableSet: UpNextSet? = null,
     /** Whether the exercise just removed from the session can still be put back (US-02c). */
     val canUndoRemoval: Boolean = false,
+    /** Whether the set just logged in one tap can still be taken back (US-35). */
+    val canUndoOneTapLog: Boolean = false,
     /** The exercise being walked through, if any (US-05a). */
     val guided: GuidedState = GuidedState(),
     /** What is showing over the just-finished session, if anything (US-31). */
@@ -235,6 +237,7 @@ private data class ScreenExtras(
 private data class SideTrips(
     val canUndoRemoval: Boolean,
     val guided: GuidedState,
+    val canUndoOneTapLog: Boolean,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -312,6 +315,25 @@ class ActiveSessionViewModel
                 restoreSet = restoreSet,
                 unitPreference = unitPreference,
                 scope = viewModelScope,
+            )
+
+        /**
+         * `LogUpNextSet` is built from dependencies this class already holds rather than injected
+         * as one more constructor parameter. The point of sharing it with the notification's
+         * `LOG SET` is that the *logic* lives in one class (US-54); which of two identical
+         * instances this screen uses is not part of that, and a new parameter would have churned
+         * ten test files that have nothing to do with this story. The controller around it owns
+         * the undo window (US-35), the same split [setEdit] and [removal] already are — and like
+         * them it is exposed for the route to wire `undo` directly. An undo also drops the record
+         * banner announced for that set: a record set by a row that no longer exists is not one.
+         */
+        val oneTap =
+            OneTapLogController(
+                logUpNextSet = LogUpNextSet(logSets, restTimer, unitPreference),
+                deleteSet = deleteSet,
+                restTimer = restTimer,
+                scope = viewModelScope,
+                onUndone = { justSetRecord.value = null },
             )
 
         /** Ending the session lives in its own state holder; see [FinishController]. */
@@ -541,8 +563,8 @@ class ActiveSessionViewModel
                 ) { unit, entry, edit, canUndoSetDelete ->
                     ScreenExtras(unit, entry, edit, canUndoSetDelete)
                 },
-                combine(removal.canUndo, guided.state) { canUndoRemoval, guidedState ->
-                    SideTrips(canUndoRemoval, guidedState)
+                combine(removal.canUndo, guided.state, oneTap.canUndo) { canUndoRemoval, guidedState, canUndoOneTap ->
+                    SideTrips(canUndoRemoval, guidedState, canUndoOneTap)
                 },
                 justSetRecord,
             ) { computed, prompt, extras, sideTrips, record ->
@@ -559,6 +581,7 @@ class ActiveSessionViewModel
                     restTotal = computed.total,
                     upNext = computed.upNext,
                     canUndoRemoval = sideTrips.canUndoRemoval,
+                    canUndoOneTapLog = sideTrips.canUndoOneTapLog,
                     guided = sideTrips.guided,
                     progress = computed.progress,
                     openSessionExerciseId = computed.openSessionExerciseId,
@@ -580,15 +603,6 @@ class ActiveSessionViewModel
         }
 
         /**
-         * Built from dependencies this class already holds rather than injected as an eleventh
-         * constructor parameter. The point of sharing it with the notification's `LOG SET` is
-         * that the *logic* lives in one class (US-54); which of two identical instances this
-         * screen uses is not part of that, and a new parameter would have churned ten test
-         * files that have nothing to do with this story.
-         */
-        private val logUpNextSet = LogUpNextSet(logSets, restTimer, unitPreference)
-
-        /**
          * Logs the set the rest panel is offering, without opening the sheet (ADR-0023).
          *
          * One tap, which is under US-03's two-tap ceiling rather than at it. The rest then
@@ -601,7 +615,7 @@ class ActiveSessionViewModel
                 // The write and the rest that follows it are `LogUpNextSet`'s, shared with the
                 // notification's own LOG SET so the two cannot drift (US-54). What stays here
                 // is the part that is genuinely this screen's: the record banner.
-                val logged = logUpNextSet(next)
+                val logged = oneTap.log(next)
                 rest.markStarted()
                 justSetRecord.value = detectPersonalRecord(logged, next.exerciseId, currentMember.id())
             }

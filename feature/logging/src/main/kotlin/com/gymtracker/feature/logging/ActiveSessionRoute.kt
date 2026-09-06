@@ -60,11 +60,18 @@ fun LoggingRoute(
     viewModel: ActiveSessionViewModel = hiltViewModel(),
     warmUpViewModel: WarmUpViewModel = hiltViewModel(),
     trainHomeViewModel: TrainHomeViewModel = hiltViewModel(),
+    screenAwakeViewModel: ScreenAwakeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val warmUpElapsed by warmUpViewModel.elapsed.collectAsStateWithLifecycle()
     val nextRoutine by trainHomeViewModel.nextRoutine.collectAsStateWithLifecycle()
+    val keepScreenOn by screenAwakeViewModel.keepScreenOn.collectAsStateWithLifecycle()
     RestNotificationPermission(viewModel)
+
+    // US-59: held only while a workout is actually running — the session screen, its rest, the
+    // warm-up step and the guided screen all sit under this route while `activeSession` is set;
+    // Train home, the finish summary and every other destination do not.
+    KeepScreenOn(enabled = keepScreenOn && state.activeSession != null)
 
     // Re-ranked whenever NoSession is what's on screen (US-36) — after finishing a workout, or
     // after a visit to Routines that might have added, deleted or renamed one. Firing on every
@@ -108,6 +115,7 @@ fun LoggingRoute(
         setEdit = viewModel.setEditCallbacks(),
         onUndoSetDelete = viewModel.setEdit::undo,
         onLogNextSet = viewModel::onLogNextSet,
+        onUndoOneTapLog = viewModel.oneTap::undo,
         onAddExercise = onAddExercise,
         nextRoutine = nextRoutine,
         onStartFromRoutine = viewModel::onStartFromRoutine,
@@ -236,6 +244,7 @@ internal fun LoggingScreen(
     setEdit: SetEditCallbacks = SetEditCallbacks.Inert,
     onUndoSetDelete: () -> Unit = {},
     onLogNextSet: (UpNextSet) -> Unit = {},
+    onUndoOneTapLog: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     nextRoutine: Routine? = null,
     onStartFromRoutine: (RoutineId) -> Unit = {},
@@ -272,6 +281,7 @@ internal fun LoggingScreen(
             setEdit = setEdit,
             onUndoSetDelete = onUndoSetDelete,
             onLogNextSet = onLogNextSet,
+            onUndoOneTapLog = onUndoOneTapLog,
             onAddExercise = onAddExercise,
             nextRoutine = nextRoutine,
             onStartFromRoutine = onStartFromRoutine,
@@ -326,6 +336,7 @@ private fun SessionScreen(
     setEdit: SetEditCallbacks,
     onUndoSetDelete: () -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
+    onUndoOneTapLog: () -> Unit,
     onAddExercise: () -> Unit,
     nextRoutine: Routine?,
     onStartFromRoutine: (RoutineId) -> Unit,
@@ -348,6 +359,7 @@ private fun SessionScreen(
             onEditSet = onEditSet,
             onUndoSetDelete = onUndoSetDelete,
             onLogNextSet = onLogNextSet,
+            onUndoOneTapLog = onUndoOneTapLog,
             onSkipRest = onSkipRest,
             onFinishWorkout = onFinishWorkout,
             onFinishSummaryDismissed = onFinishSummaryDismissed,

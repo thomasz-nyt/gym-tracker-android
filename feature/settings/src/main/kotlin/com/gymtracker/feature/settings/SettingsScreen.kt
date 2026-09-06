@@ -109,6 +109,7 @@ fun SettingsRoute(
         onImportSuccessDismissed = viewModel::onImportSuccessDismissed,
         onUnitChanged = viewModel::onUnitChanged,
         onRestDefaultStepped = viewModel::onRestDefaultStepped,
+        onKeepScreenOnToggled = viewModel::onKeepScreenOnToggled,
         onHealthIntegrationToggled = viewModel::onHealthIntegrationToggled,
         onForgetMetricsConfirmed = viewModel::onForgetMetricsConfirmed,
         onForgetMetricsDeclined = viewModel::onForgetMetricsDeclined,
@@ -135,6 +136,7 @@ internal fun SettingsScreen(
     onImportSuccessDismissed: () -> Unit = {},
     onUnitChanged: (WeightUnit) -> Unit = {},
     onRestDefaultStepped: (Int) -> Unit = {},
+    onKeepScreenOnToggled: (Boolean) -> Unit = {},
     onHealthIntegrationToggled: (Boolean) -> Unit = {},
     onHealthPermissionRationaleContinue: (HealthPermission) -> Unit = {},
     onForgetMetricsConfirmed: () -> Unit = {},
@@ -170,6 +172,8 @@ internal fun SettingsScreen(
             UnitToggle(unit = state.unit, onUnitChanged = onUnitChanged)
 
             RestDefaultField(seconds = state.restDefaultSeconds, onStepped = onRestDefaultStepped)
+
+            KeepScreenOnToggle(enabled = state.keepScreenOn, onToggled = onKeepScreenOnToggled)
 
             ExportSection(
                 isExporting = state.isExporting,
@@ -263,6 +267,36 @@ private fun RestDefaultField(
         onStep = onStepped,
         readOnly = true,
     )
+}
+
+/**
+ * US-59: the screen stays on while a workout runs, unless the member turns this off. One node,
+ * operable by its label — the same `toggleable` row `HealthSection` uses, for the same reason.
+ */
+@Composable
+private fun KeepScreenOnToggle(
+    enabled: Boolean,
+    onToggled: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .toggleable(value = enabled, onValueChange = onToggled, role = Role.Switch),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Keep the screen on during a workout", style = MaterialTheme.typography.titleSmall)
+            Switch(checked = enabled, onCheckedChange = null)
+        }
+        Text(
+            text =
+                "While a workout is running the screen does not dim or lock, so the rest countdown " +
+                    "stays readable from the bench. Off, the phone's own timeout applies.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
 }
 
 @Composable
