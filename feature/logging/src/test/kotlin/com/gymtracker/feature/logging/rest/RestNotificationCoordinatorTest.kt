@@ -110,6 +110,41 @@ class RestNotificationCoordinatorTest {
             assertEquals(listOf(now.plusSeconds(45)), alarms.scheduled)
         }
 
+    // US-56 as amended (2026-09-05): two ways a notification outlived its rest, both held down here.
+
+    @Test
+    fun `a rest that already ran out is not re-armed when the process starts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            // An alarm set for a time in the past fires at once — which is how "Rest over" used to pop
+            // the morning after an unfinished session, the moment the app was opened.
+            store.setRest(now.minusSeconds(5), Duration.ofSeconds(60))
+
+            coordinate(backgroundScope)
+
+            assertEquals(emptyList(), alarms.scheduled, "nothing to wake up for")
+            assertEquals(emptyList(), alarms.cues)
+            assertEquals(emptyList(), notifier.shown, "no countdown for a rest that is over")
+            assertEquals(1, notifier.dismissed, "a countdown left in the shade by the dead process comes down")
+            assertEquals(
+                0,
+                notifier.restOverDismissed,
+                "a Rest over already up is left alone — its receiver may be what started this process",
+            )
+        }
+
+    @Test
+    fun `ending the rest takes a lingering Rest over with it`() =
+        runTest(UnconfinedTestDispatcher()) {
+            coordinate(backgroundScope)
+            store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
+            val before = notifier.restOverDismissed
+
+            // What EndSession and skip both write: no rest means nothing is over either.
+            store.setRestEndsAt(null)
+
+            assertEquals(before + 1, notifier.restOverDismissed)
+        }
+
     @Test
     fun `re-applying re-posts the running rest without waiting for it to change`() =
         runTest(UnconfinedTestDispatcher()) {
@@ -203,6 +238,7 @@ class RestNotificationCoordinatorTest {
     private class RecordingNotifier : RestNotifier {
         val shown = mutableListOf<Instant>()
         var dismissed = 0
+        var restOverDismissed = 0
 
         override suspend fun showResting(endsAt: Instant) {
             shown += endsAt
@@ -214,6 +250,8 @@ class RestNotificationCoordinatorTest {
 
         override suspend fun showRestOver() = error("the alarm's receiver posts this one, not the coordinator")
 
-        override fun dismissRestOver() = error("the alarm's receiver posts this one, not the coordinator")
+        override fun dismissRestOver() {
+            restOverDismissed++
+        }
     }
 }

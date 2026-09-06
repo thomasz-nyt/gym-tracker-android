@@ -23,4 +23,8 @@ abstract class RestNotificationModule {
     @Binds
     @Singleton
     abstract fun restNotifier(impl: RestNotification): RestNotifier
+
+    @Binds
+    @Singleton
+    abstract fun appForeground(impl: ProcessForeground): AppForeground
 }

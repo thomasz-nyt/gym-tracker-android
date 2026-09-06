@@ -1,14 +1,10 @@
 package com.gymtracker.feature.logging.rest
 
-import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -22,8 +18,10 @@ import javax.inject.Singleton
 /**
  * Schedules the "rest is over" notification (ADR-0010).
  *
- * The alarm is only ever a notification trigger — the timer itself is the end time in
- * DataStore, so a missed or cancelled alarm costs a buzz, never the timer.
+ * The alarm is only ever a trigger — the timer itself is the end time in DataStore, so a missed
+ * or cancelled alarm costs a buzz, never the timer. It is scheduled whether or not notifications
+ * are allowed: since ADR-0049 the receiver it fires plays the zero-second cue, which is not a
+ * notification, and the notifier checks permission itself before posting anything.
  */
 @Singleton
 class RestAlarm
@@ -34,8 +32,6 @@ class RestAlarm
         private val alarms = context.getSystemService(AlarmManager::class.java)
 
         override fun schedule(endsAt: Instant) {
-            if (!canNotify()) return
-
             // Exact because a rest is 60 seconds; an inexact alarm can land minutes late,
             // which for this purpose is the same as not firing.
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAt.toEpochMilli(), pendingIntent())
@@ -54,15 +50,6 @@ class RestAlarm
         override fun cancelCue() {
             alarms.cancel(cueIntent())
         }
-
-        /**
-         * Without notification permission there is nothing for the alarm to do, so we do not
-         * take a wakeup for it. The in-app countdown is unaffected (US-05).
-         */
-        private fun canNotify(): Boolean =
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
 
         private fun pendingIntent(): PendingIntent =
             PendingIntent.getBroadcast(
@@ -98,10 +85,17 @@ class RestOverReceiver : BroadcastReceiver() {
     @Inject
     lateinit var cue: RestCue
 
+    @Inject
+    lateinit var foreground: AppForeground
+
     override fun onReceive(
         context: Context,
         intent: Intent?,
     ) {
+        // Read here, on the main thread, before anything moves off it: the process lifecycle is a
+        // main-thread object.
+        val onScreen = foreground.isInForeground()
+
         // Reading the next set out of Room is more than onReceive may do inline, and well
         // inside what goAsync allows.
         val pending = goAsync()
@@ -110,7 +104,10 @@ class RestOverReceiver : BroadcastReceiver() {
                 // The zero-second cue (ADR-0049) rides this alarm rather than a third one; the
                 // pulse comes first so it is not waiting behind a Room read for the set line.
                 cue.play()
-                notifier.showRestOver()
+                // With the app on screen the band already reads 0:00 and the cue has just pulsed;
+                // a notification over it would only cover LOG SET (US-56 as amended). The
+                // countdown still comes down either way.
+                if (onScreen) notifier.dismissResting() else notifier.showRestOver()
             } finally {
                 pending.finish()
             }

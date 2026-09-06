@@ -14,9 +14,14 @@ import javax.inject.Singleton
 /**
  * Keeps the alarm and the notification in step with the stored rest (US-54, ADR-0046).
  *
- * `restEndsAt` is the single trigger: a value schedules and shows, null cancels and dismisses.
- * Skipping, logging the next set and ending a session all already write that one value, so none
- * of them has to remember to do anything else.
+ * `restEndsAt` is the single trigger: a future value schedules and shows, null cancels and
+ * dismisses — "Rest over" included, since no rest means nothing is over — and a value already in
+ * the past is treated as none: nothing is re-armed for a rest that ran out while the process was
+ * gone (an alarm set in the past fires at once, which is how "Rest over" used to pop the morning
+ * after an unfinished session), though a "Rest over" already in the shade is left alone, because
+ * the receiver that posts it may be the very thing that started this process. Skipping, logging
+ * the next set and ending a session (`EndSession`, since US-56's 2026-09-05 amendment) all write
+ * that one value, so none of them has to remember to do anything else.
  *
  * That is the point, not a tidiness argument. Scheduling used to live in a Compose side effect
  * keyed on a separate "a rest started" flag, and `RestController.skip()` never set that flag —
@@ -64,10 +69,11 @@ class RestNotificationCoordinator
         }
 
         private suspend fun apply(endsAt: Instant?) {
-            if (endsAt == null) {
+            if (endsAt == null || !endsAt.isAfter(clock.instant())) {
                 alarms.cancel()
                 alarms.cancelCue()
                 notifier.dismissResting()
+                if (endsAt == null) notifier.dismissRestOver()
             } else {
                 alarms.schedule(endsAt)
                 // ADR-0049: the ten-second cue is the same trigger once more, ten seconds earlier
