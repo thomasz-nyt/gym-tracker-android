@@ -148,3 +148,22 @@ neither is obvious from the design, and both would have shipped.
 - **Revisit if** a member reports the ongoing notification as unwanted noise, in which case
   degrading to option 3 (rich content at zero only) is a small change and needs no new mechanism,
   or if Play distribution forces the foreground service after all.
+
+## Amendment — 2026-09-05: the notification's lifetime is the rest's, and the cue is the alert
+
+Reported from real use: rest notifications kept arriving after the routine was over. Three causes,
+all in this ADR's territory — US-56's amendment of the same date has the behaviour. `EndSession`
+now clears the stored end time — the single trigger this ADR made everything follow, which until
+now only `StartSession` ever wrote null to, for the *next* workout — so finishing during a rest
+takes the countdown and both alarms down with it. The coordinator treats an end time already in the
+past as no rest rather than arming an alarm that fires at once (a stale "Rest over" re-posted at the
+next launch), and a null end time dismisses "Rest over" too: no rest, nothing is over. The receiver
+posts nothing when there is no session to log into.
+
+Two refinements on the surface itself. "Rest over" is silent: ADR-0049's cue is the alert, so this
+channel's buzz right behind it was two signals for one moment — and a silent notification does not
+peek, which is also why it is not posted at all while the app is on screen. It expires after ten
+minutes. Both notifications are public on the lock screen, and the log action names what it writes.
+The alarm is no longer gated on notification permission: since ADR-0049 the receiver plays the
+zero-second cue, and the notifier checks the permission itself. The "revisit if" above stands;
+none of this degrades the surface to option 3.
