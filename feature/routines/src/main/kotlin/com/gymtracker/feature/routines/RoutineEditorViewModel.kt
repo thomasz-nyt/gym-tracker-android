@@ -68,6 +68,8 @@ data class TargetEditorState(
     val sets: String,
     val reps: String,
     val weight: String,
+    /** The rest after each set, in whole seconds as typed (ADR-0050); blank means the default from Settings. */
+    val rest: String = "",
     /**
      * Why the last save was refused, one line per field that could not be read — empty until a
      * save is attempted on an unusable form, and cleared by the next keystroke. Found by the

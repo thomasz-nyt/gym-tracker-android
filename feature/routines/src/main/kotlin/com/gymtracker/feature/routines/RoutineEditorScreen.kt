@@ -42,6 +42,7 @@ import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineItemId
 import com.gymtracker.core.domain.set.LastPerformance
+import com.gymtracker.core.domain.units.MinutesSeconds
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.ZoneId
@@ -368,9 +369,10 @@ private val DAY_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault())
 
 /**
- * "Target 3 × 8 · 105 lb" — every present field joined, any absent field simply not mentioned
- * (US-30: "each is optional on its own", so a load-only or a sets-only target is still a target,
- * not nothing).
+ * "Target 3 × 8 · 105 lb · 1:30 rest" — every present field joined, any absent field simply not
+ * mentioned (US-30: "each is optional on its own", so a load-only, a sets-only or — since
+ * ADR-0050 — a rest-only target is still a target, not nothing). The rest reads the same way the
+ * session screen reads it, through the one `m:ss` formatter both features share.
  */
 private fun MovementTarget.asTargetLine(unit: WeightUnit): String {
     val setsReps =
@@ -381,7 +383,8 @@ private fun MovementTarget.asTargetLine(unit: WeightUnit): String {
             else -> null
         }
     val weight = weightKg?.let { WeightFormatter.format(it, unit).primary }
-    val parts = listOfNotNull(setsReps, weight)
+    val restLine = rest?.let { "${MinutesSeconds.format(it)} rest" }
+    val parts = listOfNotNull(setsReps, weight, restLine)
     return "Target " + parts.joinToString("  ·  ")
 }
 
@@ -402,17 +405,59 @@ private fun RefusalReasons(errors: List<String>) {
     }
 }
 
+/** The four fields, in the order the target line reads them back: sets, reps, load, rest (ADR-0050). */
+@Composable
+private fun TargetFields(
+    editor: TargetEditorState,
+    onFieldChanged: (sets: String?, reps: String?, weight: String?, rest: String?) -> Unit,
+) {
+    OutlinedTextField(
+        value = editor.sets,
+        onValueChange = { onFieldChanged(it, null, null, null) },
+        label = { Text("Sets") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = editor.reps,
+        onValueChange = { onFieldChanged(null, it, null, null) },
+        label = { Text("Reps") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = editor.weight,
+        onValueChange = { onFieldChanged(null, null, it, null) },
+        label = { Text("Load (${editor.unit.name.lowercase()})") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    // Whole seconds, typed: "90" is 1:30. A stepper in fifteen-second steps is Tier 3's inline
+    // target editor; this dialog stays plain text fields for the reason its own doc gives.
+    OutlinedTextField(
+        value = editor.rest,
+        onValueChange = { onFieldChanged(null, null, null, it) },
+        label = { Text("Rest (seconds)") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
 /**
- * Sets, edits or clears one movement's target (US-30).
+ * Sets, edits or clears one movement's target (US-30; the rest since ADR-0050).
  *
- * Three plain text fields rather than the stepper the session screen uses for logging a set:
- * this dialog is reached from the sofa, not mid-set with chalk on your fingers, so ADR-0016's
+ * Plain text fields rather than the stepper the session screen uses for logging a set: this
+ * dialog is reached from the sofa, not mid-set with chalk on your fingers, so ADR-0016's
  * one-handed constraint does not apply here the way it does there.
  */
 @Composable
 private fun TargetEditorDialog(
     editor: TargetEditorState,
-    onFieldChanged: (sets: String?, reps: String?, weight: String?) -> Unit,
+    onFieldChanged: (sets: String?, reps: String?, weight: String?, rest: String?) -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit,
@@ -423,34 +468,13 @@ private fun TargetEditorDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
                 Text(
-                    text = "Each number is optional. A blank field says nothing about that number.",
+                    text =
+                        "Each number is optional. A blank field says nothing about that number; " +
+                            "a blank rest means your default from Settings.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedTextField(
-                    value = editor.sets,
-                    onValueChange = { onFieldChanged(it, null, null) },
-                    label = { Text("Sets") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = editor.reps,
-                    onValueChange = { onFieldChanged(null, it, null) },
-                    label = { Text("Reps") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = editor.weight,
-                    onValueChange = { onFieldChanged(null, null, it) },
-                    label = { Text("Load (${editor.unit.name.lowercase()})") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                TargetFields(editor, onFieldChanged)
                 RefusalReasons(editor.errors)
             }
         },

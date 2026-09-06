@@ -70,6 +70,7 @@ class SyncPayloadCodecTest {
                 targetSets = 3,
                 targetReps = 8,
                 targetWeightKg = 61.25,
+                targetRestSeconds = 90,
             )
 
         val dto = json.decodeFromString(SyncSessionExerciseDto.serializer(), codec.encode(entity))
@@ -81,6 +82,7 @@ class SyncPayloadCodecTest {
         assertEquals(3, dto.targetSets)
         assertEquals(8, dto.targetReps)
         assertEquals(61.25, dto.targetWeightKg)
+        assertEquals(90, dto.targetRestSeconds, "the rest travels with the target (ADR-0050)")
         assertEquals(4_000L, dto.updatedAt)
     }
 
@@ -148,6 +150,7 @@ class SyncPayloadCodecTest {
                 targetSets = 3,
                 targetReps = 8,
                 targetWeightKg = 61.25,
+                targetRestSeconds = 90,
             )
 
         val payload = codec.encode(entity)
@@ -159,6 +162,7 @@ class SyncPayloadCodecTest {
         assertEquals(3, dto.targetSets)
         assertEquals(8, dto.targetReps)
         assertEquals(61.25, dto.targetWeightKg)
+        assertEquals(90, dto.targetRestSeconds, "the rest travels with the target (ADR-0050)")
         assertEquals(2_500L, dto.updatedAt)
         assertFalse(payload.contains("userId"), "routine_items carries no user_id in either schema")
     }

@@ -38,6 +38,7 @@ internal data class SyncSessionExerciseDto(
     val targetSets: Int? = null,
     val targetReps: Int? = null,
     val targetWeightKg: Double? = null,
+    val targetRestSeconds: Int? = null,
     val updatedAt: Long,
 )
 
@@ -72,5 +73,6 @@ internal data class SyncRoutineItemDto(
     val targetSets: Int? = null,
     val targetReps: Int? = null,
     val targetWeightKg: Double? = null,
+    val targetRestSeconds: Int? = null,
     val updatedAt: Long,
 )

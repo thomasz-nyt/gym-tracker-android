@@ -1550,6 +1550,35 @@ mid-rest and the stored rest is gone). `TwoTapSetLoggingTest` and `OneTapSetLogg
 All four gates green locally; the instrumented addition compiles and runs on CI's emulator once the
 PR retargets to `main` (or as soon as #81 lands).
 
+**Tier 1, fifth piece, 2026-09-05: a movement's target includes the rest that follows each set
+(US-05 and US-30 amended, ADR-0050, schema v11).** The trainer's objection the review led with —
+three minutes for squats, sixty seconds for curls, one default cannot serve both — closed the way
+ADR-0027 already built for: `MovementTarget` gains a fourth independently optional field,
+`restSeconds`, carried on `routine_items` and `session_exercises` (`target_rest_seconds`, v10 → v11,
+additive), copied one-way at start with the other three, in the sync payload and the backup envelope
+as a nullable field with a default (no format version moves). `RestTimer.start(rest)` takes the
+movement's own length when its target names one, else the default, and pins it as the total so
+"of 1:30" is the rest actually taken; every path that starts a rest passes it — the sheet and guided
+mode through `RestController.startAfterSet(rest)` with the appearance looked up by id, the one-tap
+button and the notification's `LOG SET` through `UpNextSet.rest`, so `LogUpNextSet` cannot fall back
+to the default while the sheet takes the target's. The routine editor's target dialog gains `Rest
+(seconds)` with the same per-field refusal the other three have; the target line reads
+`Target 3 × 8 · 105 lb · 1:30 rest` in the editor and under the open movement, through one `m:ss`
+formatter lifted into `:core:domain` (`MinutesSeconds`; `Durations.kt` delegates). The rest panel
+does not label it — the band's total already is it — and the queue's compact line does not add it.
+Not built, deliberately: a rest of zero (a superset, its own story) and a per-session override from
+the band (`+30S` covers the moment). Every all-null-means-absent reader of the target columns counts
+the fourth field, each pinned by a test, because a trailing defaulted field is exactly the change the
+compiler cannot catch a reader ignoring. Tests first: `SetRoutineItemTargetTest` (+2), `RestTimerTest`
+(+2), `DetermineUpNextSetTest` (+2), `LogUpNextSetTest` (+1), `MinutesSecondsTest`,
+`TargetRestMigrationTest` (v10 → v11 against the exported `11.json`), `SyncPayloadCodecTest` and
+`BackupCodecTest` (a rest-only target survives the round trip), `SessionExerciseTest` and
+`RoutineTest` (+1 each), `RoutineEditorViewModelTest` (+2), `PerExerciseRestTest` (the sheet's and
+guided mode's rests), and `PerExerciseRestScreenTest` (instrumented — the target line names the rest
+and `LOG SET 1` starts a 1:30 rest). `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` unedited. All
+four gates green locally; the instrumented addition compiles and runs on CI's emulator once the PR
+retargets to `main`, or on every PR once #81 lands.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason

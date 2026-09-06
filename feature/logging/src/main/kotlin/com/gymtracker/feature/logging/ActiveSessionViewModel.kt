@@ -308,7 +308,8 @@ class ActiveSessionViewModel
             SetEntryController(
                 logSets = logSets,
                 onSetLogged = { sessionExerciseId, logged ->
-                    rest.startAfterSet()
+                    // ADR-0050: the movement's own rest when its target names one, else the default.
+                    rest.startAfterSet(sessionExercises.find(sessionExerciseId)?.target?.rest)
                     justSetRecord.value =
                         resolveJustSetRecord(
                             sessionExerciseId,
@@ -433,7 +434,8 @@ class ActiveSessionViewModel
                     // Write first, rest second, and only if the write returned — the same
                     // ordering SetEntryController holds to for the manual path (US-05).
                     logSets(sessionExerciseId = sessionExerciseId, input = input, sets = 1)
-                    rest.startAfterSet()
+                    // ADR-0050: the movement's own rest when its target names one, else the default.
+                    rest.startAfterSet(sessionExercises.find(sessionExerciseId)?.target?.rest)
                 },
                 unitPreference = unitPreference,
                 planStore = guidedPlanStore,

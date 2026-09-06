@@ -117,6 +117,11 @@ mistake; there was no way to take one back out.
   the rest cue`, off by default — a short tone on the notification stream, never when the phone is
   silenced. The cue is not a notification: it fires whether or not I granted that permission, and
   the countdown, the notification and logging the next set are all unchanged by it.
+- **Amended 2026-09-05 (ADR-0050):** "my configured default" is the fallback, not the only
+  length. When the movement's target names its own rest (US-30, fourth field), the rest that
+  follows each of its sets is that long — from `Save set`, from the one-tap and notification `LOG
+  SET`, and from a guided set alike — and the band's total reads it. With no rest named, the
+  default applies exactly as before; `+30S` extends either.
 
 ### US-05a — Be walked through an exercise
 Added 2026-08-02. See `adr/0017-guided-exercise-flow.md`, which revisits the
@@ -473,6 +478,19 @@ plan they wanted.
   says which field it could not read, one line per field, cleared by the next keystroke. A
   blank field is still never a problem. It used to refuse silently, the same defect PR #74
   fixed on the set sheet's `Save set`.
+- **Amended 2026-09-05 (ADR-0050): a target has a fourth field, the rest.** I can give a
+  movement the **rest to take after each of its sets** — `Rest (seconds)` in the same dialog as
+  sets, reps and load, optional like them, typed as whole seconds (`90` is 1:30), 1 or more, with
+  the same per-field refusal (`Rest needs a whole number of seconds, 1 or more.`). Blank means my
+  default from Settings, exactly as before. It is copied into the session with the other three
+  fields when I start the routine, and it reads back on the target line wherever the target is
+  read in full — `Target 3 × 8 · 105 lb · 1:30 rest` in the routine editor and under the open
+  movement mid-workout — never on the still-to-come rows' compact line. **Every set I log on that
+  movement — `Save set`, the one-tap `LOG SET`, the notification's `LOG SET`, a guided set — starts
+  a rest of that length, and the band's "of 1:30" is that length.** A movement whose target names
+  no rest takes my default; guided mode's own sets × reps are unchanged. A rest is never written to
+  `sets` and no derived number reads it. `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass
+  **unedited**.
 
 ### US-32 — A session remembers the routine it was started from
 See `adr/0028-a-session-remembers-its-routine.md`. History reads "Sun 9 Aug, 13:53" today;

@@ -249,6 +249,25 @@ class SessionExerciseTest {
         }
 
     @Test
+    fun `a target that names only a rest round-trips as a target, not as absence`() =
+        runTest {
+            // ADR-0050: the fourth column joins the all-null-means-absent rule.
+            val session = startSession("s1")
+            val restOnly = MovementTarget(sets = null, reps = null, weightKg = null, restSeconds = 90)
+
+            sessionExercises.add(SessionExercise(SessionExerciseId("se1"), session, ExerciseId("bench"), 1, restOnly))
+
+            assertEquals(
+                restOnly,
+                sessionExercises
+                    .observeForSession(session)
+                    .first()
+                    .single()
+                    .target,
+            )
+        }
+
+    @Test
     fun `an exercise added without a target round-trips as null`() =
         runTest {
             val session = startSession("s1")

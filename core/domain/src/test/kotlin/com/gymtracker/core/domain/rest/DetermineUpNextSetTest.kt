@@ -2,6 +2,7 @@ package com.gymtracker.core.domain.rest
 
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
@@ -68,6 +69,42 @@ class DetermineUpNextSetTest {
 
             assertEquals(squatAppearance.id, next?.sessionExerciseId)
             assertEquals(squat, next?.exerciseId)
+        }
+
+    @Test
+    fun `up next carries the movement's own rest when its target names one`() =
+        runTest {
+            // ADR-0050: the one-tap paths start the rest themselves (LogUpNextSet), so the rest
+            // a movement earns has to travel with what is up next or the shade would fall back
+            // to the default while the sheet took the target's.
+            val appearance =
+                SessionExercise(
+                    SessionExerciseId("se-1"),
+                    thisSession,
+                    bench,
+                    1,
+                    MovementTarget(sets = 3, reps = 8, weightKg = null, restSeconds = 90),
+                )
+            sessionExercises.add(appearance)
+            sets.belongsTo(appearance)
+            val set = ExerciseSet("s1", appearance.id, 1, 60.0, 5, null, now)
+            sets.add(set)
+            sets.lastFor[bench] = set.id
+
+            val next = determineUpNext(thisSession, alice, WeightUnit.KG)
+
+            assertEquals(Duration.ofSeconds(90), next?.rest)
+        }
+
+    @Test
+    fun `up next names no rest when the target names none, so the default applies`() =
+        runTest {
+            val appearance = appear("se-1", bench, 1)
+            val set = ExerciseSet("s1", appearance.id, 1, 60.0, 5, null, now)
+            sets.add(set)
+            sets.lastFor[bench] = set.id
+
+            assertNull(determineUpNext(thisSession, alice, WeightUnit.KG)?.rest)
         }
 
     @Test
