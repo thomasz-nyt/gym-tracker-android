@@ -98,6 +98,16 @@ class LogUpNextSetTest {
         }
 
     @Test
+    fun `the rest that follows is the movement's own when its target names one`() =
+        runTest {
+            // ADR-0050: the shade's LOG SET and the sheet's Save set must earn the same rest.
+            logUpNextSet(upNext(weight = 60.0, reps = 8).copy(rest = Duration.ofSeconds(90)))
+
+            assertEquals(now.plusSeconds(90), store.restEndsAt.first())
+            assertEquals(Duration.ofSeconds(90), store.restTotal.first())
+        }
+
+    @Test
     fun `it returns the set it wrote, so the caller can report on it`() =
         runTest {
             val logged = logUpNextSet(upNext(weight = 60.0, reps = 8))
