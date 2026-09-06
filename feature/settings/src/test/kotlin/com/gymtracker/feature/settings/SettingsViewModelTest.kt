@@ -27,6 +27,7 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.rest.RestCueTonePreference
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.FakeSessionRepository
 import com.gymtracker.core.domain.units.WeightUnit
@@ -104,6 +105,7 @@ class SettingsViewModelTest {
         unitPreference: FakeUnitPreference = FakeUnitPreference(),
         restTimerStore: FakeRestTimerStore = FakeRestTimerStore(),
         keepScreenOnPreference: FakeKeepScreenOnPreference = FakeKeepScreenOnPreference(),
+        restCueTonePreference: FakeRestCueTonePreference = FakeRestCueTonePreference(),
         healthMetricsSource: FakeHealthMetricsSource = FakeHealthMetricsSource(),
         healthIntegration: FakeHealthIntegration = FakeHealthIntegration(),
     ) = SettingsViewModel(
@@ -122,6 +124,7 @@ class SettingsViewModelTest {
         unitPreference = unitPreference,
         restTimerStore = restTimerStore,
         keepScreenOnPreference = keepScreenOnPreference,
+        restCueTonePreference = restCueTonePreference,
         healthMetricsSource = healthMetricsSource,
         healthIntegration = healthIntegration,
         forgetHealthMetrics = ForgetHealthMetrics(sessions),
@@ -423,6 +426,28 @@ class SettingsViewModelTest {
 
             assertEquals(false, viewModel.uiState.value.keepScreenOn)
             assertEquals(false, preference.current())
+        }
+
+    @Test
+    fun `the rest cue's tone starts off, and reads the member's setting`() =
+        runTest {
+            // ADR-0049: the haptic is the cue; the tone is the opt-in.
+            assertEquals(false, viewModel().uiState.value.restCueTone)
+
+            val turnedOn = viewModel(restCueTonePreference = FakeRestCueTonePreference(initial = true))
+            assertEquals(true, turnedOn.uiState.value.restCueTone)
+        }
+
+    @Test
+    fun `turning the rest cue's tone on is written through and reflected immediately`() =
+        runTest {
+            val preference = FakeRestCueTonePreference()
+            val viewModel = viewModel(restCueTonePreference = preference)
+
+            viewModel.onRestCueToneToggled(true)
+
+            assertEquals(true, viewModel.uiState.value.restCueTone)
+            assertEquals(true, preference.current())
         }
 
     @Test
@@ -757,6 +782,20 @@ class SettingsViewModelTest {
     private class FakeKeepScreenOnPreference(
         initial: Boolean = true,
     ) : KeepScreenOnPreference {
+        private val state = MutableStateFlow(initial)
+
+        override fun observe(): Flow<Boolean> = state
+
+        override suspend fun current(): Boolean = state.value
+
+        override suspend fun set(enabled: Boolean) {
+            state.value = enabled
+        }
+    }
+
+    private class FakeRestCueTonePreference(
+        initial: Boolean = false,
+    ) : RestCueTonePreference {
         private val state = MutableStateFlow(initial)
 
         override fun observe(): Flow<Boolean> = state

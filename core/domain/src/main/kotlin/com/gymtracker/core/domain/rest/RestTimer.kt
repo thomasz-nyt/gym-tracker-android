@@ -33,6 +33,19 @@ class RestTimer(
     }
 
     /**
+     * Adds [by] to the running rest (US-05 as amended by ADR-0049): the end time *and* the pinned
+     * total move together, through the same atomic write [start] uses, so a rest started at 1:00
+     * and extended reads "0:45 of 1:30" rather than a bar that jumps past full. With no rest
+     * running this does nothing — there is nothing to extend, and starting one from a stray tap
+     * would be the app inventing a rest nobody earned.
+     */
+    suspend fun extend(by: Duration) {
+        val endsAt = store.restEndsAt.first() ?: return
+        val total = store.restTotal.first() ?: by
+        store.setRest(endsAt.plus(by), total.plus(by))
+    }
+
+    /**
      * How much rest is left, or null when none is running or it has already elapsed.
      *
      * Null for "finished" rather than [Duration.ZERO]: a rest that is over is not a rest of
@@ -50,4 +63,10 @@ class RestTimer(
 
     private fun Instant.remaining(): Duration? =
         Duration.between(clock.instant(), this).takeIf { !it.isNegative && !it.isZero }
+
+    companion object {
+        /** What one tap of `+30S` adds (ADR-0049) — the design bundle's own figure. */
+        val EXTENSION_STEP: Duration = Duration.ofSeconds(EXTENSION_SECONDS)
+        private const val EXTENSION_SECONDS = 30L
+    }
 }

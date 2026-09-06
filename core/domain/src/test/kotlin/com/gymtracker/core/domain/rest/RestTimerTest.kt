@@ -60,6 +60,28 @@ class RestTimerTest {
         }
 
     @Test
+    fun `extending a rest moves its end and its total together`() =
+        runTest {
+            // ADR-0049: "0:45 of 1:30", not a bar that jumps past full — the denominator moves
+            // with the end time, in one write, so the two can never disagree.
+            timer().start()
+
+            timer(now.plusSeconds(15)).extend(RestTimer.EXTENSION_STEP)
+
+            assertEquals(now.plusSeconds(90), store.restEndsAt.first())
+            assertEquals(Duration.ofSeconds(90), store.restTotal.first())
+        }
+
+    @Test
+    fun `extending with no rest running starts nothing`() =
+        runTest {
+            timer().extend(RestTimer.EXTENSION_STEP)
+
+            assertNull(store.restEndsAt.first(), "a stray tap must not invent a rest nobody earned")
+            assertNull(store.restTotal.first())
+        }
+
+    @Test
     fun `a changed default is used by the next rest`() =
         runTest {
             store.setDefaultRest(Duration.ofSeconds(120))
