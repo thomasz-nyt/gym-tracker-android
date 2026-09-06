@@ -25,6 +25,7 @@ import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.UpdateSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -102,7 +103,7 @@ class RestCountdownTest {
             startSessionFromRoutine = fakeStartSessionFromRoutine(),
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
-            endSession = EndSession(repository, sets, clock),
+            endSession = EndSession(repository, sets, restStore, clock),
             workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
             recordSessionMetrics = fakeRecordSessionMetrics(repository),
             personalRecordsAchievedIn =
@@ -218,4 +219,27 @@ class RestCountdownTest {
          */
         const val REST_TICK_MILLIS = 1_000L
     }
+
+    @Test
+    fun `finishing the workout ends the rest that was running`() =
+        runTest {
+            // US-56 as amended (2026-09-05): the rest belongs to the session, and the session is
+            // over — otherwise the countdown outlived the workout and "Rest over" arrived after it.
+            val viewModel = viewModel(FakeSessions(listOf(session("s1"))))
+            viewModel.onExerciseChosen(ExerciseId("bench"))
+            val row =
+                viewModel.uiState
+                    .first { it.exercises.isNotEmpty() }
+                    .exercises
+                    .single()
+            viewModel.setEntry.open(row)
+            viewModel.uiState.first { it.setEntry != null }
+            viewModel.setEntry.confirm()
+            assertEquals(now.plusSeconds(60), restStore.restEndsAt.first(), "a rest is running")
+
+            viewModel.finish.confirm()
+
+            assertNull(restStore.restEndsAt.first())
+            assertNull(restStore.restTotal.first())
+        }
 }

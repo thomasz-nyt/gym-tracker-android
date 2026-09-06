@@ -98,7 +98,7 @@ class ExerciseSelectionTest {
             startSessionFromRoutine = fakeStartSessionFromRoutine(),
             addExerciseToSession =
                 AddExerciseToSession(sessionExercises) { SessionExerciseId("se-${nextSessionExercise++}") },
-            endSession = EndSession(repository, sets, clock),
+            endSession = EndSession(repository, sets, restStore, clock),
             workoutDetail = WorkoutDetail(repository, sessionExercises, sets, catalog),
             recordSessionMetrics = fakeRecordSessionMetrics(repository),
             personalRecordsAchievedIn =
