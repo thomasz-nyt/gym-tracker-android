@@ -45,6 +45,16 @@ class RestAlarm
             alarms.cancel(pendingIntent())
         }
 
+        override fun scheduleCue(at: Instant) {
+            // Deliberately not behind canNotify(): the cue is a haptic pulse and an optional tone,
+            // not a notification, so a member who declined notifications still gets it (ADR-0049).
+            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), cueIntent())
+        }
+
+        override fun cancelCue() {
+            alarms.cancel(cueIntent())
+        }
+
         /**
          * Without notification permission there is nothing for the alarm to do, so we do not
          * take a wakeup for it. The in-app countdown is unaffected (US-05).
@@ -62,8 +72,17 @@ class RestAlarm
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
+        private fun cueIntent(): PendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                CUE_REQUEST_CODE,
+                Intent(context, RestCueReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
         private companion object {
             const val REQUEST_CODE = 1
+            const val CUE_REQUEST_CODE = 2
         }
     }
 
@@ -76,6 +95,9 @@ class RestOverReceiver : BroadcastReceiver() {
     @Inject
     lateinit var notifier: RestNotifier
 
+    @Inject
+    lateinit var cue: RestCue
+
     override fun onReceive(
         context: Context,
         intent: Intent?,
@@ -85,6 +107,9 @@ class RestOverReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
+                // The zero-second cue (ADR-0049) rides this alarm rather than a third one; the
+                // pulse comes first so it is not waiting behind a Room read for the set line.
+                cue.play()
                 notifier.showRestOver()
             } finally {
                 pending.finish()

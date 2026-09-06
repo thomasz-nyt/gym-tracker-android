@@ -62,6 +62,11 @@ class RestController(
         scope.launch { restTimer.skip() }
     }
 
+    /** `+30S` (ADR-0049): thirty more seconds on the running rest, end time and total together. */
+    fun extend() {
+        scope.launch { restTimer.extend(RestTimer.EXTENSION_STEP) }
+    }
+
     /** When the running rest ends, for the alarm. Null if none is running. */
     suspend fun endsAt(): Instant? = store.restEndsAt.first()
 

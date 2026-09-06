@@ -1,10 +1,12 @@
 package com.gymtracker.feature.logging.rest
 
+import com.gymtracker.core.domain.rest.RestCueSchedule
 import com.gymtracker.core.domain.rest.RestTimerStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +34,7 @@ class RestNotificationCoordinator
         private val store: RestTimerStore,
         private val alarms: RestAlarms,
         private val notifier: RestNotifier,
+        private val clock: Clock,
     ) {
         private var scope: CoroutineScope? = null
 
@@ -63,9 +66,14 @@ class RestNotificationCoordinator
         private suspend fun apply(endsAt: Instant?) {
             if (endsAt == null) {
                 alarms.cancel()
+                alarms.cancelCue()
                 notifier.dismissResting()
             } else {
                 alarms.schedule(endsAt)
+                // ADR-0049: the ten-second cue is the same trigger once more, ten seconds earlier
+                // — and cancelled rather than fired late when fewer than ten seconds remain,
+                // which a re-timed or extended rest (US-05) can produce as easily as a short one.
+                RestCueSchedule.cueAt(endsAt, clock.instant())?.let(alarms::scheduleCue) ?: alarms.cancelCue()
                 notifier.showResting(endsAt)
             }
         }
