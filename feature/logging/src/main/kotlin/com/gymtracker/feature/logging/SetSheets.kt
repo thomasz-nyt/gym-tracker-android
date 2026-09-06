@@ -275,10 +275,17 @@ private fun SetEntryFields(
  * US-03 left RPE a plain decimal field because it is "typed occasionally and deliberately" — and
  * then it was typed almost never, because a keyboard between sets is exactly the cost ADR-0016
  * built steppers to avoid. The valid values are eleven half steps from 5 to 10
- * ([RpeFormatter.scale]), which is a row of chips, not a number to type: tap one to record it, tap it
- * again to clear it. Blank stays blank — not recorded is not a claim the set was easy
+ * ([RpeFormatter.scale]), which is a row of chips, not a number to type: tap one to record it, tap
+ * it again to clear it. Blank stays blank — not recorded is not a claim the set was easy
  * (constitution §2.4). [selected] is the sheet's own string, so a stored `8.0` and a tapped `8`
  * are compared as numbers, not spellings.
+ *
+ * **Each chip reads `@8`, `@8.5` — never a bare number.** Found on the emulator, not by
+ * inspection: a bare "8" chip is the exact same text as a reps count of 8, and with the reps
+ * field prefilled to 8 (a very common rep count) the two are indistinguishable on screen — which
+ * is exactly what broke `TwoTapSetLoggingTest`'s own prefill assertion, proof the ambiguity is
+ * real for a member reading the sheet, not only for a test. `@` is the same lifting notation
+ * this class's own read-back already uses everywhere a set is shown ([RpeFormatter.at]).
  */
 @Composable
 private fun RpeChips(
@@ -296,12 +303,12 @@ private fun RpeChips(
             horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
             verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
         ) {
-            RPE_CHOICES.forEach { choice ->
-                val isSelected = selectedValue == choice.toDouble()
+            RpeFormatter.scale.forEach { value ->
+                val isSelected = selectedValue == value
                 FilterChip(
                     selected = isSelected,
-                    onClick = { onSelected(if (isSelected) "" else choice) },
-                    label = { Text(choice) },
+                    onClick = { onSelected(if (isSelected) "" else RpeFormatter.number(value)) },
+                    label = { Text(RpeFormatter.at(value)) },
                     // ADR-0019: FilterChip reads CornerFull unless told otherwise (Shape.kt's trap).
                     shape = MaterialTheme.shapes.large,
                     modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
@@ -310,9 +317,6 @@ private fun RpeChips(
         }
     }
 }
-
-/** The domain's own scale, 5.0..10.0 in half steps, spelled the way [RpeFormatter] reads them back. */
-private val RPE_CHOICES: List<String> = RpeFormatter.scale.map(RpeFormatter::number)
 
 /**
  * What set entry can do, gathered up so the sheet takes one parameter instead of eight.

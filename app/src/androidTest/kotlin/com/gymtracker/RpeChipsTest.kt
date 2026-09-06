@@ -149,9 +149,14 @@ class RpeChipsTest {
             compose.onNodeWithText(ADD_SET).performScrollTo().performClick()
             awaitSheet()
 
-            // "8.5", not "8": the sheet's reps field also reads "8", and this is a chip test, not
-            // a disambiguation exercise. Persisted as 8.5, spelled back as "@8.5".
-            compose.onNodeWithText(CHOSEN_RPE).performClick()
+            // "@8.5", not "@8": the sheet's reps field reads "8", and this is a chip test, not a
+            // disambiguation exercise. Scrolled to first — eleven chips wrap the sheet's FlowRow
+            // onto more than one line, and a chip below the fold needs the same performScrollTo()
+            // "Add set" itself needs in a short `LazyColumn` (see addSetButton() there): found on
+            // CI's emulator, once #81 made this test actually run — a chip that requires scrolling
+            // to reach does not register a tap without it, silently. Persisted as 8.5, spelled
+            // back as "@8.5".
+            compose.onNodeWithText(CHOSEN_RPE).performScrollTo().performClick()
             compose.onNodeWithText(SAVE_SET).performClick()
 
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
@@ -190,7 +195,9 @@ class RpeChipsTest {
 
             compose.onNodeWithContentDescription(EDIT_SET_1).performClick()
             awaitEditor()
-            compose.onNodeWithText(CORRECTED_RPE).performClick()
+            // Scrolled to first — see the note on the "@8.5" tap above; the same chip row wraps
+            // in the editor sheet too.
+            compose.onNodeWithText(CORRECTED_RPE).performScrollTo().performClick()
             compose.onNodeWithText(SAVE_CHANGES).performClick()
 
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
@@ -203,7 +210,7 @@ class RpeChipsTest {
             // Tapping the selected chip again clears it: not recorded, not "easy" (constitution §2.4).
             compose.onNodeWithContentDescription(EDIT_SET_1).performClick()
             awaitEditor()
-            compose.onNodeWithText(CORRECTED_RPE).performClick()
+            compose.onNodeWithText(CORRECTED_RPE).performScrollTo().performClick()
             compose.onNodeWithText(SAVE_CHANGES).performClick()
 
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
@@ -256,9 +263,9 @@ class RpeChipsTest {
 
         /** The tail of the rest panel's comparison line: load, reps and last week's effort. */
         const val LAST_WEEK_READ_BACK = "× 8  @8"
-        const val CHOSEN_RPE = "8.5"
+        const val CHOSEN_RPE = "@8.5"
         const val CHOSEN_READ_BACK = "@8.5"
-        const val CORRECTED_RPE = "9"
+        const val CORRECTED_RPE = "@9"
         const val CORRECTED_READ_BACK = "@9"
 
         val LAST_WEEK = SessionId("last-week-rpe")
