@@ -104,6 +104,15 @@ mistake; there was no way to take one back out.
 - If notification permission is denied, the timer still runs and displays
   in-app. The permission is requested once and never re-prompted.
 - I can dismiss or skip it. It never blocks logging the next set.
+- **Amended 2026-09-05 (ADR-0049), closing two calls this file carried since ADR-0016:** I can
+  add **thirty seconds** to a running rest — `+30S` on the rest band beside `SKIP REST`, and as
+  the notification's third action — as often as I like; each tap moves the end time and the
+  bar's total together, so "0:45 of 1:30" reads true. With no rest running the control is absent.
+  And the rest **cues me at ten seconds and at zero**, screen on or off, phone in hand or in a
+  pocket: a short haptic pulse always, and — only if I turn it on in Settings, `Sound a tone with
+  the rest cue`, off by default — a short tone on the notification stream, never when the phone is
+  silenced. The cue is not a notification: it fires whether or not I granted that permission, and
+  the countdown, the notification and logging the next set are all unchanged by it.
 
 ### US-05a — Be walked through an exercise
 Added 2026-08-02. See `adr/0017-guided-exercise-flow.md`, which revisits the
