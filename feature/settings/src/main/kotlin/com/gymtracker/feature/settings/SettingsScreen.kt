@@ -110,6 +110,7 @@ fun SettingsRoute(
         onUnitChanged = viewModel::onUnitChanged,
         onRestDefaultStepped = viewModel::onRestDefaultStepped,
         onKeepScreenOnToggled = viewModel::onKeepScreenOnToggled,
+        onRestCueToneToggled = viewModel::onRestCueToneToggled,
         onHealthIntegrationToggled = viewModel::onHealthIntegrationToggled,
         onForgetMetricsConfirmed = viewModel::onForgetMetricsConfirmed,
         onForgetMetricsDeclined = viewModel::onForgetMetricsDeclined,
@@ -137,6 +138,7 @@ internal fun SettingsScreen(
     onUnitChanged: (WeightUnit) -> Unit = {},
     onRestDefaultStepped: (Int) -> Unit = {},
     onKeepScreenOnToggled: (Boolean) -> Unit = {},
+    onRestCueToneToggled: (Boolean) -> Unit = {},
     onHealthIntegrationToggled: (Boolean) -> Unit = {},
     onHealthPermissionRationaleContinue: (HealthPermission) -> Unit = {},
     onForgetMetricsConfirmed: () -> Unit = {},
@@ -174,6 +176,8 @@ internal fun SettingsScreen(
             RestDefaultField(seconds = state.restDefaultSeconds, onStepped = onRestDefaultStepped)
 
             KeepScreenOnToggle(enabled = state.keepScreenOn, onToggled = onKeepScreenOnToggled)
+
+            RestCueToneToggle(enabled = state.restCueTone, onToggled = onRestCueToneToggled)
 
             ExportSection(
                 isExporting = state.isExporting,
@@ -267,6 +271,37 @@ private fun RestDefaultField(
         onStep = onStepped,
         readOnly = true,
     )
+}
+
+/**
+ * ADR-0049: the rest cue's tone. The haptic pulse at ten seconds and at zero is not a setting —
+ * it is the cue — but a beep every sixty seconds in a shared gym is the member's to turn on, so
+ * this defaults off. Same one-node `toggleable` row as [KeepScreenOnToggle].
+ */
+@Composable
+private fun RestCueToneToggle(
+    enabled: Boolean,
+    onToggled: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(GymDimens.TightGap)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .sizeIn(minHeight = GymDimens.MinTouchTarget)
+                    .toggleable(value = enabled, onValueChange = onToggled, role = Role.Switch),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Sound a tone with the rest cue", style = MaterialTheme.typography.titleSmall)
+            Switch(checked = enabled, onCheckedChange = null)
+        }
+        Text(
+            text =
+                "The rest cues you with a short buzz at ten seconds and at zero. On, it beeps too — " +
+                    "never when the phone is silenced. Off by default.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
 }
 
 /**

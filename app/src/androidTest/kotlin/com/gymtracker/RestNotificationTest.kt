@@ -169,14 +169,21 @@ class RestNotificationTest {
     }
 
     @Test
-    fun theRestingNotificationCarriesBothActions() {
+    fun theRestingNotificationCarriesItsThreeActions() {
         runBlocking {
             notifier.showResting(Instant.now().plus(Duration.ofSeconds(60)))
 
             val titles = posted(RESTING_ID).actions.orEmpty().map { it.title.toString() }
             // LOG SET is present *during* the rest on purpose — US-05's "it never blocks
             // logging the next set" has to hold in the shade too.
-            assertEquals(listOf("LOG SET", "SKIP REST"), titles)
+            //
+            // The third action is ADR-0049's, and this assertion changing is the point rather
+            // than collateral: US-56 built the surface and left the slot deliberately empty —
+            // "the notification has room for a third action; that is not an argument for filling
+            // it" — pending the maintainer's call on `+30s`. ADR-0049 is that call. Asserted in
+            // order, so the button a thumb finds by muscle memory mid-rest cannot be reshuffled
+            // without this failing.
+            assertEquals(listOf("LOG SET", "SKIP REST", "+30S"), titles)
         }
     }
 

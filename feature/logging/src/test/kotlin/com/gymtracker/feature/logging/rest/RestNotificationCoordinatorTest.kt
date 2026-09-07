@@ -5,8 +5,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 
 /**
@@ -27,7 +29,7 @@ class RestNotificationCoordinatorTest {
     // `backgroundScope`, because the collection is meant to run for the life of the process
     // and so never completes on its own — see the class under test.
     private fun coordinate(scope: CoroutineScope) {
-        RestNotificationCoordinator(store, alarms, notifier).start(scope)
+        RestNotificationCoordinator(store, alarms, notifier, Clock.fixed(now, ZoneOffset.UTC)).start(scope)
     }
 
     @Test
@@ -111,7 +113,7 @@ class RestNotificationCoordinatorTest {
     @Test
     fun `re-applying re-posts the running rest without waiting for it to change`() =
         runTest(UnconfinedTestDispatcher()) {
-            val coordinator = RestNotificationCoordinator(store, alarms, notifier)
+            val coordinator = RestNotificationCoordinator(store, alarms, notifier, Clock.fixed(now, ZoneOffset.UTC))
             coordinator.start(backgroundScope)
             store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
 
@@ -129,7 +131,7 @@ class RestNotificationCoordinatorTest {
     @Test
     fun `re-applying with no rest running clears rather than posts`() =
         runTest(UnconfinedTestDispatcher()) {
-            val coordinator = RestNotificationCoordinator(store, alarms, notifier)
+            val coordinator = RestNotificationCoordinator(store, alarms, notifier, Clock.fixed(now, ZoneOffset.UTC))
             coordinator.start(backgroundScope)
             val dismissalsBefore = notifier.dismissed
 
@@ -139,9 +141,47 @@ class RestNotificationCoordinatorTest {
             assertEquals(dismissalsBefore + 1, notifier.dismissed)
         }
 
+    @Test
+    fun `starting a rest schedules the cue ten seconds before the end`() =
+        runTest(UnconfinedTestDispatcher()) {
+            // ADR-0049: the same trigger once more, ten seconds early — RestCueSchedule's one rule,
+            // scheduled by the same code path that schedules the end, so neither can be forgotten.
+            coordinate(backgroundScope)
+
+            store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
+
+            assertEquals(listOf(now.plusSeconds(50)), alarms.cues)
+        }
+
+    @Test
+    fun `a rest already inside its last ten seconds gets no cue, and any pending one is cancelled`() =
+        runTest(UnconfinedTestDispatcher()) {
+            coordinate(backgroundScope)
+            val cancelledBefore = alarms.cuesCancelled
+
+            store.setRest(now.plusSeconds(8), Duration.ofSeconds(8))
+
+            assertEquals(emptyList(), alarms.cues, "a cue fired late, or now, is a cue for nothing")
+            assertEquals(cancelledBefore + 1, alarms.cuesCancelled, "and whatever was pending is called off")
+        }
+
+    @Test
+    fun `skipping a rest cancels the cue with the alarm`() =
+        runTest(UnconfinedTestDispatcher()) {
+            coordinate(backgroundScope)
+            store.setRest(now.plusSeconds(60), Duration.ofSeconds(60))
+            val cancelledBefore = alarms.cuesCancelled
+
+            store.setRestEndsAt(null)
+
+            assertEquals(cancelledBefore + 1, alarms.cuesCancelled, "no pulse for a rest that is over")
+        }
+
     private class RecordingAlarms : RestAlarms {
         val scheduled = mutableListOf<Instant>()
         var cancelled = 0
+        val cues = mutableListOf<Instant>()
+        var cuesCancelled = 0
 
         override fun schedule(endsAt: Instant) {
             scheduled += endsAt
@@ -149,6 +189,14 @@ class RestNotificationCoordinatorTest {
 
         override fun cancel() {
             cancelled++
+        }
+
+        override fun scheduleCue(at: Instant) {
+            cues += at
+        }
+
+        override fun cancelCue() {
+            cuesCancelled++
         }
     }
 

@@ -9,6 +9,9 @@
     -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- ADR-0049: the rest cue is a haptic pulse (and an optional tone). A normal permission, no
+         prompt; the cue is not a notification and does not wait on POST_NOTIFICATIONS. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application>
         <receiver
@@ -21,6 +24,10 @@
         -->
         <receiver
             android:name="com.gymtracker.feature.logging.rest.RestActionReceiver"
+            android:exported="false" />
+        <!-- ADR-0049: the ten-second cue's own wakeup, the same shape as RestOverReceiver's. -->
+        <receiver
+            android:name="com.gymtracker.feature.logging.rest.RestCueReceiver"
             android:exported="false" />
     </application>
 

@@ -44,7 +44,7 @@ class RestActionReceiver : BroadcastReceiver() {
         intent: Intent?,
     ) {
         val action = intent?.action ?: return
-        if (action != ACTION_LOG_SET && action != ACTION_SKIP_REST) return
+        if (action != ACTION_LOG_SET && action != ACTION_SKIP_REST && action != ACTION_EXTEND_REST) return
 
         // A write plus a re-post is far inside a receiver's budget, but it is still more than
         // onReceive may do inline.
@@ -58,6 +58,9 @@ class RestActionReceiver : BroadcastReceiver() {
                     // Clearing the stored end time is the whole skip: the coordinator sees it
                     // and takes the alarm and the notification down.
                     ACTION_SKIP_REST -> restTimer.skip()
+                    // One write to the stored end time; the coordinator re-posts the countdown
+                    // and reschedules both alarms on its own (ADR-0049).
+                    ACTION_EXTEND_REST -> restTimer.extend(RestTimer.EXTENSION_STEP)
                 }
             } finally {
                 // The rest-over notification is the one thing the coordinator does not own, so
@@ -71,5 +74,6 @@ class RestActionReceiver : BroadcastReceiver() {
     internal companion object {
         const val ACTION_LOG_SET = "com.gymtracker.feature.logging.rest.LOG_SET"
         const val ACTION_SKIP_REST = "com.gymtracker.feature.logging.rest.SKIP_REST"
+        const val ACTION_EXTEND_REST = "com.gymtracker.feature.logging.rest.EXTEND_REST"
     }
 }

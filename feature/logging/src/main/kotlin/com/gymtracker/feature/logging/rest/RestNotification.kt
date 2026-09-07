@@ -67,6 +67,8 @@ class RestNotification
                             // action that does nothing is worse than one that is not offered.
                             if (notice != null) addAction(action(LOG_SET_LABEL, RestActionReceiver.ACTION_LOG_SET))
                             addAction(action(SKIP_REST_LABEL, RestActionReceiver.ACTION_SKIP_REST))
+                            // US-56 left this slot free pending the maintainer's call; ADR-0049 fills it.
+                            addAction(action(EXTEND_REST_LABEL, RestActionReceiver.ACTION_EXTEND_REST))
                         }.build(),
             )
         }
@@ -197,6 +199,7 @@ class RestNotification
 
             private const val LOG_SET_LABEL = "LOG SET"
             private const val SKIP_REST_LABEL = "SKIP REST"
+            private const val EXTEND_REST_LABEL = "+30S"
             private const val OPEN_REQUEST = 10
             private const val IMMUTABLE_UPDATE =
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

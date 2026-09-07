@@ -21,6 +21,7 @@ import com.gymtracker.core.data.member.DataStoreCurrentMember
 import com.gymtracker.core.data.member.DataStoreKeepScreenOnPreference
 import com.gymtracker.core.data.member.DataStoreUnitPreference
 import com.gymtracker.core.data.member.RoomAccountAdoption
+import com.gymtracker.core.data.rest.DataStoreRestCueTonePreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
 import com.gymtracker.core.data.routine.RoomRoutineItemRepository
 import com.gymtracker.core.data.routine.RoomRoutineRepository
@@ -72,6 +73,7 @@ import com.gymtracker.core.domain.progress.WeeklyVolumeByBodyPart
 import com.gymtracker.core.domain.rest.DescribeRestNotification
 import com.gymtracker.core.domain.rest.DetermineUpNextSet
 import com.gymtracker.core.domain.rest.LogUpNextSet
+import com.gymtracker.core.domain.rest.RestCueTonePreference
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.routine.AddExerciseToRoutine
@@ -473,6 +475,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun restTimerStore(impl: DataStoreRestTimerStore): RestTimerStore
+
+    @Binds
+    abstract fun restCueTonePreference(impl: DataStoreRestCueTonePreference): RestCueTonePreference
 
     @Binds
     abstract fun warmUpTimerStore(impl: DataStoreWarmUpTimerStore): WarmUpTimerStore

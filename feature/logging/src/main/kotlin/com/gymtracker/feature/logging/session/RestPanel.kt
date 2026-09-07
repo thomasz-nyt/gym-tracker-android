@@ -139,6 +139,7 @@ internal fun RestingBody(
     unit: WeightUnit,
     justSetRecord: PersonalRecord?,
     onSkipRest: () -> Unit,
+    onExtendRest: () -> Unit,
     onLogNext: () -> Unit,
     onAdjust: () -> Unit,
     modifier: Modifier = Modifier,
@@ -177,7 +178,7 @@ internal fun RestingBody(
                 modifier = Modifier.padding(GymDimens.CompactScreenPadding).weight(1f, fill = false),
             )
 
-            RestSecondaryRow(onSkipRest = onSkipRest, onAdjust = onAdjust)
+            RestSecondaryRow(onSkipRest = onSkipRest, onExtendRest = onExtendRest, onAdjust = onAdjust)
 
             // "— DON'T WAIT" is cut (ADR-0011's Turn 4 amendment, frame 4c): it was the longest
             // string on the screen, and the value line beneath already says what tapping it will
@@ -199,7 +200,7 @@ internal fun RestingBody(
             // on screen at all: a dead end this app has never had anywhere else. Up next and the
             // log button both need a real set to describe and stay absent; SKIP REST needs
             // nothing but a rest to leave, so it is the one control that always renders.
-            RestSecondaryRow(onSkipRest = onSkipRest, onAdjust = onAdjust)
+            RestSecondaryRow(onSkipRest = onSkipRest, onExtendRest = onExtendRest, onAdjust = onAdjust)
         }
     }
 }
@@ -214,6 +215,7 @@ internal fun RestingBody(
 @Composable
 private fun RestSecondaryRow(
     onSkipRest: () -> Unit,
+    onExtendRest: () -> Unit,
     onAdjust: () -> Unit,
 ) {
     Row(
@@ -222,6 +224,10 @@ private fun RestSecondaryRow(
     ) {
         TextButton(onClick = onSkipRest, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
             GymText(text = "SKIP REST", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
+        }
+        // ADR-0049: the control five ADRs drew and left off, now that RestTimer.extend exists.
+        TextButton(onClick = onExtendRest, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+            GymText(text = "+30S", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
         }
         TextButton(onClick = onAdjust, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
             GymText(text = "Add set", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
@@ -444,6 +450,7 @@ private fun RestingBodyNarrowWorstCasePreview() {
             unit = WeightUnit.LB,
             justSetRecord = null,
             onSkipRest = {},
+            onExtendRest = {},
             onLogNext = {},
             onAdjust = {},
         )

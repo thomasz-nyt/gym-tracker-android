@@ -18,6 +18,7 @@ import com.gymtracker.core.domain.health.SessionsWithHealthMetrics
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.KeepScreenOnPreference
 import com.gymtracker.core.domain.member.UnitPreference
+import com.gymtracker.core.domain.rest.RestCueTonePreference
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.units.WeightUnit
@@ -72,6 +73,8 @@ data class SettingsUiState(
     val restDefaultSeconds: Long = DEFAULT_REST_SECONDS,
     /** US-59: whether the screen is held on while a workout runs. Defaults on. */
     val keepScreenOn: Boolean = true,
+    /** ADR-0049: whether the rest cue sounds a tone as well as its haptic pulse. Defaults off. */
+    val restCueTone: Boolean = false,
     /**
      * US-20: the device/account gate, independent of [healthIntegrationEnabled] (ADR-0038).
      * `SettingsScreen` renders no health UI at all while this is [HealthStatus.Unavailable] —
@@ -139,6 +142,7 @@ class SettingsViewModel
         private val unitPreference: UnitPreference,
         private val restTimerStore: RestTimerStore,
         private val keepScreenOnPreference: KeepScreenOnPreference,
+        private val restCueTonePreference: RestCueTonePreference,
         private val healthMetricsSource: HealthMetricsSource,
         private val healthIntegration: HealthIntegration,
         private val forgetHealthMetrics: ForgetHealthMetrics,
@@ -174,6 +178,11 @@ class SettingsViewModel
                 }
             }
             viewModelScope.launch {
+                restCueTonePreference.observe().collect { enabled ->
+                    _uiState.update { it.copy(restCueTone = enabled) }
+                }
+            }
+            viewModelScope.launch {
                 // status() is independent of the toggle (ADR-0038) — re-read here so the section
                 // can decide whether to render at all, and again whenever the toggle itself
                 // changes, since a member flipping it is the other moment the picture can change.
@@ -188,6 +197,11 @@ class SettingsViewModel
         /** US-59: the next workout, and any already running, follows the new setting at once. */
         fun onKeepScreenOnToggled(enabled: Boolean) {
             viewModelScope.launch { keepScreenOnPreference.set(enabled) }
+        }
+
+        /** ADR-0049: the tone is the opt-in half of the rest cue; the haptic pulse is not a setting. */
+        fun onRestCueToneToggled(enabled: Boolean) {
+            viewModelScope.launch { restCueTonePreference.set(enabled) }
         }
 
         fun onExport(destination: String) {

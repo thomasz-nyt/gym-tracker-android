@@ -87,6 +87,7 @@ internal fun SessionBody(
     onLogNextSet: (UpNextSet) -> Unit,
     onUndoOneTapLog: () -> Unit,
     onSkipRest: () -> Unit,
+    onExtendRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     onFinishSummaryDismissed: () -> Unit,
     nextRoutine: Routine?,
@@ -99,15 +100,7 @@ internal fun SessionBody(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            state.finish is FinishFlow.Ready ->
-                Box(modifier = Modifier.padding(GymDimens.ScreenPadding)) {
-                    FinishSummaryScreen(
-                        detail = state.finish.detail,
-                        records = state.finish.records,
-                        unit = state.unit,
-                        onDone = onFinishSummaryDismissed,
-                    )
-                }
+            state.finish is FinishFlow.Ready -> FinishSummaryBody(state.finish, state.unit, onFinishSummaryDismissed)
             state.finish != null -> CenteredSpinner()
             state.isLoading -> CenteredSpinner()
             state.activeSession != null ->
@@ -136,6 +129,7 @@ internal fun SessionBody(
                     canUndoOneTapLog = state.canUndoOneTapLog,
                     onUndoOneTapLog = onUndoOneTapLog,
                     onSkipRest = onSkipRest,
+                    onExtendRest = onExtendRest,
                     onFinishWorkout = onFinishWorkout,
                     onSelectExercise = onSelectExercise,
                     warmUp = warmUp,
@@ -153,6 +147,22 @@ internal fun SessionBody(
                     )
                 }
         }
+    }
+}
+
+/**
+ * The finish summary (US-31), padded like [NoSession] — the two states that draw on the bare
+ * ground rather than the ruled sheet. Its own function only so [SessionBody] stays under detekt's
+ * length limit as the session's callbacks keep accruing; nothing here is new behaviour.
+ */
+@Composable
+private fun FinishSummaryBody(
+    finish: FinishFlow.Ready,
+    unit: WeightUnit,
+    onDone: () -> Unit,
+) {
+    Box(modifier = Modifier.padding(GymDimens.ScreenPadding)) {
+        FinishSummaryScreen(detail = finish.detail, records = finish.records, unit = unit, onDone = onDone)
     }
 }
 
@@ -283,6 +293,7 @@ private fun ActiveSession(
     canUndoOneTapLog: Boolean,
     onUndoOneTapLog: () -> Unit,
     onSkipRest: () -> Unit,
+    onExtendRest: () -> Unit,
     onFinishWorkout: () -> Unit,
     onSelectExercise: (SessionExerciseId) -> Unit,
     warmUp: WarmUp,
@@ -320,6 +331,7 @@ private fun ActiveSession(
                 unit = unit,
                 justSetRecord = justSetRecord,
                 onSkipRest = onSkipRest,
+                onExtendRest = onExtendRest,
                 onLogNext = { upNext?.let(onLogNextSet) },
                 onAdjust = {
                     exercises.firstOrNull { it.sessionExercise.id == upNext?.sessionExerciseId }?.let(onAddSet)

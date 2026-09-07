@@ -1440,7 +1440,7 @@ for either: the storage is ADR-0005's, the window is ADR-0012's, and a window fl
 architecture decision. Tests first — `OneTapLogUndoTest` (four controller cases), two
 `SettingsViewModelTest` cases, `KeepScreenOnTest` and `OneTapUndoTest` (instrumented);
 `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` unedited. All four gates green locally; the
-instrumented additions ran on CI's emulator only, and the PR lists what to verify on a device.
+instrumented additions compile and run on CI's emulator once the PR retargets to `main`, and the PR lists what to verify on a device.
 
 **Tier 1, second piece, 2026-09-05: RPE reads back (US-60).** RPE had been captured since M1 and
 shown in exactly one place — a past workout's detail, as `RPE 8.0` — never on the session row,
@@ -1453,7 +1453,7 @@ since a keyboard between sets is the cost ADR-0016 built steppers to avoid. Stil
 never carried forward (US-03), no new column, no change to the two-tap path. Tests first:
 `RpeFormatterTest`, and `RpeChipsTest` (instrumented — one tap records it, it reads back on the
 rest panel and on the row, an edit changes it, a second tap on the same chip clears it). All four
-gates green locally; the instrumented additions ran on CI's emulator only.
+gates green locally; the instrumented additions compile and run on CI's emulator once the PR retargets to `main`.
 
 **Tier 1, third piece, 2026-09-05: the whole of last time, under the open movement (US-61).**
 ADR-0023 put last time's *last set* on the rest panel as the number to beat, and the review's
@@ -1467,8 +1467,7 @@ screen renders it as a `LAST TIME · TUE 4 AUG` kicker and one line of every set
 (US-60), under the target line, absent for a movement never done before. `asDay()` consolidated
 into `Dates.kt` on its third caller, the same threshold `Durations.kt` used. Tests first:
 `PreviousPerformanceOfTest`, `LastTimeBlockTest` (instrumented — all three seeded sets on the
-open movement; nothing on one never done). All four gates green locally; the instrumented
-additions ran on CI's emulator only.
+open movement; nothing on one never done). All four gates green locally; the instrumented additions compile and run on CI's emulator once the PR retargets to `main`.
 
 **From the gym floor, 2026-09-05: the weight is editable set by set in guided mode (US-05a
 amended).** Reported by the maintainer after a session: once an exercise is started, the rep count
@@ -1497,6 +1496,30 @@ the set that is written). `GuidedFlowScreenTest`, `TwoTapSetLoggingTest` and
 and runs on CI's emulator once the PR retargets to `main` — `ci.yml` runs that job for PRs to `main`
 only, so a stacked PR gets build, lint, unit tests and the APK until then.
 
+**Tier 1, fourth piece, 2026-09-05: the rest can be extended, and it cues at ten seconds and at
+zero (US-05 amended, ADR-0049).** Both were drawn on the design bundle's rest frames and left off by
+five ADRs in a row (0016, 0023, 0029, 0036, 0047), each for the same reason — they amend US-05, so
+they were the maintainer's call — and both were decided on 2026-09-04: `+30s` yes; the cue yes, as a
+haptic pulse always with a tone behind a Settings toggle. `RestTimer.extend(by)` moves the stored end
+time and the pinned total together through the one `setRest` that `start()` already uses (so the
+progress bar's denominator stays honest); `+30S` joins `SKIP REST` and `Add set` on the band's
+`label.caps` row and fills the notification slot US-56 left free, handled by `RestActionReceiver`
+exactly as `SKIP REST` is — one write, after which `RestNotificationCoordinator` re-posts and
+reschedules on its own. The cue is ADR-0010's mechanism once more, ten seconds earlier: a second
+exact alarm at `RestCueSchedule.cueAt(endsAt)` (pure, `:core:domain`) fires `RestCueReceiver`, and
+`RestOverReceiver` fires the same pulse at zero before posting "Rest over". The pulse is a short
+`Vibrator` pattern, always, plus a `ToneGenerator` beep on the notification stream when the new
+`Sound a tone with the rest cue` toggle is on (default off) and the ringer is normal. Not gated on
+notification permission — a cue is not a notification. One manifest addition, `VIBRATE`, a normal
+permission. Tests first: `RestTimerTest` (+2: extend moves end and total; nothing to extend, nothing
+happens), `RestCueScheduleTest`, `RestNotificationCoordinatorTest` (+3: the cue is scheduled ten
+seconds early, not when fewer than ten remain, and cancelled with the rest), `SettingsViewModelTest`
+(+2), and `RestExtendTest` (instrumented — `+30S` moves the stored end time and total by thirty
+seconds and the band reads `of 1:30`). All four gates green locally; the instrumented additions
+compile and run on CI's emulator once the PR retargets to `main`, as for every stacked PR in this
+review. **The two "needs the maintainer's call" items below are therefore closed and removed from
+that list.**
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
@@ -1508,15 +1531,10 @@ only, so a stacked PR gets build, lint, unit tests and the APK until then.
   one rest taken after B, logged as rounds. Three or more would need a different model. Audit
   finding 07 stands, and nothing has been drawn for it.
 
-**Needs the maintainer's call before it can be written:**
-
-- **+30s on the rest timer.** ADR-0016 deferred it explicitly as a US-05 amendment; it is on
-  the redesign's screens but has never been decided. **Put to the maintainer again on 2026-08-30
-  while US-56 was being planned, and deliberately left open** — US-56 gives it an obvious home
-  (the notification has a third action slot free) and an obvious home is not a decision.
-- **An audio cue at 0:10 and 0:00.** For earbuds with the phone in a pocket. US-05 promises a
-  notification only, so this is an amendment rather than a bug. Unchanged by US-56, which is a
-  visual surface and makes no sound.
+**Formerly "needs the maintainer's call" — both decided 2026-09-04 and landed 2026-09-05
+(ADR-0049):** `+30s` on the rest timer, and the cue at 0:10 and 0:00 (a haptic pulse always, a
+tone behind a Settings toggle). Kept as a pointer so the five ADRs that deferred them (0016, 0023,
+0029, 0036, 0047) still resolve to where the decision landed.
 
 **Deliberately not designed, and staying that way:**
 

@@ -12,6 +12,14 @@ interface RestAlarms {
     fun schedule(endsAt: Instant)
 
     fun cancel()
+
+    /**
+     * The ten-second cue (ADR-0049): a second wakeup, at [at], firing [RestCueReceiver]. Not gated
+     * on notification permission the way [schedule] is — a cue is a pulse, not a notification.
+     */
+    fun scheduleCue(at: Instant)
+
+    fun cancelCue()
 }
 
 /**
