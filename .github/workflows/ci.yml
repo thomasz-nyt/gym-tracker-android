@@ -97,14 +97,18 @@ jobs:
             build-logic/**/build/reports/
           retention-days: 7
 
-  # testing-strategy.md: "Instrumented tests run on PRs to main only (they are slow);
-  # unit tests run on every push." This is the home of the two-tap assertion (§2), which
-  # that document says to treat a regression in as a broken build.
+   # testing-strategy.md: "Instrumented tests run on every pull request, whatever its base."
+  # They used to run for PRs to main only; a stacked PR (one based on another PR's branch)
+  # therefore shipped new instrumented tests that had never run anywhere, and a base
+  # change fires `pull_request: edited`, which this workflow does not listen for, so
+  # retargeting did not start them either. Not on the push to main after a merge: the PR
+  # already ran them on the same merge commit. This is the home of the two-tap assertion
+  # (§2), which that document says to treat a regression in as a broken build.
   instrumented:
     name: Instrumented tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v7
 

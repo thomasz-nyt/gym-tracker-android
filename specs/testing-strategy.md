@@ -158,5 +158,10 @@ then died at launch with `ClassNotFoundException`. ktlint, detekt, the unit
 tests and `assembleDebug` were all green. Lint is the only check that reads the
 merged manifest against the compiled classes.
 
-Instrumented tests run on PRs to `main` only (they are slow); unit tests run on
-every push.
+Instrumented tests run on **every pull request, whatever its base** (they are slow —
+roughly fifteen emulator minutes — but the alternative was worse: until 2026-09-05 they ran
+for PRs to `main` only, so a PR stacked on another PR's branch shipped new instrumented
+tests that had never run anywhere, and retargeting it to `main` later did not start them
+either, because a base change is a `pull_request: edited` event the workflow does not
+listen for; found on #76–#79). They do not run again on the push to `main` after a merge —
+the PR already ran them on the same merge commit. Unit tests run on every push.
