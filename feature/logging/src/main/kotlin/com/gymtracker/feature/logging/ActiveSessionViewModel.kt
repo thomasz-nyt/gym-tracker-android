@@ -537,6 +537,15 @@ class ActiveSessionViewModel
                                     memberId,
                                     currentRow.sessionExercise.sessionId,
                                 ),
+                            // ADR-0050: this `UpNextSet` is built by hand rather than by
+                            // `DetermineUpNextSet` — that one needs a set already logged in the
+                            // session, and this button is what logs the first. So the movement's
+                            // own rest has to be threaded in here too, or the one-tap button on
+                            // this screen would start the default while the notification's
+                            // `LOG SET` started the target's: two call sites disagreeing about
+                            // what logging does, which is the thing `LogUpNextSet` exists to
+                            // prevent. Caught on CI's emulator, not by inspection.
+                            rest = target?.rest,
                         )
                     }
 

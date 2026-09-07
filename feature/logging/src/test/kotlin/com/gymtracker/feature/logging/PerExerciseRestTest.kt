@@ -147,6 +147,26 @@ class PerExerciseRestTest {
         }
 
     @Test
+    fun `the one-tap LOG SET button on the session screen earns the movement's own rest too`() =
+        runTest {
+            // The seam this case exists for, and the one that broke: `nextLoggableSet` — what the
+            // session screen's one-tap button writes — is assembled by hand in the ViewModel rather
+            // than by `DetermineUpNextSet`, because that one needs a set already logged and this
+            // button is what logs the first. Threading the rest into one and not the other let the
+            // on-screen button start the default while the notification's `LOG SET` started the
+            // target's. Caught on the emulator by `PerExerciseRestScreenTest`; pinned here, where
+            // it costs a second rather than eight minutes to notice.
+            val viewModel = viewModel()
+            seed(viewModel, MovementTarget(sets = 3, reps = 8, weightKg = 45.0, restSeconds = 90))
+            val next = viewModel.uiState.first { it.nextLoggableSet != null }.nextLoggableSet!!
+
+            viewModel.onLogNextSet(next)
+
+            assertEquals(now.plusSeconds(90), restStore.restEndsAt.first())
+            assertEquals(Duration.ofSeconds(90), restStore.restTotal.first())
+        }
+
+    @Test
     fun `a movement whose target names no rest takes the default, as before`() =
         runTest {
             val viewModel = viewModel()
