@@ -1455,6 +1455,21 @@ never carried forward (US-03), no new column, no change to the two-tap path. Tes
 rest panel and on the row, an edit changes it, a second tap on the same chip clears it). All four
 gates green locally; the instrumented additions ran on CI's emulator only.
 
+**Tier 1, third piece, 2026-09-05: the whole of last time, under the open movement (US-61).**
+ADR-0023 put last time's *last set* on the rest panel as the number to beat, and the review's
+audit found that was all a lifter could see mid-session — the previous appearance's other sets
+lived in Progress, two screens from the bench. `PreviousPerformanceOf` (`:core:domain`, JUnit 5)
+reads the most recent earlier appearance in full through the two repository reads the rest panel
+already makes (`lastSetOfBefore`, then that appearance's sets) — no new query, correct
+retroactively — and `ActiveSessionViewModel` carries it for the open exercise (built from the
+`SetRepository` it already holds, like `LogUpNextSet`, so no constructor churn). The session
+screen renders it as a `LAST TIME · TUE 4 AUG` kicker and one line of every set with its RPE
+(US-60), under the target line, absent for a movement never done before. `asDay()` consolidated
+into `Dates.kt` on its third caller, the same threshold `Durations.kt` used. Tests first:
+`PreviousPerformanceOfTest`, `LastTimeBlockTest` (instrumented — all three seeded sets on the
+open movement; nothing on one never done). All four gates green locally; the instrumented
+additions ran on CI's emulator only.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason

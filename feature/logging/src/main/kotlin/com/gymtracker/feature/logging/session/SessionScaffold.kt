@@ -47,6 +47,7 @@ import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SessionProgress
+import com.gymtracker.core.domain.set.PreviousPerformance
 import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.feature.logging.FinishFlow
 import com.gymtracker.feature.logging.FinishSummaryScreen
@@ -119,6 +120,7 @@ internal fun SessionBody(
                     progress = state.progress,
                     openSessionExerciseId = state.openSessionExerciseId,
                     nextLoggableSet = state.nextLoggableSet,
+                    lastTime = state.lastTime,
                     justSetRecord = state.justSetRecord,
                     onAddExercise = onAddExercise,
                     onAddSet = onAddSet,
@@ -265,6 +267,7 @@ private fun ActiveSession(
     progress: SessionProgress?,
     openSessionExerciseId: SessionExerciseId?,
     nextLoggableSet: UpNextSet?,
+    lastTime: PreviousPerformance?,
     justSetRecord: PersonalRecord?,
     onAddExercise: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
@@ -329,6 +332,7 @@ private fun ActiveSession(
                 openSessionExerciseId = openSessionExerciseId,
                 unit = unit,
                 nextLoggableSet = nextLoggableSet,
+                lastTime = lastTime,
                 orderIsAPlan = progress?.orderIsAPlan == true,
                 onAddSet = onAddSet,
                 onRemoveExercise = onRemoveExercise,
@@ -413,6 +417,7 @@ private fun MidSetBody(
     openSessionExerciseId: SessionExerciseId?,
     unit: WeightUnit,
     nextLoggableSet: UpNextSet?,
+    lastTime: PreviousPerformance?,
     orderIsAPlan: Boolean,
     onAddSet: (SessionExerciseRow) -> Unit,
     onRemoveExercise: (SessionExerciseId) -> Unit,
@@ -440,6 +445,7 @@ private fun MidSetBody(
                 exercises = exercises,
                 openSessionExerciseId = openSessionExerciseId,
                 nextLoggableSet = nextLoggableSet,
+                lastTime = lastTime,
                 unit = unit,
                 orderIsAPlan = orderIsAPlan,
                 onAddSet = onAddSet,

@@ -43,12 +43,9 @@ import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.feature.logging.SessionExerciseRow
 import com.gymtracker.feature.logging.WarmUp
+import com.gymtracker.feature.logging.asDay
 import com.gymtracker.feature.logging.asMinutesSeconds
 import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * The warm-up: a stopwatch, and nothing else (US-28, ADR-0021).
@@ -411,10 +408,6 @@ private fun logButtonDetail(
     val weight = WeightFormatter.format(upNext.prefill.weight?.let { UnitConverter.toKilograms(it, unit) }, unit)
     return "${weight.primary} × ${upNext.prefill.reps}"
 }
-
-/** The day a set happened, for the rest panel's comparison line. */
-private fun Instant.asDay(): String =
-    DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()).withZone(ZoneId.systemDefault()).format(this)
 
 /**
  * ADR-0011's Turn 4 amendment: 320dp, 130% font scale, the longest exercise name in the bundled
