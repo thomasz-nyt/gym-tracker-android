@@ -1031,6 +1031,27 @@ architecture decision.
 - Changing the setting takes effect at once, including for a workout already running.
 - `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
 
+### US-60 — RPE reads back wherever a set is shown, and is one tap to record
+Added 2026-09-05, the UI/UX and trainer review's first trainer-level gap. RPE has been captured
+since M1 (US-03) and shown in exactly one place — a past workout's detail, as `RPE 8.0`. Never on
+the session row, never beside the number to beat on the rest panel, never in the exercise log.
+A trainer's reasoning: RPE is autoregulation data, and it is only worth recording if last week's
+is visible next to this week's — `135 × 8 @8` and `135 × 8 @10` are different targets.
+
+- Every surface that shows a set shows its RPE when one was recorded: the session row
+  (`SET 2  135 lb × 8  @8  +1:30`), the rest panel's comparison (`Last Tue 4 Aug  ·  135 lb × 8
+  @8`), the exercise log (US-34) and the workout detail (US-06b) — spelled one way everywhere,
+  lifting's own `@8`, `@8.5` for a half step, never `8.0`.
+- Absent when none was recorded. Not recorded is not "easy" (constitution §2.4).
+- Recording it is **one tap**: eleven chips, 5 to 10 in half steps (`SetValidation`'s own range),
+  on both the set sheet and the set editor; tapping the selected chip again clears it. The
+  decimal keyboard field is gone — a keyboard between sets is exactly the cost ADR-0016 built
+  steppers to avoid, and "typed occasionally and deliberately" had come to mean almost never.
+- Still optional, still blank by default, still never carried forward from the last set (US-03).
+  No new column; the same `sets.rpe` every set has carried since M1.
+- The two-tap path is untouched — the chips add no step to `Add set` → `Save set`.
+  `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` pass unedited.
+
 ---
 
 ## M4a — Rep, animated

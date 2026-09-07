@@ -51,6 +51,7 @@ import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionSummary
 import com.gymtracker.core.domain.session.SetIntervals
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Duration
@@ -285,7 +286,8 @@ private fun PastLoggedSets(
                         append("${set.setIndex}.  ${set.reps} reps")
                         append("   ${weight.primary}")
                         weight.secondary?.let { append("  ·  $it") }
-                        set.rpe?.let { append("   RPE $it") }
+                        // US-60: one spelling everywhere — "@8", not "RPE 8.0".
+                        set.rpe?.let { append("   ${RpeFormatter.at(it)}") }
                         intervals[set.id]?.let { append("   +${it.asMinutesSeconds()}") }
                     },
                 style = MaterialTheme.typography.titleMedium,

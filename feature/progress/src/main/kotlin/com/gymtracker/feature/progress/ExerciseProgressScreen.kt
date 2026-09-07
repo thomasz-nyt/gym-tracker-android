@@ -34,6 +34,7 @@ import com.gymtracker.core.domain.progress.ExerciseLogEntry
 import com.gymtracker.core.domain.progress.ExerciseTrend
 import com.gymtracker.core.domain.progress.ExerciseTrendPoint
 import com.gymtracker.core.domain.progress.PersonalRecord
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -216,10 +217,15 @@ private fun ExerciseLogEntry.summary(unit: WeightUnit): String =
     estimatedOneRepMaxKg?.let { "Best ${WeightFormatter.format(it, unit).primary} est. 1RM" }
         ?: "${sets.size} ${if (sets.size == 1) "set" else "sets"}, no load recorded"
 
-/** "8 reps  ·  135 lb" — the same figures a set carries on `WorkoutDetailScreen`, read-only here. */
+/**
+ * "8 reps   135 lb   @8" — the same figures a set carries on `WorkoutDetailScreen`, read-only
+ * here. The RPE (US-60) is the part of a past set that tells you whether the number was a
+ * grind or a warm-up; absent when none was recorded.
+ */
 private fun ExerciseSet.describe(unit: WeightUnit): String {
     val weight = WeightFormatter.format(weightKg, unit)
-    return "$reps reps   ${weight.primary}"
+    val effort = rpe?.let { "   ${RpeFormatter.at(it)}" }.orEmpty()
+    return "$reps reps   ${weight.primary}$effort"
 }
 
 /** US-16: "top-set weight and total volume as switchable series". */

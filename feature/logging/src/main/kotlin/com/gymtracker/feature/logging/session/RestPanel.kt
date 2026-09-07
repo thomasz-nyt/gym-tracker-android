@@ -36,6 +36,7 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SessionProgress
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.set.SetPrefill
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
@@ -374,8 +375,11 @@ private fun UpNext(
         )
         upNext.comparison?.let { last ->
             val previous = WeightFormatter.format(last.weightKg, unit)
+            // US-60: how hard that set felt is part of the number to beat — `135 lb × 8 @8`
+            // is a different target from `135 lb × 8 @10`. Absent when none was recorded.
+            val effort = last.rpe?.let { "  ${RpeFormatter.at(it)}" }.orEmpty()
             NumeralText(
-                text = "Last ${last.performedAt.asDay()}  ·  ${previous.primary} × ${last.reps}",
+                text = "Last ${last.performedAt.asDay()}  ·  ${previous.primary} × ${last.reps}$effort",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

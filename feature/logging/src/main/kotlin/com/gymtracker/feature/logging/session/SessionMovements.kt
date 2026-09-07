@@ -32,6 +32,7 @@ import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.SetIntervals
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
@@ -367,6 +368,17 @@ private fun LoggedSets(
                     wordRole = GymTextRoles.WordUnit,
                     modifier = Modifier.weight(1f),
                 )
+                // US-60: the RPE typed for this set, read back where the set is — it was
+                // captured since M1 and shown nowhere on this screen. Absent when none was
+                // recorded, which is not a claim the set was easy (constitution §2.4).
+                set.rpe?.let { rpe ->
+                    GymText(
+                        text = RpeFormatter.at(rpe),
+                        role = GymTextRoles.Meta,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = GymDimens.TightGap),
+                    )
+                }
                 GymText(
                     text = intervals[set.id]?.let { "+${it.asMinutesSeconds()}" } ?: "—",
                     role = GymTextRoles.Meta,

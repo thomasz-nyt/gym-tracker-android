@@ -1442,6 +1442,19 @@ architecture decision. Tests first — `OneTapLogUndoTest` (four controller case
 `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` unedited. All four gates green locally; the
 instrumented additions ran on CI's emulator only, and the PR lists what to verify on a device.
 
+**Tier 1, second piece, 2026-09-05: RPE reads back (US-60).** RPE had been captured since M1 and
+shown in exactly one place — a past workout's detail, as `RPE 8.0` — never on the session row,
+never beside the number to beat on the rest panel, never in the exercise log; the review's audit
+named it first among the trainer-level gaps. `RpeFormatter` (`:core:domain`, JUnit 5) gives it one
+spelling, `@8` / `@8.5`, on all four surfaces. Recording it becomes eleven chips (5–10 in half
+steps, `SetValidation`'s own range) on both sheets, replacing the decimal keyboard field US-03 had
+kept because RPE was "typed occasionally and deliberately" — which in practice meant almost never,
+since a keyboard between sets is the cost ADR-0016 built steppers to avoid. Still optional, still
+never carried forward (US-03), no new column, no change to the two-tap path. Tests first:
+`RpeFormatterTest`, and `RpeChipsTest` (instrumented — one tap records it, it reads back on the
+rest panel and on the row, an edit changes it, a second tap on the same chip clears it). All four
+gates green locally; the instrumented additions ran on CI's emulator only.
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason
