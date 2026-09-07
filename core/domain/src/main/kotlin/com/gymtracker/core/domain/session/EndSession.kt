@@ -1,6 +1,7 @@
 package com.gymtracker.core.domain.session
 
 import com.gymtracker.core.domain.model.SessionId
+import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.set.SetRepository
 import java.time.Clock
 import java.time.Instant
@@ -26,13 +27,23 @@ sealed interface EndSessionResult {
  *
  * A session with no sets is deleted rather than saved, so an accidental "Start workout" leaves
  * nothing behind to explain later.
+ *
+ * **Ending the session ends the rest that was running (US-56 as amended, 2026-09-05).** The rest
+ * timer is keyed by nothing but "the member's current rest" (ADR-0010), and until this only
+ * [StartSession] ever cleared it — for the *next* workout. Finish during a rest and the countdown
+ * outlived the workout: the shade kept counting, the alarm fired, and "Rest over" arrived for a
+ * session that was already in history. The rest belongs to the session; when the session is
+ * over, so is the rest, in either branch below.
  */
 class EndSession(
     private val sessions: SessionRepository,
     private val sets: SetRepository,
+    private val restTimerStore: RestTimerStore,
     private val clock: Clock,
 ) {
     suspend operator fun invoke(id: SessionId): EndSessionResult {
+        restTimerStore.setRestEndsAt(null)
+
         if (sets.lastSetAtInSession(id) == null) {
             sessions.deleteSession(id)
             return EndSessionResult.Discarded

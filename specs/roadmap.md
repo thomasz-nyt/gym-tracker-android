@@ -1520,6 +1520,36 @@ compile and run on CI's emulator once the PR retargets to `main`, as for every s
 review. **The two "needs the maintainer's call" items below are therefore closed and removed from
 that list.**
 
+**From real use, 2026-09-05: a rest notification outlived the workout (US-56 and US-05 amended,
+ADR-0048 note).** Reported by the maintainer after a session; three causes in the code, none of them
+a guess. `EndSession` never touched the rest — only `StartSession` cleared it, for the *next*
+workout — so finishing during a rest left the countdown in the shade, the alarm fired, and
+`RestOverReceiver` posted its no-session fallback, "Time for your next set.", for a workout already
+in history (with ADR-0049 the cue pulsed after it too). The coordinator re-armed an end time already
+in the past on every process start, which an `AlarmManager` fires at once — a stale "Rest over" the
+morning after an unfinished session. And "Rest over" was dismissed only by the next rest or an
+action, so finishing right after it left it in the shade indefinitely. Fixed at the source:
+`EndSession` clears the rest in both branches (the stale-session path too); the coordinator treats a
+past end time as none and dismisses "Rest over" on null, leaving one already posted alone on a past
+time because the receiver posting it may be what started the process; the notifier posts nothing
+with no set to name. Then the notification as a surface (US-56), refined in the same PR at the
+maintainer's choice of all seven: "Rest over" expires after ten minutes; it is silent, because the
+cue owns the pulse and the tone (and so no longer peeks); it is not posted while the app is on
+screen (`AppForeground`, the process lifecycle, read in the receiver); both notifications are public
+on the lock screen; the log action reads `LOG 135 LB × 8` / `LOG 12 REPS` (`RestNotice.logLabel`, in
+the domain, tested); the alarm is no longer gated on notification permission, which had quietly gated
+ADR-0049's zero-second cue; a one-line in-app rationale (`Know when to lift`, `Allow` / `Not now`)
+precedes Android's prompt, and nothing is asked when the permission is already granted or below
+Android 13; and the rest band says `Rest alerts are off — the countdown here still runs` with `TURN
+ON` when notifications are disabled. `RestController` loses two functions it no longer needs
+(`endsAt`, `onNotificationPermissionAsked`) and gains the rationale's two, staying under detekt's
+count. Tests first: `EndSessionTest` (+2), `RestNotificationCoordinatorTest` (+2: a past end time
+is not re-armed; null dismisses "Rest over"), `RestCountdownTest` (finishing ends the rest),
+`DescribeRestNotificationTest` (+2, the label), and `FinishDuringRestTest` (instrumented — finish
+mid-rest and the stored rest is gone). `TwoTapSetLoggingTest` and `OneTapSetLoggingTest` unedited.
+All four gates green locally; the instrumented addition compiles and runs on CI's emulator once the
+PR retargets to `main` (or as soon as #81 lands).
+
 **Designed, not built, and needing a user story first:**
 
 - **Swap a movement when the machine is taken.** The audit calls this the most common reason

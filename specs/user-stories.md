@@ -103,6 +103,10 @@ mistake; there was no way to take one back out.
 - The timer keeps running when the app is backgrounded and notifies at zero.
 - If notification permission is denied, the timer still runs and displays
   in-app. The permission is requested once and never re-prompted.
+- **Amended 2026-09-05:** before Android's own prompt, the app says in one line what rest alerts
+  are for — *Know when to lift*: a notification counts the rest down and says when it's over, with
+  the next set on it — with `Allow` and `Not now`. Either answer counts as asked: still once, still
+  never re-prompted. Nothing is asked below Android 13, or when the permission is already granted.
 - I can dismiss or skip it. It never blocks logging the next set.
 - **Amended 2026-09-05 (ADR-0049), closing two calls this file carried since ADR-0016:** I can
   add **thirty seconds** to a running rest — `+30S` on the rest band beside `SKIP REST`, and as
@@ -1028,6 +1032,29 @@ on a screen you are not looking at.
   as it is now. US-05's "asked once, never re-prompted" is unchanged.
 - The two-tap and one-tap paths are untouched: `TwoTapSetLoggingTest` and `OneTapSetLoggingTest`
   pass **unedited**.
+- **Amended 2026-09-05, from real use — a rest notification outlived the workout.** Three ways it
+  could, all closed. *Finishing the workout ends the rest:* `EndSession` clears the stored end time
+  (until now only starting the *next* workout did), so the countdown comes down, both alarms are
+  cancelled, and no "Rest over" arrives for a session already in history; resolving an abandoned
+  session (US-01) does the same. *A rest that ran out is not re-armed:* a stored end time already in
+  the past is treated as no rest when the process starts — an alarm set in the past fires at once,
+  which is how "Rest over" used to pop the morning after an unfinished session. *"Rest over" is
+  taken down when the rest is:* no rest means nothing is over, so ending or skipping dismisses a
+  lingering "Rest over", and one nobody acts on expires on its own after ten minutes. With nothing
+  to lift next — no session, or its last set deleted — "Rest over" is not posted at all: "Time for
+  your next set." with nothing to log was the notification members saw after finishing.
+- **Also amended 2026-09-05 — the surface, refined.** "Rest over" is **silent**: ADR-0049's cue
+  owns the pulse and the optional tone, so it no longer buzzes a second time right behind it (silent
+  also means no heads-up — the cue is the alert, the notification is the place to work). It is **not
+  posted while the app is on screen**: the band already reads 0:00, and a heads-up over it only
+  covered `LOG SET`; the countdown still comes down. Both notifications are **readable on the lock
+  screen** without an unlock — phone face-up on the floor. The log action **says what it writes**,
+  `LOG 135 LB × 8`, or `LOG 12 REPS` for a bodyweight movement, because the shade has no screen
+  around the button and a mis-tap writes a set. The zero-second cue **fires whether or not
+  notifications are allowed** — its alarm was gated on the permission, which ADR-0049 promised it
+  was not. And **with notifications off, the rest band says so**: one quiet line, `Rest alerts are
+  off — the countdown here still runs`, with `TURN ON` opening Android's settings for the app;
+  absent whenever alerts are on.
 
 **Not decided here.** `+30s` and an audio cue at 0:10/0:00 are both listed in
 `specs/roadmap.md` as needing the maintainer's call, and both stayed open when this story was

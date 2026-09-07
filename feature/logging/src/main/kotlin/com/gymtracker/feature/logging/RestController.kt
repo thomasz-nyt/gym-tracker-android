@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.time.Duration
-import java.time.Instant
 
 /**
  * The rest between sets (US-05), split out of `ActiveSessionViewModel` for the same reason
@@ -28,6 +27,7 @@ class RestController(
     private val scope: CoroutineScope,
 ) {
     private val started = MutableStateFlow(false)
+    private val rationale = MutableStateFlow(false)
 
     /**
      * Flips when a rest begins *on this screen*, which is the one moment it is appropriate to
@@ -67,12 +67,22 @@ class RestController(
         scope.launch { restTimer.extend(RestTimer.EXTENSION_STEP) }
     }
 
-    /** When the running rest ends, for the alarm. Null if none is running. */
-    suspend fun endsAt(): Instant? = store.restEndsAt.first()
-
     suspend fun shouldAskForNotifications(): Boolean = store.shouldAskForNotificationPermission.first()
 
-    fun onNotificationPermissionAsked() {
+    /**
+     * US-05 as amended (2026-09-05): one in-app line saying what rest alerts are for, before
+     * Android's own prompt — showing for the first rest ever, and only when there is something to
+     * ask (the route decides that; this only holds whether the line is up).
+     */
+    val notificationRationale: StateFlow<Boolean> = rationale
+
+    fun offerNotificationRationale() {
+        rationale.value = true
+    }
+
+    /** Either answer counts as asked — once, never re-prompted (US-05). */
+    fun onNotificationRationaleAnswered() {
+        rationale.value = false
         scope.launch { store.markNotificationPermissionAsked() }
     }
 

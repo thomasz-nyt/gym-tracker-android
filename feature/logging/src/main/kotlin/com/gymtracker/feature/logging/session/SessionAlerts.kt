@@ -95,6 +95,40 @@ internal fun FinishWorkoutDialog(
     )
 }
 
+/**
+ * US-05 as amended (2026-09-05): what rest alerts are for, in the app's own words, before Android's
+ * permission prompt lands mid-set with no context. Shown once, for the first rest ever, and only
+ * when the permission is still to be asked; `Not now` counts as asked (US-05: once, never
+ * re-prompted). Same dialog shape as [FinishWorkoutDialog] — a title in `title.lg`, one line of
+ * body, two text buttons at the touch-target floor.
+ */
+@Composable
+internal fun RestAlertsRationaleDialog(
+    onAllow: () -> Unit,
+    onNotNow: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onNotNow,
+        title = { GymText(text = "Know when to lift", role = GymTextRoles.TitleLg) },
+        text = {
+            Text(
+                "With the screen off or the phone in your pocket, a notification counts the rest down " +
+                    "and says when it's over — with the next set right on it. Android will ask you to allow it.",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onAllow, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Text("Allow")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onNotNow, modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget)) {
+                Text("Not now")
+            }
+        },
+    )
+}
+
 @Composable
 private fun AbandonedSessionDialog(
     prompt: StaleSessionPrompt,

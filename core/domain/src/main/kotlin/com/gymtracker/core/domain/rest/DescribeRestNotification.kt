@@ -6,6 +6,8 @@ import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.session.SessionRepository
+import com.gymtracker.core.domain.units.UnitConverter
+import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.first
 
@@ -40,6 +42,16 @@ data class RestNotice(
     val sessionExerciseId: SessionExerciseId get() = upNext.sessionExerciseId
 
     val exerciseId: ExerciseId get() = upNext.exerciseId
+
+    /**
+     * What the notification's log action will write, spelled out — `LOG 135 LB × 8`, or
+     * `LOG 12 REPS` for a bodyweight movement (US-56 as amended 2026-09-05). In the shade there
+     * is no screen around the button to say what a tap does, and a mis-tap writes a set.
+     */
+    fun logLabel(): String {
+        val load = weight?.let { WeightFormatter.format(UnitConverter.toKilograms(it, unit), unit).primary.uppercase() }
+        return if (load == null) "LOG $reps REPS" else "LOG $load × $reps"
+    }
 }
 
 /**

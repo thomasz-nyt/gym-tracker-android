@@ -1,6 +1,8 @@
 package com.gymtracker.feature.logging
 
 import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymtracker.core.domain.model.ExerciseId
@@ -21,6 +25,7 @@ import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.session.StaleSessionPrompt
+import com.gymtracker.feature.logging.session.RestAlertsRationaleDialog
 import com.gymtracker.feature.logging.session.SessionBody
 import com.gymtracker.feature.logging.session.SessionDialogs
 import kotlinx.coroutines.launch
@@ -409,6 +414,8 @@ private fun SessionScreen(
 @Composable
 private fun RestNotificationPermission(viewModel: ActiveSessionViewModel) {
     val restStarted by viewModel.rest.restStarted.collectAsStateWithLifecycle()
+    val rationale by viewModel.rest.notificationRationale.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val requestPermission =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             // Whatever the member answers, the rest is already stored, so the coordinator has
@@ -418,15 +425,32 @@ private fun RestNotificationPermission(viewModel: ActiveSessionViewModel) {
     LaunchedEffect(restStarted) {
         if (!restStarted) return@LaunchedEffect
         viewModel.rest.onHandled()
+        if (!viewModel.rest.shouldAskForNotifications()) return@LaunchedEffect
 
-        val mustAsk =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                viewModel.rest.shouldAskForNotifications()
-
-        if (mustAsk) {
-            // Once, ever (US-05). Denial is fine — the countdown still runs on screen.
-            viewModel.rest.onNotificationPermissionAsked()
-            requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // Once, ever (US-05) — and only when there is something to ask: below Android 13 there is
+        // no runtime permission, and one already granted needs no dialog, ours or Android's.
+        val nothingToAsk =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || context.canPostNotifications()
+        if (nothingToAsk) {
+            viewModel.rest.onNotificationRationaleAnswered()
+        } else {
+            viewModel.rest.offerNotificationRationale()
         }
     }
+
+    if (rationale) {
+        // US-05 as amended (2026-09-05): one in-app line saying what the alerts are for, before
+        // Android's own prompt. Either answer counts as asked; denial is fine — the countdown
+        // still runs on screen.
+        RestAlertsRationaleDialog(
+            onAllow = {
+                viewModel.rest.onNotificationRationaleAnswered()
+                requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            },
+            onNotNow = viewModel.rest::onNotificationRationaleAnswered,
+        )
+    }
 }
+
+private fun Context.canPostNotifications(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED

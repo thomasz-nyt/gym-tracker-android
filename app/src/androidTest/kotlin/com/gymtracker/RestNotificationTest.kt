@@ -183,7 +183,7 @@ class RestNotificationTest {
             // it" — pending the maintainer's call on `+30s`. ADR-0049 is that call. Asserted in
             // order, so the button a thumb finds by muscle memory mid-rest cannot be reshuffled
             // without this failing.
-            assertEquals(listOf("LOG SET", "SKIP REST", "+30S"), titles)
+            assertEquals(listOf(LOG_LABEL, "SKIP REST", "+30S"), titles)
         }
     }
 
@@ -193,7 +193,7 @@ class RestNotificationTest {
             notifier.showRestOver()
 
             val posted = posted(REST_OVER_ID)
-            assertEquals(listOf("LOG SET"), posted.actions.orEmpty().map { it.title.toString() })
+            assertEquals(listOf(LOG_LABEL), posted.actions.orEmpty().map { it.title.toString() })
             assertTrue(
                 posted.extras
                     .getCharSequence(Notification.EXTRA_TEXT)
@@ -201,6 +201,20 @@ class RestNotificationTest {
                     .contains("135 lb × 8"),
                 "it should name the set it is about, in the member's unit",
             )
+        }
+    }
+
+    @Test
+    fun theRestOverNotificationIsReadableOnTheLockScreenAndExpiresOnItsOwn() {
+        runBlocking {
+            notifier.showRestOver()
+
+            val posted = posted(REST_OVER_ID)
+            // Phone face-up on the floor beside the bench: the set to lift next, and the action
+            // that logs it, without an unlock first.
+            assertEquals(Notification.VISIBILITY_PUBLIC, posted.visibility, "readable on the lock screen")
+            // Walk away mid-workout and this should not be waiting the next morning.
+            assertEquals(Duration.ofMinutes(10).toMillis(), posted.timeoutAfter, "it expires on its own")
         }
     }
 
@@ -290,6 +304,13 @@ class RestNotificationTest {
         const val RESTING_ID = 2
         const val REST_OVER_ID = 1
         const val RESTING_CHANNEL = "rest-running"
+
+        /**
+         * What `RestNotice.logLabel()` renders for this fixture (US-56 as amended): the shade has
+         * no screen around its buttons to say what a tap will do, and a mis-tap writes a set. The
+         * body line keeps its lower-case `135 lb × 8`; only the button shouts.
+         */
+        const val LOG_LABEL = "LOG 135 LB × 8"
 
         const val POST_TIMEOUT_MILLIS = 5_000L
         const val POLL_MILLIS = 50L

@@ -732,6 +732,10 @@ class ActiveSessionViewModel
                     is StaleSessionPrompt.Finish -> sessions.endSession(prompt.session.id, prompt.endedAt)
                     is StaleSessionPrompt.Discard -> sessions.deleteSession(prompt.session.id)
                 }
+                // The same rule EndSession applies (US-56 as amended): a rest left running by a
+                // session that is now over is a countdown to nothing, and its "Rest over" would
+                // otherwise arrive the next time the app was opened.
+                restTimerStore.setRestEndsAt(null)
                 stalePrompt.value = null
             }
         }

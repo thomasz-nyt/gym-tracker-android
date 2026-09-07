@@ -323,8 +323,9 @@ object DataModule {
     fun endSession(
         sessions: SessionRepository,
         sets: SetRepository,
+        restTimerStore: RestTimerStore,
         clock: Clock,
-    ): EndSession = EndSession(sessions, sets, clock)
+    ): EndSession = EndSession(sessions, sets, restTimerStore, clock)
 
     @Provides
     fun recordSessionMetrics(

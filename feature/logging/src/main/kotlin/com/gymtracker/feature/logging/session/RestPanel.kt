@@ -1,5 +1,8 @@
 package com.gymtracker.feature.logging.session
 
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,9 +20,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.app.NotificationManagerCompat
 import com.gymtracker.core.designsystem.component.GymDivider
 import com.gymtracker.core.designsystem.component.GymLoadRow
 import com.gymtracker.core.designsystem.component.GymText
@@ -158,6 +164,7 @@ internal fun RestingBody(
         }
 
         RestBand(remaining = remaining, total = total)
+        RestAlertsOffLine()
 
         if (upNext != null) {
             // A display refinement, not a promise: read back from the SessionExercise's own
@@ -204,6 +211,46 @@ internal fun RestingBody(
         }
     }
 }
+
+/**
+ * US-56 as amended (2026-09-05): with notifications off nothing is posted for the shade, and nothing
+ * said so — the countdown here simply kept going. One quiet line, only while resting, with the way
+ * back. Absent whenever alerts are on, and in previews, which have no notification manager to ask.
+ * Re-read on every tick of the band above it, so turning alerts back on in Android's settings and
+ * returning takes the line down within a second.
+ */
+@Composable
+private fun RestAlertsOffLine() {
+    if (LocalInspectionMode.current) return
+    val context = LocalContext.current
+    if (NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = GymDimens.CompactScreenPadding, vertical = GymDimens.HairGap),
+        horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GymText(
+            text = "Rest alerts are off — the countdown here still runs.",
+            role = GymTextRoles.Meta,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(
+            onClick = { context.startActivity(notificationSettings(context)) },
+            modifier = Modifier.sizeIn(minHeight = GymDimens.MinTouchTarget),
+        ) {
+            GymText(text = "TURN ON", role = GymTextRoles.LabelCaps, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** Android's own notification settings for this app — the one place alerts can be turned back on. */
+private fun notificationSettings(context: Context): Intent =
+    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
 
 /**
  * `SKIP REST` and `Add set` (ADR-0047): the resting state's own `label.caps × 2` secondary row,
