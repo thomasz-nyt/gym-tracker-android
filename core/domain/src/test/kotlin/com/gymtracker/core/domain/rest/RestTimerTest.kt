@@ -60,6 +60,30 @@ class RestTimerTest {
         }
 
     @Test
+    fun `a rest started at the movement's own length takes it, not the default`() =
+        runTest {
+            // ADR-0050: three minutes for squats, sixty seconds for curls — one default cannot
+            // serve both, so a target may name the rest that follows its sets.
+            timer().start(Duration.ofMinutes(3))
+
+            assertEquals(now.plusSeconds(180), store.restEndsAt.first())
+            assertEquals(
+                Duration.ofMinutes(3),
+                store.restTotal.first(),
+                "the bar's denominator is the rest actually taken",
+            )
+        }
+
+    @Test
+    fun `a rest started with no length named falls back to the default`() =
+        runTest {
+            timer().start(null)
+
+            assertEquals(now.plusSeconds(60), store.restEndsAt.first())
+            assertEquals(Duration.ofSeconds(60), store.restTotal.first())
+        }
+
+    @Test
     fun `extending a rest moves its end and its total together`() =
         runTest {
             // ADR-0049: "0:45 of 1:30", not a bar that jumps past full — the denominator moves

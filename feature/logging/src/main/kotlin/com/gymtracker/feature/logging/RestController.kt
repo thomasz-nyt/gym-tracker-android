@@ -40,9 +40,12 @@ class RestController(
      */
     val restStarted: StateFlow<Boolean> = started
 
-    /** Starts the rest that follows a logged set. */
-    suspend fun startAfterSet() {
-        restTimer.start()
+    /**
+     * Starts the rest that follows a logged set — [rest] when the movement's own target names one
+     * (US-30 as amended by ADR-0050), else the member's default.
+     */
+    suspend fun startAfterSet(rest: Duration? = null) {
+        restTimer.start(rest)
         markStarted()
     }
 

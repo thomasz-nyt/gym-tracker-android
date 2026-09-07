@@ -12,6 +12,7 @@ import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.flow.first
+import java.time.Duration
 
 /**
  * What the rest panel says is coming (ADR-0023).
@@ -23,6 +24,10 @@ import kotlinx.coroutines.flow.first
  * @property comparison the member's most recent set of this movement from an *earlier* session,
  *   or null when there is none. Null means the panel shows nothing in its place, rather than
  *   comparing a set against itself or inventing a baseline (constitution §2.4).
+ * @property rest the rest this movement's target names for after each set (ADR-0050), or null
+ *   when it names none and the member's default applies. Carried here so the one-tap paths —
+ *   the screen's button and the notification's `LOG SET` — start the same rest the sheet would,
+ *   without a second lookup of their own.
  */
 data class UpNextSet(
     val sessionExerciseId: SessionExerciseId,
@@ -30,6 +35,7 @@ data class UpNextSet(
     val setNumber: Int,
     val prefill: SetPrefill,
     val comparison: ExerciseSet?,
+    val rest: Duration? = null,
 )
 
 /**
@@ -74,6 +80,7 @@ class DetermineUpNextSet(
             // which is what the prefill would have found anyway.
             prefill = prefillFromLastSet(appearance.exerciseId, member, unit) ?: mostRecent.asPrefill(unit),
             comparison = sets.lastSetOfBefore(appearance.exerciseId, member, sessionId),
+            rest = appearance.target?.rest,
         )
     }
 

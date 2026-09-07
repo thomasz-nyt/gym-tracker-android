@@ -541,14 +541,19 @@ internal fun sessionKicker(
 /** US-54: the other-exercises section label — a rename only, not a filter change (US-45 stands). */
 internal fun otherExercisesSectionLabel(orderIsAPlan: Boolean): String = if (orderIsAPlan) "THEN" else "ALSO TODAY"
 
-/** "Target 3 × 8 · 105 lb" for the current movement, or null when it has no target (US-13). */
+/**
+ * "Target 3 × 8 · 105 lb · 1:30 rest" for the current movement — every present field, any absent
+ * one simply not mentioned — or null when it has no target at all (US-13). The rest is the
+ * movement's own (ADR-0050); a movement resting on the default says nothing about it here.
+ */
 private fun targetLine(
     target: MovementTarget?,
     unit: WeightUnit,
 ): String? {
-    val setsReps = setsRepsPart(target) ?: return null
     val weight = target?.weightKg?.let { WeightFormatter.format(it, unit).primary }
-    return "Target $setsReps" + (weight?.let { " · $it" } ?: "")
+    val rest = target?.rest?.let { "${it.asMinutesSeconds()} rest" }
+    val parts = listOfNotNull(setsRepsPart(target), weight, rest)
+    return if (parts.isEmpty()) null else "Target " + parts.joinToString(" · ")
 }
 
 /** "3×10 · 90 lb" for a still-to-come row — the same numbers, without the "Target" label. */

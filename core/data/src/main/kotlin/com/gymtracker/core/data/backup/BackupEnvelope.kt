@@ -67,6 +67,7 @@ internal data class SessionExerciseDto(
     val targetSets: Int? = null,
     val targetReps: Int? = null,
     val targetWeightKg: Double? = null,
+    val targetRestSeconds: Int? = null,
 )
 
 @Serializable
@@ -96,6 +97,7 @@ internal data class RoutineItemDto(
     val targetSets: Int? = null,
     val targetReps: Int? = null,
     val targetWeightKg: Double? = null,
+    val targetRestSeconds: Int? = null,
 )
 
 internal const val CURRENT_FORMAT_VERSION = 1

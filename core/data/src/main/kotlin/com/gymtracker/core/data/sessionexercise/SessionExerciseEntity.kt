@@ -47,6 +47,7 @@ data class SessionExerciseEntity(
     @ColumnInfo(name = "target_sets") val targetSets: Int? = null,
     @ColumnInfo(name = "target_reps") val targetReps: Int? = null,
     @ColumnInfo(name = "target_weight_kg") val targetWeightKg: Double? = null,
+    @ColumnInfo(name = "target_rest_seconds") val targetRestSeconds: Int? = null,
 )
 
 internal fun SessionExerciseEntity.toDomain(): SessionExercise =
@@ -55,7 +56,7 @@ internal fun SessionExerciseEntity.toDomain(): SessionExercise =
         sessionId = SessionId(sessionId),
         exerciseId = ExerciseId(exerciseId),
         position = position,
-        target = toTarget(targetSets, targetReps, targetWeightKg),
+        target = toTarget(targetSets, targetReps, targetWeightKg, targetRestSeconds),
     )
 
 internal fun SessionExercise.toEntity(updatedAt: Instant = Instant.now()): SessionExerciseEntity =
@@ -69,17 +70,23 @@ internal fun SessionExercise.toEntity(updatedAt: Instant = Instant.now()): Sessi
         targetSets = target?.sets,
         targetReps = target?.reps,
         targetWeightKg = target?.weightKg,
+        targetRestSeconds = target?.restSeconds,
     )
 
 /**
  * Shares [MovementTarget]'s all-null-means-absent rule with
  * [com.gymtracker.core.data.routine.RoutineItemEntity.toTarget] without sharing an entity type
  * — `routine_items` and `session_exercises` are unrelated tables that happen to carry the same
- * three columns.
+ * four columns. The rest counts (ADR-0050): a target that names only a rest is a plan, not an absence.
  */
 private fun toTarget(
     sets: Int?,
     reps: Int?,
     weightKg: Double?,
+    restSeconds: Int?,
 ): MovementTarget? =
-    if (sets == null && reps == null && weightKg == null) null else MovementTarget(sets, reps, weightKg)
+    if (listOfNotNull(sets, reps, weightKg, restSeconds).isEmpty()) {
+        null
+    } else {
+        MovementTarget(sets, reps, weightKg, restSeconds)
+    }

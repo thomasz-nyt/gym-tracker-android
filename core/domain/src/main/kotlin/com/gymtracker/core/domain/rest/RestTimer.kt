@@ -21,10 +21,15 @@ class RestTimer(
     private val store: RestTimerStore,
     private val clock: Clock,
 ) {
-    /** Starts a rest of the member's configured length, replacing any already running. */
-    suspend fun start() {
-        val rest = store.defaultRest.first()
-        store.setRest(clock.instant().plus(rest), rest)
+    /**
+     * Starts a rest, replacing any already running: [rest] when the movement's own target names
+     * one (US-30 as amended by ADR-0050 — three minutes for squats, sixty seconds for curls; one
+     * default cannot serve both), else the member's configured default. Either way the length is
+     * pinned as the total, so the bar's denominator is the rest actually taken.
+     */
+    suspend fun start(rest: Duration? = null) {
+        val length = rest ?: store.defaultRest.first()
+        store.setRest(clock.instant().plus(length), length)
     }
 
     /** Ends the rest now. US-05: "I can dismiss or skip it." */

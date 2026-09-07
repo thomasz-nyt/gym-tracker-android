@@ -55,6 +55,7 @@ private fun SessionExerciseEntity.toSyncDto() =
         targetSets = targetSets,
         targetReps = targetReps,
         targetWeightKg = targetWeightKg,
+        targetRestSeconds = targetRestSeconds,
         updatedAt = updatedAt,
     )
 
@@ -89,5 +90,6 @@ private fun RoutineItemEntity.toSyncDto() =
         targetSets = targetSets,
         targetReps = targetReps,
         targetWeightKg = targetWeightKg,
+        targetRestSeconds = targetRestSeconds,
         updatedAt = updatedAt,
     )

@@ -188,6 +188,19 @@ class RoutineTest {
         }
 
     @Test
+    fun `a target that names only a rest round-trips as a target, not as absence`() =
+        runTest {
+            // ADR-0050: "bench, take two minutes" is a plan; the fourth column counts.
+            val id = upperA()
+            item("i1", id, bench, 1)
+            val restOnly = MovementTarget(sets = null, reps = null, weightKg = null, restSeconds = 120)
+
+            items.updateItem(items.itemsOf(id).single().copy(target = restOnly))
+
+            assertEquals(restOnly, items.itemsOf(id).single().target)
+        }
+
+    @Test
     fun `a movement with no target round-trips as null, not as a row of zeroes`() =
         runTest {
             val id = upperA()

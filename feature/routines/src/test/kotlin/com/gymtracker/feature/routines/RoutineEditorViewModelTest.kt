@@ -455,4 +455,58 @@ class RoutineEditorViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    // ADR-0050: a target may name the rest that follows each set — the fourth field, optional like
+    // the other three, typed in whole seconds and read back the same way.
+
+    @Test
+    fun `a movement's rest is entered with its target, saved in seconds, and read back`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", reps = "8", rest = "90")
+            viewModel.target.onSave()
+
+            viewModel.uiState.test {
+                assertEquals(
+                    MovementTarget(sets = 3, reps = 8, weightKg = null, restSeconds = 90),
+                    expectMostRecentItem().movements.single().target,
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+            viewModel.target.onEdit(itemId)
+            viewModel.target.editor.test {
+                assertEquals("90", awaitItem()?.rest, "read back as the seconds it was typed as")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a rest below one second is refused with its reason, and nothing is saved`() =
+        runTest {
+            givenUpperA()
+            val viewModel = viewModel()
+            viewModel.onAddExercise(bench)
+            val itemId = items.itemsOf(upperA).single().id
+
+            viewModel.target.onEdit(itemId)
+            viewModel.target.onFieldChanged(sets = "3", rest = "0")
+            viewModel.target.onSave()
+
+            viewModel.target.editor.test {
+                assertEquals(
+                    listOf("Rest needs a whole number of seconds, 1 or more."),
+                    expectMostRecentItem()?.errors,
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+            viewModel.uiState.test {
+                assertNull(expectMostRecentItem().movements.single().target, "nothing was saved")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

@@ -15,7 +15,10 @@ import com.gymtracker.core.domain.set.SetInput
  * (ADR-0006), which a second hand-rolled call site is precisely the place to get wrong.
  *
  * The rest is started here rather than by the caller because it is not optional: US-05 has a
- * rest follow every set, and a member logging from the shade cannot start one by hand.
+ * rest follow every set, and a member logging from the shade cannot start one by hand. Its
+ * length is the movement's own when its target names one ([UpNextSet.rest], ADR-0050), else the
+ * default — the same rule the set sheet's path applies, so the shade and the sheet cannot
+ * disagree about how long a rest a movement earns.
  */
 class LogUpNextSet(
     private val logSets: LogSets,
@@ -43,7 +46,7 @@ class LogUpNextSet(
                 sets = 1,
             )
 
-        restTimer.start()
+        restTimer.start(next.rest)
         return logged.first()
     }
 }

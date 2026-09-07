@@ -143,6 +143,7 @@ class BackupCodec
                 targetSets = target?.sets,
                 targetReps = target?.reps,
                 targetWeightKg = target?.weightKg,
+                targetRestSeconds = target?.restSeconds,
             )
 
         private fun SessionExerciseDto.toDomain() =
@@ -151,7 +152,7 @@ class BackupCodec
                 sessionId = SessionId(sessionId),
                 exerciseId = ExerciseId(exerciseId),
                 position = position,
-                target = targetOrNull(targetSets, targetReps, targetWeightKg),
+                target = targetOrNull(targetSets, targetReps, targetWeightKg, targetRestSeconds),
             )
 
         private fun ExerciseSet.toDto() =
@@ -196,6 +197,7 @@ class BackupCodec
                 targetSets = target?.sets,
                 targetReps = target?.reps,
                 targetWeightKg = target?.weightKg,
+                targetRestSeconds = target?.restSeconds,
             )
 
         private fun RoutineItemDto.toDomain() =
@@ -204,14 +206,23 @@ class BackupCodec
                 routineId = RoutineId(routineId),
                 exerciseId = ExerciseId(exerciseId),
                 position = position,
-                target = targetOrNull(targetSets, targetReps, targetWeightKg),
+                target = targetOrNull(targetSets, targetReps, targetWeightKg, targetRestSeconds),
             )
 
-        /** Shares `RoutineItemEntity.toTarget`'s all-null-means-absent rule (US-13's pattern). */
+        /**
+         * Shares `RoutineItemEntity.toTarget`'s all-null-means-absent rule (US-13's pattern), the
+         * rest included (ADR-0050) — a file written by a build that knows the rest must not decode a
+         * rest-only target as no target.
+         */
         private fun targetOrNull(
             sets: Int?,
             reps: Int?,
             weightKg: Double?,
+            restSeconds: Int?,
         ): MovementTarget? =
-            if (sets == null && reps == null && weightKg == null) null else MovementTarget(sets, reps, weightKg)
+            if (listOfNotNull(sets, reps, weightKg, restSeconds).isEmpty()) {
+                null
+            } else {
+                MovementTarget(sets, reps, weightKg, restSeconds)
+            }
     }

@@ -80,7 +80,7 @@ class BackupCodecTest {
                         routineId = RoutineId("r1"),
                         exerciseId = ExerciseId("Bench"),
                         position = 1,
-                        target = MovementTarget(sets = 3, reps = 8, weightKg = 61.25),
+                        target = MovementTarget(sets = 3, reps = 8, weightKg = 61.25, restSeconds = 90),
                     ),
                 ),
         )
@@ -92,6 +92,25 @@ class BackupCodecTest {
         val decoded = codec.decode(json)
 
         assertEquals(contents, decoded)
+    }
+
+    @Test
+    fun `a target that names only a rest survives the round trip`() {
+        // ADR-0050: the all-null-means-absent rule has to count the fourth field too, or a
+        // routine whose bench says only "take two minutes" restores with no target at all.
+        val restOnly =
+            contents.copy(
+                routineItems =
+                    listOf(
+                        contents.routineItems.single().copy(
+                            target = MovementTarget(sets = null, reps = null, weightKg = null, restSeconds = 120),
+                        ),
+                    ),
+            )
+
+        val decoded = codec.decode(codec.encode(restOnly, exportedAt, appVersion = "1.0"))
+
+        assertEquals(restOnly, decoded)
     }
 
     @Test

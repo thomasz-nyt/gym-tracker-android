@@ -35,7 +35,7 @@ import com.gymtracker.core.data.sync.SyncQueueEntity
         RoutineItemEntity::class,
         SyncQueueEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -68,6 +68,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V8_TARGETS = 8
         private const val V9_ROUTINE_ORIGIN = 9
         private const val V10_SYNC_QUEUE = 10
+        private const val V11_TARGET_REST = 11
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -322,6 +323,21 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
+                }
+            }
+
+        /**
+         * A movement's target gains the rest that follows each set (US-30 and US-05 as amended by
+         * ADR-0050): one nullable column on each of `routine_items` and `session_exercises`, the
+         * same shape and the same one-way copy as the v7 → v8 target columns. Additive only —
+         * every existing target is untouched and reads back with no rest named, which means the
+         * member's default, exactly as before.
+         */
+        val MIGRATION_10_11 =
+            object : Migration(V10_SYNC_QUEUE, V11_TARGET_REST) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_rest_seconds` INTEGER")
+                    db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_rest_seconds` INTEGER")
                 }
             }
     }

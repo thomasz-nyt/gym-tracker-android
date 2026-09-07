@@ -16,8 +16,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * The target-entry form for one movement (US-30), split out of [RoutineEditorViewModel] for the
- * same reason `SetEntryController` was split out of `ActiveSessionViewModel`: a form with its
+ * The target-entry form for one movement (US-30; the rest since ADR-0050), split out of
+ * [RoutineEditorViewModel] for the same reason `SetEntryController` was split out of
+ * `ActiveSessionViewModel`: a form with its
  * own state and validation is the natural piece to lift out once a class covers more than one
  * concern.
  */
@@ -76,6 +77,11 @@ class TargetEditorController(
                             ?.let { UnitConverter.fromKilograms(it, unit) }
                             ?.let(::trimTargetWeight)
                             .orEmpty(),
+                    rest =
+                        item.target
+                            ?.restSeconds
+                            ?.toString()
+                            .orEmpty(),
                 )
         }
     }
@@ -90,6 +96,7 @@ class TargetEditorController(
         sets: String? = null,
         reps: String? = null,
         weight: String? = null,
+        rest: String? = null,
     ) {
         state.value =
             state.value?.let { current ->
@@ -97,6 +104,7 @@ class TargetEditorController(
                     sets = sets ?: current.sets,
                     reps = reps ?: current.reps,
                     weight = weight ?: current.weight,
+                    rest = rest ?: current.rest,
                     errors = emptyList(),
                 )
             }
@@ -159,7 +167,8 @@ class TargetEditorController(
         val parsedReps = reps.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
         val parsedWeight = weight.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
         val weightKg = parsedWeight?.let { UnitConverter.toKilograms(it, unit) }
-        return MovementTarget(parsedSets, parsedReps, weightKg)
+        val parsedRest = rest.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+        return MovementTarget(parsedSets, parsedReps, weightKg, parsedRest)
     }
 
     /**
@@ -176,16 +185,20 @@ class TargetEditorController(
             if (sets.isNotBlank() && (parsedSets == null || parsedSets < MIN_TARGET_SETS)) add(SETS_PROBLEM)
             if (reps.isNotBlank() && (parsedReps == null || parsedReps < MIN_TARGET_REPS)) add(REPS_PROBLEM)
             if (typedWeight.isNotEmpty() && (parsedWeight == null || parsedWeight < 0)) add(LOAD_PROBLEM)
+            val parsedRest = rest.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+            if (rest.isNotBlank() && (parsedRest == null || parsedRest < MIN_TARGET_REST_SECONDS)) add(REST_PROBLEM)
         }
 
     private companion object {
         const val MIN_TARGET_SETS = 1
         const val MIN_TARGET_REPS = 1
+        const val MIN_TARGET_REST_SECONDS = 1
 
         /** What the dialog shows for each unreadable field; asserted literally by the unit test. */
         const val SETS_PROBLEM = "Sets needs a whole number, 1 or more."
         const val REPS_PROBLEM = "Reps needs a whole number, 1 or more."
         const val LOAD_PROBLEM = "Load needs a number, 0 or more."
+        const val REST_PROBLEM = "Rest needs a whole number of seconds, 1 or more."
 
         /** The catalog's ranking is per member; this form does not rank, it only needs a name. */
         val ANY_MEMBER = UserId("")

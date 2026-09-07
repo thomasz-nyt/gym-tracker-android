@@ -179,6 +179,7 @@ sessions(id PK, user_id, gym_name, started_at, ended_at,
 session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
                   exercise_id, position,
                   target_sets NULL, target_reps NULL, target_weight_kg NULL,
+                  target_rest_seconds NULL,
                   updated_at, sync_state)
 
 sets(id PK, session_exercise_id FK→session_exercises ON DELETE CASCADE,
@@ -191,6 +192,7 @@ routines(id PK, user_id, name, position, created_at,
 routine_items(id PK, routine_id FK→routines ON DELETE CASCADE,
               exercise_id FK→exercises, position,
               target_sets NULL, target_reps NULL, target_weight_kg NULL,
+              target_rest_seconds NULL,
               updated_at, sync_state)
 
 sync_queue(id PK, entity, entity_id, op, payload_json, created_at, attempts)
@@ -209,9 +211,13 @@ survives; an FK would make that impossible. Read paths therefore keep an honest 
 fallback. `routine_items.exercise_id` does have the FK because backup validation rejects a file
 whose routine references an id the current bundled catalog no longer contains.
 
-**Targets (schema v8, US-30, ADR-0027).** The three nullable `target_*` columns above are new,
-and `session_exercises` gains the same three, which `StartSessionFromRoutine` fills in as it
-copies. That duplication is the point: the session carries its own snapshot of what was planned,
+**Targets (schema v8, US-30, ADR-0027; a fourth column, schema v11, ADR-0050).** The nullable
+`target_*` columns above are new, and `session_exercises` gains the same ones, which
+`StartSessionFromRoutine` fills in as it copies. `target_rest_seconds` (v11) is the rest to take
+after each set of the movement, in whole seconds, floor 1; NULL means the member's default rest
+from Settings, not "no rest". A row whose only non-null target column is the rest is a target,
+not an absence — every reader of these columns (the two Room mappers, the backup codec) counts all
+four. That duplication is the point: the session carries its own snapshot of what was planned,
 so there is still **no foreign key back to the routine and nothing to join on**, and editing the
 routine next week cannot rewrite what last Tuesday was planned to be. ADR-0027 rejected the
 join-back implementation for exactly that reason.
@@ -395,6 +401,7 @@ create table session_exercises (
   target_sets int check (target_sets >= 1),
   target_reps int check (target_reps >= 1),
   target_weight_kg numeric(6,2) check (target_weight_kg >= 0),
+  target_rest_seconds int check (target_rest_seconds >= 1),
   updated_at timestamptz not null default now()
 );
 
@@ -415,6 +422,7 @@ create table routine_items (
   target_sets int check (target_sets >= 1),
   target_reps int check (target_reps >= 1),
   target_weight_kg numeric(6,2) check (target_weight_kg >= 0),
+  target_rest_seconds int check (target_rest_seconds >= 1),
   updated_at timestamptz not null default now()
 );
 

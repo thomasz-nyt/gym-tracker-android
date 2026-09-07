@@ -7,6 +7,7 @@ import com.gymtracker.core.domain.model.RoutineItem
 import com.gymtracker.core.domain.model.RoutineItemId
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -96,6 +97,36 @@ class SetRoutineItemTargetTest {
         runTest {
             assertFailsWith<IllegalArgumentException> {
                 setTarget(benchItem(), MovementTarget(sets = 3, reps = 8, weightKg = -1.0))
+            }
+        }
+
+    // ADR-0050: the rest joins the target as a fourth independently optional field. A target
+    // that names only a rest is still a target — "bench, take two minutes" is a real plan.
+
+    @Test
+    fun `a target may name the rest that follows each set, on its own if need be`() =
+        runTest {
+            val item = benchItem()
+
+            val updated = setTarget(item, MovementTarget(sets = null, reps = null, weightKg = null, restSeconds = 120))
+
+            assertEquals(120, updated.target?.restSeconds)
+            assertEquals(Duration.ofMinutes(2), updated.target?.rest, "what the rest timer will take")
+            assertEquals(
+                120,
+                items
+                    .itemsOf(routineId)
+                    .single()
+                    .target
+                    ?.restSeconds,
+            )
+        }
+
+    @Test
+    fun `a rest of fewer than one second is rejected`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                setTarget(benchItem(), MovementTarget(sets = 3, reps = 8, weightKg = 47.6, restSeconds = 0))
             }
         }
 }
