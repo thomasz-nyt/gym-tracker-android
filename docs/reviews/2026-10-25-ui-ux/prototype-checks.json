@@ -1,0 +1,53 @@
+[
+  {
+    "width": 320,
+    "variant": "A",
+    "horizontalOverflow": false,
+    "logVisible": true
+  },
+  {
+    "width": 320,
+    "variant": "B",
+    "horizontalOverflow": false,
+    "logVisible": true
+  },
+  {
+    "width": 320,
+    "variant": "C",
+    "horizontalOverflow": false,
+    "logVisible": true
+  },
+  {
+    "width": 390,
+    "variant": "A",
+    "horizontalOverflow": false,
+    "logVisible": true
+  },
+  {
+    "width": 390,
+    "variant": "B",
+    "horizontalOverflow": false,
+    "logVisible": true
+  },
+  {
+    "width": 390,
+    "variant": "C",
+    "horizontalOverflow": false,
+    "logVisible": true
+  },
+  {
+    "invalidLoadBlocked": true,
+    "draftPreserved": true
+  },
+  {
+    "oneSetPerLog": true,
+    "nextMovementAfterPlanMet": true
+  },
+  {
+    "movementHasOwnValues": true,
+    "restPreservedOnSelection": true
+  },
+  {
+    "variantSwitchUpdatesURL": true
+  }
+]
