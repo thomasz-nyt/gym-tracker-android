@@ -4,6 +4,16 @@ Date: 2026-10-25. Application baseline: `f6deca7`; review documentation baseline
 
 This is a visual companion to the [43-item product review](../2026-10-22-product-ux-review.md) and [agreed product direction](../2026-10-22-implementation-handoff.md). The proposed screens are a throwaway HTML prototype with synthetic example records. They do not implement the Android changes.
 
+## Open the interactive demo
+
+**[Open demo.html](demo.html)** — one self-contained HTML file, including REP's font. Double-click it or open it in a browser; no server, installation, network connection, sign-in or real training data is needed.
+
+The phone is clickable. Try the six guided walkthroughs or explore freely: Log & switch, Correct & Undo, End early & finish, Save routine changes (including failure), Bodyweight without a set count, and First routine. Switch between A/B/C layouts without resetting the workout; try dark mode or 130%/200% text. The live rest timer can be paused. Reset restores the current walkthrough's sample state.
+
+Logging, corrections, deletion/Undo, selection, rest extension/skip, adding/removing/reordering movements, finish/reopen, Progress, and the three routine-save choices update the same simulated records. The side panel explains what changed and exposes the complete example state. Exercise instruction, integration and backup panels describe their interaction boundaries; they do not connect to external services or files.
+
+[Desktop demo preview](screenshots/interactive-demo.png) · [Mobile demo preview](screenshots/interactive-demo-mobile.png).
+
 ## Start with the visuals
 
 - [Three workout layout options](screenshots/proposed-layout-options.png): A, workout sheet; B, focused movement and plan drawer; C, whole-plan checklist.
@@ -54,3 +64,5 @@ Start discussion with A. The user has already settled the behavior: flexible sel
 Android production source is unchanged. `./gradlew assembleDebug --console=plain` passed for the current app. The earlier required full local checks and all three CI jobs on PR #84 passed on the same production source baseline. New proposed screens need real implementation stories, failing tests, current-build device verification, TalkBack, IME and large-text checks before they can be described as shipped or accessible.
 
 The separate `prototype/rep-ui-ux-discussion` branch preserves the throwaway alternatives for discussion. Do not merge prototype code into the production Android source. A selected direction must be implemented through the repository's spec-first/test-first process.
+
+Interactive-demo verification: all six walkthroughs were clicked through in Chromium, including safe template-save failure and recovery; invalid-load entry preserves the draft; the mobile page has no horizontal overflow, and the primary action remains inside the phone at 200% text. Desktop/mobile screenshots were captured and visually inspected. These observations concern the HTML demo, not native Android behavior.
