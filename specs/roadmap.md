@@ -42,6 +42,21 @@ of this file so it does not get lost between milestones.
 
 ---
 
+## Approved offline review repair — 2026-10-29
+
+The maintainer explicitly requested implementation of the agreed review and revised current-set Focus, continuing through all four handoff batches. ADR-0052 records this narrow M2 sequencing exception; cloud/accounts and other deferred milestones remain unchanged.
+
+- [ ] US-62 — Trustworthy records, single-set entry and recoverable edits (REP-01–05, 10, 27–28)
+- [ ] US-63 — One workout plan, current-set Focus, persisted outcomes and bounded recovery (REP-07–18, 30, 41)
+- [ ] US-64 — Actual, reactive Progress and honest ranges/charts (REP-19–24, 40)
+- [ ] US-65 — Preparation, catalog inspection and explicit routine reuse (REP-25–26, 29, 43)
+- [ ] US-66 — Fully validated restore, safety copy and identity refresh (REP-04/06/33–34)
+- [ ] US-67 — Accessible layouts and optional-service recovery (REP-31–32, 35–39, 42)
+
+The overlapping findings are implemented once. Completion requires the specified tests, full gates, screenshots and an installable reviewed PR; browser prototypes are not device evidence.
+
+---
+
 ## M0 — Skeleton
 
 Goal: an empty app that builds, lints, and tests in CI.

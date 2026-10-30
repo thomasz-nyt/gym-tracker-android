@@ -2,7 +2,7 @@
 
 Date: 2026-10-22. Source baseline: `main` at `f6deca70e3c07920c18719b24d582e26969da462`.
 
-**Status:** all 28 interview questions answered. This document consolidates their decisions for one final shared-understanding confirmation. Review/documentation only; production implementation has not started.
+**Status:** all 28 interview questions answered; shared direction confirmed and complete implementation explicitly requested on 2026-10-29. The revised current-set Focus is the default in-session direction. Implementation is tracked in [the execution record](2026-10-29-implementation.md), US-62–67 and ADR-0052.
 
 Companions: [43-item evidence-linked review](2026-10-22-product-ux-review.md), [answers and decision tree](2026-10-22-product-alignment.md), [domain glossary](../../CONTEXT.md), [accepted routine-save boundary, ADR-0051](../../specs/adr/0051-explicit-routine-updates-from-a-workout.md).
 
