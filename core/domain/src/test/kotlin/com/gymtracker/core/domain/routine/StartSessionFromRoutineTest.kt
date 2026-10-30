@@ -226,20 +226,15 @@ class StartSessionFromRoutineTest {
         }
 
     @Test
-    fun `SessionExercise still has no field pointing back at a routine`() =
+    fun `source occurrence identity and original targets are preserved for explicit reuse`() =
         runTest {
-            // The half of ADR-0020's original promise that ADR-0028 leaves untouched: a
-            // movement's appearance in a session never names the routine it came from, so
-            // "planned versus actual" still cannot be rendered from this type.
-            val started = startFromRoutine(upperA(), alice) as StartSessionResult.Started
-
-            val appearance = sessionExercises.forSession(started.session.id).first()
-            val appearanceFields = appearance.javaClass.declaredFields.map { it.name }
-
-            assertTrue(
-                appearanceFields.none { it.contains("routine", ignoreCase = true) },
-                "SessionExercise gained a routine field: $appearanceFields",
-            )
+            val routine = upperA()
+            val original = items.itemsOf(routine)
+            val started = startFromRoutine(routine, alice) as StartSessionResult.Started
+            val appearances = sessionExercises.forSession(started.session.id)
+            assertEquals(original.map { it.id.value }, appearances.map { it.routineItemId })
+            assertEquals(original, started.session.workflow.originalRoutineItems)
+            assertEquals(original.map { it.target }, appearances.map { it.target })
         }
 
     @Test

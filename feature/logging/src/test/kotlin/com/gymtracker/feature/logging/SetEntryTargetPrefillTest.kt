@@ -176,7 +176,7 @@ class SetEntryTargetPrefillTest {
         }
 
     @Test
-    fun `a target's weight fills in when history's set was bodyweight`() =
+    fun `bodyweight actual history stays bodyweight when a target has load`() =
         runTest {
             // US-30: "3 x 8, load unrecorded is a plan" — a target's load still has a job when
             // history has no weight to prefer (US-37).
@@ -190,7 +190,7 @@ class SetEntryTargetPrefillTest {
 
             val entry = entryOf(viewModel)
             assertEquals("5", entry?.reps, "history's reps still win")
-            assertEquals("60", entry?.weight, "history's set had no load, so the target's stands in")
+            assertEquals("", entry?.weight, "bodyweight history stays bodyweight")
         }
 
     @Test

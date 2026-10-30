@@ -35,6 +35,14 @@ class LogSetTest {
     private fun prefill() = PrefillFromLastSet(sets)
 
     @Test
+    fun `negative and nonfinite loads cannot become actual performance`() =
+        runTest {
+            listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY).forEach { invalid ->
+                assertThrows<IllegalArgumentException> { logSet()(appearance, invalid, WeightUnit.KG, 10, null) }
+            }
+        }
+
+    @Test
     fun `with no prior set there is nothing to prefill`() =
         runTest {
             assertNull(prefill()(bench, alice, WeightUnit.KG))

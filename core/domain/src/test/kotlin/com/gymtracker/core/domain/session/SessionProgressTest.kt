@@ -41,7 +41,14 @@ class SessionProgressTest {
         id: String,
         position: Int,
         exercise: ExerciseId = ExerciseId("bench"),
-    ) = SessionExercise(SessionExerciseId(id), sessionId, exercise, position)
+    ) = SessionExercise(
+        SessionExerciseId(id),
+        sessionId,
+        exercise,
+        position,
+        com.gymtracker.core.domain.model
+            .MovementTarget(1, null, null),
+    )
 
     private fun set(
         appearance: String,
@@ -79,7 +86,7 @@ class SessionProgressTest {
     }
 
     @Test
-    fun `a movement with at least one set logged counts as done`() {
+    fun `a movement with its single planned set logged counts as plan met`() {
         val exercises = listOf(appearance("se-1", 1), appearance("se-2", 2))
         val sets = listOf(set("se-1"))
 

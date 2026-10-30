@@ -5,14 +5,14 @@ import com.gymtracker.core.domain.rest.LogUpNextSet
 import com.gymtracker.core.domain.rest.RestTimer
 import com.gymtracker.core.domain.rest.UpNextSet
 import com.gymtracker.core.domain.set.DeleteSet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.time.Duration
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * The one-tap log (US-35) and the five-second window to take it back.
@@ -37,9 +37,16 @@ class OneTapLogController(
      * call so the screen's wiring is one method reference, the same shape as [SetEditController.undo].
      */
     private val onUndone: () -> Unit = {},
+    private val submission: Mutex = Mutex(),
 ) {
+    private val failure = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = failure
+
+    fun dismissError() {
+        failure.value = null
+    }
+
     private val undoable = MutableStateFlow<ExerciseSet?>(null)
-    private var expiry: Job? = null
 
     /** Whether the set just logged in one tap can still be taken back. */
     val canUndo: Flow<Boolean> = undoable.map { it != null }
@@ -49,17 +56,24 @@ class OneTapLogController(
      * shared with the notification's own `LOG SET` (US-56) — and opens the undo window on the
      * row it wrote. A second log before the window closes replaces the undoable row: only the
      * most recent one-tap log can be taken back, as with a deleted set.
+     * Keep unrelated storage failures recoverable at the one-tap UI boundary.
      */
-    suspend fun log(next: UpNextSet): ExerciseSet {
-        val logged = logUpNextSet(next)
-        undoable.value = logged
-        expiry?.cancel()
-        expiry =
-            scope.launch {
-                delay(UNDO_WINDOW.toMillis())
-                undoable.value = null
-            }
-        return logged
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun log(next: UpNextSet): ExerciseSet? {
+        if (!submission.tryLock()) return null
+        return try {
+            val logged = logUpNextSet(next)
+            failure.value = null
+            undoable.value = logged
+            logged
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            failure.value = "Could not log the set. ${error.message.orEmpty()}"
+            null
+        } finally {
+            submission.unlock()
+        }
     }
 
     /**
@@ -70,7 +84,6 @@ class OneTapLogController(
      */
     fun undo() {
         val logged = undoable.value ?: return
-        expiry?.cancel()
         undoable.value = null
         scope.launch {
             deleteSet(logged.id)
@@ -79,8 +92,8 @@ class OneTapLogController(
         }
     }
 
-    private companion object {
-        /** ADR-0012's window, so every undo on this screen behaves alike. */
-        val UNDO_WINDOW: Duration = Duration.ofSeconds(5)
+    /** Leaving a workout must not allow its last set to be undone from a different workout. */
+    fun clear() {
+        undoable.value = null
     }
 }

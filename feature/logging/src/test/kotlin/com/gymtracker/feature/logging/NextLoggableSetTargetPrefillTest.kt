@@ -171,7 +171,7 @@ class NextLoggableSetTargetPrefillTest {
         }
 
     @Test
-    fun `the target's weight fills in when history's set was bodyweight`() =
+    fun `bodyweight history remains bodyweight even when the target names a load`() =
         runTest {
             // history.reps always wins (non-null by SetPrefill's own contract); weight is the
             // one field that can genuinely be absent from a real set, so this is where a
@@ -195,7 +195,7 @@ class NextLoggableSetTargetPrefillTest {
 
             assertNotNull(next)
             assertEquals(5, next.prefill.reps, "history's reps still win")
-            assertEquals(45.0, next.prefill.weight, "history's set had no load, so the target's stands in")
+            assertNull(next.prefill.weight, "bodyweight is an actual performance, not a missing prefill")
         }
 
     @Test

@@ -38,7 +38,7 @@ class LogSet(
             ExerciseSet(
                 id = newId(),
                 sessionExerciseId = sessionExerciseId,
-                setIndex = sets.nextSetIndex(sessionExerciseId),
+                setIndex = 1,
                 weightKg = weight?.let { UnitConverter.toKilograms(it, unit) },
                 reps = reps,
                 rpe = rpe,
@@ -47,7 +47,6 @@ class LogSet(
 
         // Persisted before this returns, so the caller cannot transition the UI on a set that
         // is not yet on disk (US-03).
-        sets.add(set)
-        return set
+        return sets.append(set)
     }
 }

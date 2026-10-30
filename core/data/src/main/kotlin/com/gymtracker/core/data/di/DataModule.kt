@@ -5,6 +5,7 @@ import com.gymtracker.core.data.backup.AndroidAppVersion
 import com.gymtracker.core.data.backup.AndroidBackupFileReader
 import com.gymtracker.core.data.backup.AndroidBackupFileWriter
 import com.gymtracker.core.data.backup.BackupCodec
+import com.gymtracker.core.data.backup.FileBackupSafetyStore
 import com.gymtracker.core.data.backup.RoomBackupStore
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.AndroidCatalogAssetReader
@@ -40,6 +41,7 @@ import com.gymtracker.core.domain.backup.BackupDecoder
 import com.gymtracker.core.domain.backup.BackupEncoder
 import com.gymtracker.core.domain.backup.BackupFileReader
 import com.gymtracker.core.domain.backup.BackupFileWriter
+import com.gymtracker.core.domain.backup.BackupSafetyStore
 import com.gymtracker.core.domain.backup.BackupStore
 import com.gymtracker.core.domain.backup.ExportBackup
 import com.gymtracker.core.domain.backup.ExportBackupToFile
@@ -432,7 +434,8 @@ object DataModule {
         sessions: SessionRepository,
         catalog: ExerciseCatalog,
         store: BackupStore,
-    ): ImportBackup = ImportBackup(sessions, catalog, store)
+        safety: BackupSafetyStore,
+    ): ImportBackup = ImportBackup(sessions, catalog, store, safety)
 
     @Provides
     fun previewBackupImport(
@@ -503,6 +506,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun backupStore(impl: RoomBackupStore): BackupStore
+
+    @Binds
+    abstract fun backupSafetyStore(impl: FileBackupSafetyStore): BackupSafetyStore
 
     @Binds
     abstract fun backupEncoder(impl: BackupCodec): BackupEncoder

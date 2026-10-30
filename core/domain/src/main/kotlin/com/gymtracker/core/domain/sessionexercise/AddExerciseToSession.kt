@@ -24,6 +24,7 @@ class AddExerciseToSession(
         sessionId: SessionId,
         exerciseId: ExerciseId,
         target: MovementTarget? = null,
+        routineItemId: String? = null,
     ): SessionExercise {
         val appended =
             SessionExercise(
@@ -32,6 +33,7 @@ class AddExerciseToSession(
                 exerciseId = exerciseId,
                 position = sessionExercises.nextPosition(sessionId),
                 target = target,
+                routineItemId = routineItemId,
             )
         sessionExercises.add(appended)
         return appended

@@ -72,6 +72,7 @@ fun RoutineEditorRoute(
 
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val isDeleted by viewModel.isDeleted.collectAsStateWithLifecycle()
+    val canUndoRemoval by viewModel.canUndoRemoval.collectAsStateWithLifecycle()
     val targetEditor by viewModel.target.editor.collectAsStateWithLifecycle()
 
     // The picker hands ids back the same way it does for a session (US-02a): appended in pick
@@ -94,6 +95,8 @@ fun RoutineEditorRoute(
         onNameChanged = viewModel::onNameChanged,
         onAddExercise = onAddExercise,
         onRemoveMovement = viewModel::onRemoveMovement,
+        canUndoRemoval = canUndoRemoval,
+        onUndoRemoval = viewModel::onUndoRemoval,
         onMoveUp = viewModel::onMoveUp,
         onMoveDown = viewModel::onMoveDown,
         onDeleteRoutine = viewModel::onDeleteRoutine,
@@ -119,6 +122,8 @@ internal fun RoutineEditorScreen(
     onNameChanged: (String) -> Unit = {},
     onAddExercise: () -> Unit = {},
     onRemoveMovement: (RoutineItemId) -> Unit = {},
+    canUndoRemoval: Boolean = false,
+    onUndoRemoval: () -> Unit = {},
     onMoveUp: (Int) -> Unit = {},
     onMoveDown: (Int) -> Unit = {},
     onDeleteRoutine: () -> Unit = {},
@@ -137,6 +142,14 @@ internal fun RoutineEditorScreen(
                 value = state.name,
                 onValueChange = onNameChanged,
                 label = { Text("Name") },
+                isError = !state.isLoading && state.name.isBlank(),
+                supportingText = {
+                    if (!state.isLoading &&
+                        state.name.isBlank()
+                    ) {
+                        Text("Enter a name. Your previous name is kept until then.")
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -166,6 +179,7 @@ internal fun RoutineEditorScreen(
                 }
             }
 
+            if (canUndoRemoval) TextButton(onClick = onUndoRemoval) { Text("Undo remove movement") }
             PrimaryActionButton(text = "Add exercise", onClick = onAddExercise)
 
             DeleteRoutineAction(routineName = state.name, onDeleteRoutine = onDeleteRoutine)

@@ -22,6 +22,7 @@ data class WorkoutSession(
     val endedAt: Instant?,
     val metrics: SessionMetrics?,
     val routine: RoutineOrigin? = null,
+    val workflow: WorkoutWorkflow = WorkoutWorkflow(),
 ) {
     /** True while this session is the member's active one. */
     val isActive: Boolean get() = endedAt == null

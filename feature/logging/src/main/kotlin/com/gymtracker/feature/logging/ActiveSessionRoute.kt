@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -105,10 +104,13 @@ fun LoggingRoute(
         onFinishWorkout = viewModel.finish::confirm,
         onFinishSummaryDismissed = viewModel.finish::dismiss,
         onResolveStale = viewModel::onResolveStale,
+        onContinueStale = viewModel.onContinueStale,
         onAddSet = viewModel.setEntry::open,
         onRemoveExercise = viewModel.removal::remove,
         onUndoRemoval = viewModel.removal::undo,
-        onSelectExercise = viewModel.selection::select,
+        onSelectExercise = viewModel.workout::select,
+        onMovementOutcome = viewModel.workout::outcome,
+        onMoveExercise = viewModel.workout::move,
         guided = viewModel.guidedActions(),
         onSkipRest = viewModel.rest::skip,
         onExtendRest = viewModel.rest::extend,
@@ -122,6 +124,7 @@ fun LoggingRoute(
         onUndoSetDelete = viewModel.setEdit::undo,
         onLogNextSet = viewModel::onLogNextSet,
         onUndoOneTapLog = viewModel.oneTap::undo,
+        onDismissActionError = viewModel.oneTap::dismissError,
         onAddExercise = onAddExercise,
         nextRoutine = nextRoutine,
         onStartFromRoutine = viewModel::onStartFromRoutine,
@@ -148,6 +151,7 @@ private fun ActiveSessionViewModel.setEntryCallbacks() =
         onSetsStepped = setEntry::stepSets,
         onRpeChanged = { setEntry.change(rpe = it) },
         onConfirm = setEntry::confirm,
+        onToggleBulk = setEntry::toggleBulk,
         onDismiss = setEntry::dismiss,
     )
 
@@ -242,12 +246,15 @@ internal fun LoggingScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    onContinueStale: () -> Unit = {},
     onFinishWorkout: () -> Unit = {},
     onFinishSummaryDismissed: () -> Unit = {},
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onRemoveExercise: (SessionExerciseId) -> Unit = {},
     onUndoRemoval: () -> Unit = {},
     onSelectExercise: (SessionExerciseId) -> Unit = {},
+    onMovementOutcome: (SessionExerciseRow, com.gymtracker.core.domain.model.MovementOutcome?) -> Unit = { _, _ -> },
+    onMoveExercise: (SessionExerciseId, Int) -> Unit = { _, _ -> },
     guided: GuidedActions = GuidedActions(),
     onSkipRest: () -> Unit = {},
     onExtendRest: () -> Unit = {},
@@ -259,6 +266,7 @@ internal fun LoggingScreen(
     onUndoSetDelete: () -> Unit = {},
     onLogNextSet: (UpNextSet) -> Unit = {},
     onUndoOneTapLog: () -> Unit = {},
+    onDismissActionError: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     nextRoutine: Routine? = null,
     onStartFromRoutine: (RoutineId) -> Unit = {},
@@ -267,67 +275,59 @@ internal fun LoggingScreen(
     warmUp: WarmUp = WarmUp(),
     modifier: Modifier = Modifier,
 ) {
-    val running = state.guided.running
-
-    // Which full-screen thing is showing. History and the workout detail are navigation
-    // destinations of their own now (ADR-0024); only the guided flow and the finish summary
-    // (US-31) are still selected by state here, deliberately, for the reason ADR-0017 gives.
-    if (running != null) {
-        // A lens over the already-logged rows, so leaving it loses nothing (US-05a).
-        GuidedRoute(running = running, state = state, guided = guided, modifier = modifier)
-    } else {
-        SessionScreen(
-            state = state,
-            onStartWorkout = onStartWorkout,
-            onResolveStale = onResolveStale,
-            onFinishWorkout = onFinishWorkout,
-            onFinishSummaryDismissed = onFinishSummaryDismissed,
-            onAddSet = onAddSet,
-            onRemoveExercise = onRemoveExercise,
-            onUndoRemoval = onUndoRemoval,
-            onSelectExercise = onSelectExercise,
-            guided = guided,
-            onSkipRest = onSkipRest,
-            onExtendRest = onExtendRest,
-            onOpenHistory = onOpenHistory,
-            onBrowseCatalog = onBrowseCatalog,
-            setEntry = setEntry,
-            onEditSet = onEditSet,
-            setEdit = setEdit,
-            onUndoSetDelete = onUndoSetDelete,
-            onLogNextSet = onLogNextSet,
-            onUndoOneTapLog = onUndoOneTapLog,
-            onAddExercise = onAddExercise,
-            nextRoutine = nextRoutine,
-            onStartFromRoutine = onStartFromRoutine,
-            onOpenRoutines = onOpenRoutines,
-            onOpenSettings = onOpenSettings,
-            warmUp = warmUp,
-            modifier = modifier,
+    if (state.activeSession != null && state.finish == null) {
+        FocusWorkoutScreen(
+            state,
+            FocusActions(
+                onLogSet = onLogNextSet,
+                onAdjust = onAddSet,
+                onSelect = onSelectExercise,
+                onEdit = onEditSet,
+                onRemove = onRemoveExercise,
+                onOutcome = onMovementOutcome,
+                onMove = onMoveExercise,
+                onAddExercise = onAddExercise,
+                onSkipRest = onSkipRest,
+                onExtendRest = onExtendRest,
+                onUndoLog = onUndoOneTapLog,
+                onUndoDelete = onUndoSetDelete,
+                onUndoRemoval = onUndoRemoval,
+                onSettings = onOpenSettings,
+                onFinish = onFinishWorkout,
+                onDismissError = onDismissActionError,
+            ),
+            modifier,
         )
+        SessionDialogs(state, onResolveStale, guided, setEntry, setEdit, onContinueStale)
+        return
     }
-}
-
-/** The guided flow's own screen (US-05a), kept behind the same `BackHandler` its stop button offers. */
-@Composable
-private fun GuidedRoute(
-    running: GuidedRunning,
-    state: SessionUiState,
-    guided: GuidedActions,
-    modifier: Modifier = Modifier,
-) {
-    BackHandler(onBack = guided.onStop)
-    GuidedExerciseScreen(
-        running = running,
-        unit = state.unit,
-        restRemaining = state.restRemaining,
-        onWeightChanged = guided.onWeightChanged,
-        onWeightStepped = guided.onWeightStepped,
-        onRepsChanged = guided.onRepsChanged,
-        onRepsStepped = guided.onRepsStepped,
-        onFinishSet = guided.onFinishSet,
-        onStartNext = guided.onStartNext,
-        onStop = guided.onStop,
+    SessionScreen(
+        state = state,
+        onStartWorkout = onStartWorkout,
+        onResolveStale = onResolveStale,
+        onFinishWorkout = onFinishWorkout,
+        onFinishSummaryDismissed = onFinishSummaryDismissed,
+        onAddSet = onAddSet,
+        onRemoveExercise = onRemoveExercise,
+        onUndoRemoval = onUndoRemoval,
+        onSelectExercise = onSelectExercise,
+        guided = guided,
+        onSkipRest = onSkipRest,
+        onExtendRest = onExtendRest,
+        onOpenHistory = onOpenHistory,
+        onBrowseCatalog = onBrowseCatalog,
+        setEntry = setEntry,
+        onEditSet = onEditSet,
+        setEdit = setEdit,
+        onUndoSetDelete = onUndoSetDelete,
+        onLogNextSet = onLogNextSet,
+        onUndoOneTapLog = onUndoOneTapLog,
+        onAddExercise = onAddExercise,
+        nextRoutine = nextRoutine,
+        onStartFromRoutine = onStartFromRoutine,
+        onOpenRoutines = onOpenRoutines,
+        onOpenSettings = onOpenSettings,
+        warmUp = warmUp,
         modifier = modifier,
     )
 }

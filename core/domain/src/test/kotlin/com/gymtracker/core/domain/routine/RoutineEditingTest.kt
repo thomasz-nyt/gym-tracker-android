@@ -31,6 +31,36 @@ class RoutineEditingTest {
     private val deleteRoutine = DeleteRoutine(routines)
 
     @Test
+    fun `Undo routine removal restores occurrence identity authored target and position`() =
+        runTest {
+            val routine = createRoutine(alice, "Upper A")
+            val item =
+                addExercise(
+                    routine.id,
+                    bench,
+                ).copy(
+                    target =
+                        com.gymtracker.core.domain.model
+                            .MovementTarget(3, 12, 50.0, 90),
+                )
+            items.updateItem(item)
+            val removed = kotlin.test.assertNotNull(removeExercise(item))
+            assertTrue(items.itemsOf(routine.id).isEmpty())
+            removeExercise.restore(removed)
+            assertEquals(listOf(item), items.itemsOf(routine.id))
+        }
+
+    @Test
+    fun `a blank rename never replaces a valid routine name`() =
+        runTest {
+            val routine = createRoutine(alice, "Upper A")
+
+            renameRoutine(routine.id, "   ")
+
+            assertEquals("Upper A", routines.find(routine.id)?.name)
+        }
+
+    @Test
     fun `a new routine is a name and nothing else`() =
         runTest {
             val created = createRoutine(alice, "Upper A")

@@ -4,6 +4,10 @@ import com.gymtracker.core.domain.model.ExerciseId
 
 /** What [ValidateBackup] decided. */
 sealed interface BackupValidationResult {
+    data class Invalid(
+        val problems: List<String>,
+    ) : BackupValidationResult
+
     data class Valid(
         val contents: BackupContents,
     ) : BackupValidationResult
@@ -34,10 +38,16 @@ object ValidateBackup {
                 contents.routineItems.map { it.exerciseId }.toSet()
         val missing = referenced - knownExerciseIds
 
-        return if (missing.isEmpty()) {
-            BackupValidationResult.Valid(contents)
+        if (missing.isNotEmpty()) return BackupValidationResult.UnknownExercises(missing)
+        val problems = contents.problems()
+        return if (problems.isEmpty()) {
+            BackupValidationResult.Valid(
+                contents,
+            )
         } else {
-            BackupValidationResult.UnknownExercises(missing)
+            BackupValidationResult.Invalid(problems)
         }
     }
+
+    private fun BackupContents.problems(): List<String> = BackupGraphValidation.problems(this)
 }

@@ -76,6 +76,8 @@ class PreviewBackupImport(
                     currentRoutineCount = current.routines.size,
                 )
             }
+            is BackupValidationResult.Invalid ->
+                ImportPreviewResult.Refused(ImportRefusalReason.Invalid(validation.problems))
             is BackupValidationResult.UnknownExercises ->
                 ImportPreviewResult.Refused(ImportRefusalReason.UnknownExercises(validation.missingExerciseIds))
         }

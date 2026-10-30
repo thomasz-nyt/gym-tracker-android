@@ -86,6 +86,33 @@ class BackupCodecTest {
         )
 
     @Test
+    fun `workflow decisions and occurrence identities survive a complete backup`() {
+        val workflow =
+            com.gymtracker.core.domain.model.WorkoutWorkflow(
+                selected = SessionExerciseId("se1"),
+                originalRoutineItems = contents.routineItems,
+                reviewedStructure = "handled-list",
+                structuralEdits = true,
+                reopened =
+                    com.gymtracker.core.domain.model
+                        .ReopenedWorkout(exportedAt, setOf("set1")),
+            )
+        val complete =
+            contents.copy(
+                sessions = contents.sessions.map { it.copy(workflow = workflow) },
+                sessionExercises =
+                    contents.sessionExercises.map {
+                        it.copy(
+                            outcome = com.gymtracker.core.domain.model.MovementOutcome.ENDED_EARLY,
+                            routineItemId = "ri1",
+                        )
+                    },
+            )
+
+        assertEquals(complete, codec.decode(codec.encode(complete, exportedAt, "test")))
+    }
+
+    @Test
     fun `encoding and decoding a file returns the contents unchanged`() {
         val json = codec.encode(contents, exportedAt, appVersion = "1.0")
 
