@@ -23,9 +23,9 @@ const results=[];
 try{
 await capture('proposed-layout-options.png','view=compare&capture=1',1320,1390);
 await capture('proposed-flow.png','view=flow&capture=1',1320,2140);
-for(const s of ['home','workout','entry','catalog','progress','finish','routine','settings'])await capture(`proposed-${s}.png`,`view=single&screen=${s}&variant=A`,390,844);
-await capture('proposed-workout-dark.png','view=single&screen=workout&variant=A&theme=dark',390,844);
-await capture('proposed-workout-narrow.png','view=single&screen=workout&variant=A',320,640);
+for(const s of ['home','workout','entry','catalog','progress','finish','routine','settings'])await capture(`proposed-${s}.png`,`view=single&screen=${s}&variant=${s==='workout'?'B':'A'}`,390,844);
+await capture('proposed-workout-dark.png','view=single&screen=workout&variant=B&theme=dark',390,844);
+await capture('proposed-workout-narrow.png','view=single&screen=workout&variant=B',320,640);
 for(const width of [320,390])for(const v of ['A','B','C']){await open(`view=single&screen=workout&variant=${v}`,width,844);results.push({width,variant:v,horizontalOverflow:await evaluate('document.documentElement.scrollWidth>innerWidth'),logVisible:await evaluate('(()=>{const r=document.querySelector(".bottom .primary").getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight})()')})}
 await open('view=single&screen=entry');await evaluate('document.getElementById("weight").value="-5";saveEntry()');results.push({invalidLoadBlocked:await evaluate('document.getElementById("validation").textContent.includes("nonnegative")'),draftPreserved:await evaluate('document.getElementById("weight").value==="-5"')});
 await open('view=single&screen=workout');await evaluate('logSet()');results.push({oneSetPerLog:await evaluate('state.logged===3'),nextMovementAfterPlanMet:await evaluate('document.querySelector(".bottom .primary").textContent.includes("Next movement")')});
