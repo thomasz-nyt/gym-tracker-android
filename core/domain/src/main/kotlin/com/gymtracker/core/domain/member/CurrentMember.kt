@@ -1,6 +1,8 @@
 package com.gymtracker.core.domain.member
 
 import com.gymtracker.core.domain.model.UserId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /**
  * The member this device logs for.
@@ -12,6 +14,9 @@ import com.gymtracker.core.domain.model.UserId
 interface CurrentMember {
     /** The member's id, generating and persisting one on first call if needed. */
     suspend fun id(): UserId
+
+    /** Emits identity changes so a restored member refreshes retained screens (US-66). */
+    fun observe(): Flow<UserId> = flow { emit(id()) }
 
     /**
      * Overwrites the stored id — restoring a backup's identity (US-41, ADR-0034) rather than

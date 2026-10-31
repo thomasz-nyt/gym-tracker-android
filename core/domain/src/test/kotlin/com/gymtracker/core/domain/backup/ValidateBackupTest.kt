@@ -11,6 +11,7 @@ import com.gymtracker.core.domain.units.WeightUnit
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 /**
@@ -60,6 +61,28 @@ class ValidateBackupTest {
             )
 
         assertIs<BackupValidationResult.Valid>(ValidateBackup(empty, known))
+    }
+
+    @Test
+    fun `broken parent links and duplicate identities are refused before a write`() {
+        val valid = contents()
+        val invalid =
+            listOf(
+                valid.copy(sessions = emptyList()),
+                valid.copy(sessionExercises = emptyList()),
+                valid.copy(routines = emptyList()),
+                valid.copy(sets = valid.sets + valid.sets),
+                valid.copy(sessionExercises = valid.sessionExercises + valid.sessionExercises),
+                valid.copy(routineItems = valid.routineItems + valid.routineItems),
+                valid.copy(sessions = valid.sessions.map { it.copy(userId = UserId("another-member")) }),
+                valid.copy(sets = valid.sets.map { it.copy(weightKg = Double.NaN) }),
+                valid.copy(sets = valid.sets.map { it.copy(reps = 0) }),
+                valid.copy(restDefault = Duration.ofSeconds(-1)),
+            )
+
+        invalid.forEachIndexed { index, backup ->
+            assertFalse(ValidateBackup(backup, known) is BackupValidationResult.Valid, "invalid fixture $index")
+        }
     }
 
     @Test

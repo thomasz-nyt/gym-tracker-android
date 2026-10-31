@@ -177,6 +177,116 @@ class RoomBackupStoreTest {
     )
 
     @Test
+    fun `restoring another identity replaces the current profile rather than leaving hidden records`() =
+        runTest {
+            currentMember.restore(alice)
+            database.sessionDao().insert(session("old-alice"))
+            val empty =
+                BackupContents(
+                    bob,
+                    WeightUnit.KG,
+                    Duration.ofSeconds(90),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                )
+            store.replaceAll(empty)
+            assertEquals(emptyList(), database.sessionDao().allForUser(alice.value))
+            assertEquals(bob, currentMember.id())
+        }
+
+    @Test
+    fun `a newly active workout is checked inside the replacement transaction`() =
+        runTest {
+            currentMember.restore(alice)
+            database.sessionDao().insert(session("active", endedAt = null))
+            val empty =
+                BackupContents(
+                    alice,
+                    WeightUnit.KG,
+                    Duration.ofSeconds(90),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                )
+            assertFailsWith<IllegalStateException> { store.replaceAll(empty) }
+            assertEquals(1, database.sessionDao().allForUser(alice.value).size)
+        }
+
+    @Test
+    fun `preference storage failure rolls the SQL replacement back`() =
+        runTest {
+            currentMember.restore(alice)
+            database.sessionDao().insert(session("original"))
+            val failing =
+                RoomBackupStore(
+                    database,
+                    object : com.gymtracker.core.domain.member.UnitPreference {
+                        override suspend fun current() = WeightUnit.KG
+
+                        override fun observe() = kotlinx.coroutines.flow.flowOf(WeightUnit.KG)
+
+                        override suspend fun set(unit: WeightUnit) {
+                            error("disk full")
+                        }
+                    },
+                    DataStoreRestTimerStore(preferences("failure-rest.preferences_pb")),
+                    currentMember,
+                    SyncPayloadCodec(Json),
+                )
+            val empty =
+                BackupContents(
+                    alice,
+                    WeightUnit.KG,
+                    Duration.ofSeconds(90),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                )
+            assertFailsWith<IllegalStateException> { failing.replaceAll(empty) }
+            assertEquals(listOf("original"), database.sessionDao().allForUser(alice.value).map { it.id })
+        }
+
+    @Test
+    fun `restore retains completion and selected occurrence without losing actual sets`() =
+        runTest {
+            currentMember.restore(alice)
+            database.sessionDao().insert(session("workflow"))
+            database.sessionExerciseDao().insert(sessionExercise("movement", "workflow"))
+            database.setDao().insert(set("actual", "movement"))
+            val before = store.read(alice)
+            val complete =
+                before.copy(
+                    sessions =
+                        before.sessions.map {
+                            it.copy(
+                                workflow =
+                                    com.gymtracker.core.domain.model.WorkoutWorkflow(
+                                        selected = SessionExerciseId("movement"),
+                                    ),
+                            )
+                        },
+                    sessionExercises =
+                        before.sessionExercises.map {
+                            it.copy(
+                                outcome = com.gymtracker.core.domain.model.MovementOutcome.ENDED_EARLY,
+                                routineItemId = "original-item",
+                            )
+                        },
+                )
+
+            store.replaceAll(complete)
+
+            assertEquals(complete, store.read(alice))
+        }
+
+    @Test
     fun `reads back every row across all five tables, and only this member's`() =
         runTest {
             database.exerciseDao().insertAll(listOf(seedExercise()))

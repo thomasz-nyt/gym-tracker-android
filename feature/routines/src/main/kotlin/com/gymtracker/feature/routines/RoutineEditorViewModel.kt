@@ -24,6 +24,8 @@ import com.gymtracker.core.domain.set.LastPerformanceOf
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -129,6 +132,13 @@ class RoutineEditorViewModel
                 scope = viewModelScope,
             )
 
+        private val removed = MutableStateFlow<com.gymtracker.core.domain.model.RoutineItem?>(null)
+        private var undoExpiry: Job? = null
+        val canUndoRemoval =
+            removed
+                .map {
+                    it != null
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)
         private val deleted = MutableStateFlow(false)
 
         /** True once [onDeleteRoutine] has completed, so the screen knows to leave. */
@@ -210,7 +220,24 @@ class RoutineEditorViewModel
         }
 
         fun onRemoveMovement(id: RoutineItemId) {
-            viewModelScope.launch { removeExerciseFromRoutine(id) }
+            val routineId = editing.value ?: return
+            viewModelScope.launch {
+                val item = items.itemsOf(routineId).firstOrNull { it.id == id } ?: return@launch
+                removed.value = removeExerciseFromRoutine(item)
+                undoExpiry?.cancel()
+                undoExpiry =
+                    viewModelScope.launch {
+                        delay(UNDO_WINDOW_MILLIS)
+                        removed.value = null
+                    }
+            }
+        }
+
+        fun onUndoRemoval() {
+            val snapshot = removed.value ?: return
+            removed.value = null
+            undoExpiry?.cancel()
+            viewModelScope.launch { removeExerciseFromRoutine.restore(snapshot) }
         }
 
         /**
@@ -249,6 +276,7 @@ class RoutineEditorViewModel
 
         private companion object {
             const val STOP_TIMEOUT_MILLIS = 5_000L
+            const val UNDO_WINDOW_MILLIS = 10_000L
 
             /**
              * The catalog's ranking is per member; this screen does not rank, it only needs names.

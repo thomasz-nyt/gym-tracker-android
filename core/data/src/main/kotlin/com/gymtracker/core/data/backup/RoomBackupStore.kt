@@ -19,7 +19,9 @@ import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.member.UnitPreference
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.rest.RestTimerStore
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -46,62 +48,80 @@ class RoomBackupStore
     ) : BackupStore {
         override suspend fun read(memberId: UserId): BackupContents {
             val userId = memberId.value
-            return BackupContents(
-                memberId = memberId,
-                unit = unitPreference.current(),
-                restDefault = restTimerStore.defaultRest.first(),
-                sessions = database.sessionDao().allForUser(userId).map { it.toDomain() },
-                sessionExercises = database.sessionExerciseDao().allForUser(userId).map { it.toDomain() },
-                sets = database.setDao().allForUser(userId).map { it.toDomain() },
-                routines = database.routineDao().allForUser(userId).map { it.toDomain() },
-                routineItems = database.routineItemDao().allForUser(userId).map { it.toDomain() },
-            )
+            return database.withTransaction {
+                BackupContents(
+                    memberId = memberId,
+                    unit = unitPreference.current(),
+                    restDefault = restTimerStore.defaultRest.first(),
+                    sessions = database.sessionDao().allForUser(userId).map { it.toDomain() },
+                    sessionExercises = database.sessionExerciseDao().allForUser(userId).map { it.toDomain() },
+                    sets = database.setDao().allForUser(userId).map { it.toDomain() },
+                    routines = database.routineDao().allForUser(userId).map { it.toDomain() },
+                    routineItems = database.routineItemDao().allForUser(userId).map { it.toDomain() },
+                )
+            }
         }
 
         /**
-         * The SQL half runs inside one `withTransaction`, so a failure partway through leaves
-         * the previous data intact rather than a half-wiped table (ADR-0034). The identity and
-         * preference writes that follow are not part of that transaction — DataStore has no
-         * transactional relationship to Room — but they only run once the transaction has
-         * already committed successfully, never before.
+         * SQL replacement rolls back on write failure; preference changes are compensated.
+         * IO/SQLite/cancellation span unrelated exception hierarchies; rethrow after compensation.
          */
+        @Suppress("TooGenericExceptionCaught")
         override suspend fun replaceAll(contents: BackupContents) {
-            val userId = contents.memberId.value
+            val previousMember = currentMember.id()
+            val previousUnit = unitPreference.current()
+            val previousRest = restTimerStore.defaultRest.first()
+            try {
+                database.withTransaction {
+                    check(database.sessionDao().findActive(previousMember.value) == null) { "A workout is running" }
+                    setOf(previousMember.value, contents.memberId.value).forEach { userId ->
+                        database.sessionDao().deleteAllForUser(userId)
+                        database.routineDao().deleteAllForUser(userId)
+                    }
 
-            database.withTransaction {
-                database.sessionDao().deleteAllForUser(userId)
-                database.routineDao().deleteAllForUser(userId)
+                    val sessions = contents.sessions.map { it.toEntity() }
+                    database.sessionDao().insertAll(sessions)
+                    sessions.forEach { enqueueRestoredRow(SyncEntityNames.SESSIONS, it.id, codec.encode(it)) }
 
-                val sessions = contents.sessions.map { it.toEntity() }
-                database.sessionDao().insertAll(sessions)
-                sessions.forEach { enqueueRestoredRow(SyncEntityNames.SESSIONS, it.id, codec.encode(it)) }
+                    val sessionExercises = contents.sessionExercises.map { it.toEntity() }
+                    database.sessionExerciseDao().insertAll(sessionExercises)
+                    sessionExercises.forEach {
+                        enqueueRestoredRow(
+                            SyncEntityNames.SESSION_EXERCISES,
+                            it.id,
+                            codec.encode(it),
+                        )
+                    }
 
-                val sessionExercises = contents.sessionExercises.map { it.toEntity() }
-                database.sessionExerciseDao().insertAll(sessionExercises)
-                sessionExercises.forEach {
-                    enqueueRestoredRow(
-                        SyncEntityNames.SESSION_EXERCISES,
-                        it.id,
-                        codec.encode(it),
-                    )
+                    val sets = contents.sets.map { it.toEntity() }
+                    database.setDao().insertAll(sets)
+                    sets.forEach { enqueueRestoredRow(SyncEntityNames.SETS, it.id, codec.encode(it)) }
+
+                    val routines = contents.routines.map { it.toEntity() }
+                    database.routineDao().insertAll(routines)
+                    routines.forEach { enqueueRestoredRow(SyncEntityNames.ROUTINES, it.id, codec.encode(it)) }
+
+                    val routineItems = contents.routineItems.map { it.toEntity() }
+                    database.routineItemDao().insertAll(routineItems)
+                    routineItems.forEach { enqueueRestoredRow(SyncEntityNames.ROUTINE_ITEMS, it.id, codec.encode(it)) }
+                    // A failed preference write must abort SQL too. Room and DataStore are separate
+                    // stores, so compensate preferences on failure before reporting the restore.
+                    unitPreference.set(contents.unit)
+                    restTimerStore.setDefaultRest(contents.restDefault)
+                    currentMember.restore(contents.memberId)
                 }
-
-                val sets = contents.sets.map { it.toEntity() }
-                database.setDao().insertAll(sets)
-                sets.forEach { enqueueRestoredRow(SyncEntityNames.SETS, it.id, codec.encode(it)) }
-
-                val routines = contents.routines.map { it.toEntity() }
-                database.routineDao().insertAll(routines)
-                routines.forEach { enqueueRestoredRow(SyncEntityNames.ROUTINES, it.id, codec.encode(it)) }
-
-                val routineItems = contents.routineItems.map { it.toEntity() }
-                database.routineItemDao().insertAll(routineItems)
-                routineItems.forEach { enqueueRestoredRow(SyncEntityNames.ROUTINE_ITEMS, it.id, codec.encode(it)) }
+            } catch (error: Exception) {
+                withContext(NonCancellable) {
+                    runCatching { unitPreference.set(previousUnit) }.exceptionOrNull()?.let(error::addSuppressed)
+                    runCatching {
+                        restTimerStore.setDefaultRest(
+                            previousRest,
+                        )
+                    }.exceptionOrNull()?.let(error::addSuppressed)
+                    runCatching { currentMember.restore(previousMember) }.exceptionOrNull()?.let(error::addSuppressed)
+                }
+                throw error
             }
-
-            currentMember.restore(contents.memberId)
-            unitPreference.set(contents.unit)
-            restTimerStore.setDefaultRest(contents.restDefault)
         }
 
         private suspend fun enqueueRestoredRow(

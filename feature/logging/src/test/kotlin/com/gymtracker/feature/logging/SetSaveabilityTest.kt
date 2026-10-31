@@ -78,6 +78,22 @@ class SetSaveabilityTest {
         assertFalse(edit(reps = "0").canSave())
     }
 
+    @Test
+    fun `negative and nonfinite loads cannot be saved in either editor`() {
+        listOf("-5", "NaN", "Infinity", "-Infinity").forEach { value ->
+            assertFalse(entry(weight = value).canSave(), value)
+            assertFalse(edit(weight = value).canSave(), value)
+        }
+    }
+
+    @Test
+    fun `effort must be a finite half step from five through ten`() {
+        listOf("NaN", "Infinity", "4", "11", "7.2").forEach { value ->
+            assertFalse(entry(rpe = value).canSave(), value)
+            assertFalse(edit(rpe = value).canSave(), value)
+        }
+    }
+
     private fun entry(
         weight: String = "135",
         reps: String = "8",
@@ -89,6 +105,7 @@ class SetSaveabilityTest {
         weight = weight,
         reps = reps,
         sets = sets,
+        bulk = sets != "1",
         rpe = rpe,
         prefilled = false,
         fromHistory = false,

@@ -1320,3 +1320,55 @@ first — this is not Health Connect, and not the same read as US-22.
 - The refusal is friendly and does not lecture; one sentence, then move on.
 - A network or function failure degrades to "coaching unavailable" without
   affecting any other feature.
+
+## Approved review implementation — 2026-10-29
+
+The maintainer confirmed the consolidated review and requested complete implementation after choosing current-set Focus as the in-session direction. These amendments supersede conflicting earlier acceptance criteria (batch-count prefill, first-set completion, independently configured guided targets, warm-up exclusion, irreversible finish and the blanket routine-write-back prohibition). Constitution rules remain unchanged. See ADR-0052 and `docs/reviews/2026-10-29-implementation.md`.
+
+### US-62 — Trustworthy records and recoverable edits
+
+- Ordinary entry opens with one actual set, regardless of a routine's count. Bulk entry is explicitly selected and the save action states its count.
+- History on this exercise prefills before a target; a bodyweight history record never inherits a target load.
+- Negative, nonfinite, unparseable load and invalid effort remain recoverable draft validation in every entry/edit surface; no invalid record is written.
+- Delayed writes ignore duplicate submissions while saving and present recoverable errors. Index allocation cannot reuse an existing set's number after deletion.
+- Past-set deletion and routine-item removal expose Undo that restores identity, timestamp, values, targets and position. Routine names cannot be blank.
+
+### US-63 — One plan and a current-set Focus
+
+- Focus defaults to exercise name, current-set position, load/reps, compact rest, Adjust and one Log/Next action. History/targets/corrections and rare actions are explicit secondary views.
+- Focus and overview operate on the same actual records and copied targets; no independent guided setup or three-set target is invented.
+- Plan met requires the planned count of actual sets; reps/load may differ. Without a count, explicitly mark performed work Done. Ended early and zero-set Skipped are separate persisted outcomes.
+- Next movement is explicit after completion; Extra set remains available. Never automatically finish the workout.
+- One rest persists through selection, inspection, corrections and settings; newly logged work starts that movement's rest. Preserve extensions/cues and honest rest origin.
+- All actual previous-session sets are available on demand. Logging actions remain reachable with long plans, narrow screens, keyboard and large text; the two-tap path remains.
+- Start-to-Finish duration includes warm-up/rest. Stale-workout reconciliation precedes Focus; Continue explains elapsed time, finish-at-last-set is confirmed, and empty stale workouts may be discarded.
+- The latest finished workout can reopen within ten minutes only with no intervening workout. Re-finishing without new actual sets retains its original end; old history remains editable. Persist selected movement and outcomes across reopening.
+
+### US-64 — Useful, truthful Progress
+
+- A trained-exercise selector leads to recent actual load/reps/sets; estimates/PRs are secondary. Bodyweight sets/reps count as training without invented external-load volume.
+- Edits, deletions, Undo and restore update summaries, lists, featured results, records, charts and volume without stale cached results.
+- Chart horizontal distance represents time, with units and inspectable values linked to workouts. Same-day visits remain distinct; numerical records are accessible.
+- Dates include years where needed. Monday calendar ranges include the full oldest displayed week and label the current week partial.
+
+### US-65 — Preparation and explicit routine reuse
+
+- Empty home offers Create first routine, freestyle and restore. Routine creation opens editing: name, inspect/add movements, optional targets.
+- Catalog browse opens information with browse semantics; picker offers separate inspection and Add, preserves deliberate duplicates and reports what was added.
+- After saving a routine workout with net membership/order changes, preview Update original / Save as new / Today only once. Undoing structural edits suppresses the offer.
+- Preserve surviving occurrence identities and authored targets, including duplicate catalog exercises. Actuals, selection and completion outcomes never become template changes.
+- Routine-save cancellation, conflict or failure preserves the saved workout and original template. Missing/changed originals use an explicit fallback. Historical snapshots are unchanged.
+- Reopening does not implicitly undo a confirmed routine save; unchanged re-finish does not repeat a handled offer.
+
+### US-66 — Complete personal restore with a recovery copy
+
+- Preview file age, owner and complete contents. Validate IDs, ownership, parent relationships, values and duplicates completely before any replacement.
+- Create and validate one rolling local safety copy before replacement; failure stops with useful feedback. Preserve a valid copy during recovery and explain private-storage/reinstall limitations.
+- Replacement scope matches the copy and confirmation. A malformed file or write failure preserves existing data; success refreshes all member-dependent views.
+- Restore stays blocked while a workout is active. Offer export/recovery access to the safety copy; no merging is introduced.
+
+### US-67 — Accessible preparation and optional setup
+
+- Settings remains accessible during training without losing workout, rest or selection. Permission and band states offer explicit recovery, Search again / Change / Forget.
+- Rest defaults use efficient input, RPE has optional contextual help, editable values have labels, and complete names/details remain accessible.
+- All touched layouts support readable narrow/large-text content, keyboard and reachable actions; loading/missing/error states have visible recovery and exits.

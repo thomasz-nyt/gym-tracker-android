@@ -24,6 +24,11 @@ interface SessionExerciseRepository {
     /** Appends [sessionExercise]. Callers get its position from [nextPosition]. */
     suspend fun add(sessionExercise: SessionExercise)
 
+    /** Changes an occurrence's position/outcome while retaining its sets and identity. */
+    suspend fun update(sessionExercise: SessionExercise) {
+        error("Updating a movement is not supported by this repository")
+    }
+
     /**
      * Removes one appearance (US-02c). Its sets go with it via `ON DELETE CASCADE`.
      *

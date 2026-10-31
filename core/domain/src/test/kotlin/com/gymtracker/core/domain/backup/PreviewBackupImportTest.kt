@@ -57,6 +57,21 @@ class PreviewBackupImportTest {
         )
 
     @Test
+    fun `preview retains file creation time and build metadata without changing payload records`() =
+        runTest {
+            val metadata = BackupMetadata(Instant.parse("2026-10-20T12:00:00Z"), "0.1-test")
+            val decoder =
+                object : BackupDecoder {
+                    override fun decode(raw: String) = incoming
+
+                    override fun metadata(raw: String) = metadata
+                }
+            val result = assertIs<ImportPreviewResult.Ready>(preview(decoder = decoder)(member, "backup.json"))
+            assertEquals(metadata, result.metadata)
+            assertEquals(incoming, result.incoming)
+        }
+
+    @Test
     fun `a valid file reports both the incoming and the current counts`() =
         runTest {
             val store =

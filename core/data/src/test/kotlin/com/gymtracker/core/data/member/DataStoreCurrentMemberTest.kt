@@ -3,6 +3,8 @@ package com.gymtracker.core.data.member
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import app.cash.turbine.test
+import com.gymtracker.core.domain.model.UserId
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -21,6 +23,19 @@ class DataStoreCurrentMemberTest {
 
     private fun dataStore(name: String = "member.preferences_pb"): DataStore<Preferences> =
         PreferenceDataStoreFactory.create { folder.newFile(name) }
+
+    @Test
+    fun `retained observers switch to the restored identity`() =
+        runTest {
+            val member = DataStoreCurrentMember(dataStore())
+            val original = member.id()
+            member.observe().test {
+                assertEquals(original, awaitItem())
+                member.restore(UserId("restored-member"))
+                assertEquals(UserId("restored-member"), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 
     @Test
     fun `the same id is returned on every call`() =

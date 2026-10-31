@@ -33,6 +33,17 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun find(id: String): SessionEntity?
 
+    @Query(
+        "UPDATE sessions SET ended_at = :endedAt, workflow_json = :workflow, " +
+            "updated_at = :updatedAt, sync_state = 'PENDING' WHERE id = :id",
+    )
+    suspend fun updateWorkflow(
+        id: String,
+        endedAt: Long?,
+        workflow: String?,
+        updatedAt: Long,
+    )
+
     @Insert
     suspend fun insert(session: SessionEntity)
 

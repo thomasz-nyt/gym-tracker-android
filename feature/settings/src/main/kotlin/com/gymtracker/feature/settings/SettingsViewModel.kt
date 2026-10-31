@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -159,7 +158,8 @@ class SettingsViewModel
             // screen's controls must read live the moment it opens, not only once something
             // starts collecting them.
             viewModelScope.launch {
-                flow { emit(currentMember.id()) }
+                currentMember
+                    .observe()
                     .flatMapLatest { sessions.observeActiveSession(it) }
                     .map { it != null }
                     .collect { active -> _uiState.update { it.copy(hasActiveSession = active) } }
@@ -399,6 +399,7 @@ class SettingsViewModel
  */
 private fun ImportRefusalReason.message(): String =
     when (this) {
+        is ImportRefusalReason.Invalid -> problems.joinToString("\n")
         is ImportRefusalReason.SessionActive ->
             "A workout is running. Finish or discard it before importing."
         is ImportRefusalReason.UnknownExercises ->

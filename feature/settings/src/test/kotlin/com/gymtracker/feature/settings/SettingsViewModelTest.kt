@@ -119,7 +119,14 @@ class SettingsViewModelTest {
                 clock = clock,
             ),
         previewImport = PreviewBackupImport(fileReader, decoder, catalog, sessions, store),
-        importBackup = ImportBackup(sessions, catalog, store),
+        importBackup =
+            ImportBackup(
+                sessions,
+                catalog,
+                store,
+                com.gymtracker.core.domain.backup
+                    .FakeBackupSafetyStore(),
+            ),
         sessions = sessions,
         unitPreference = unitPreference,
         restTimerStore = restTimerStore,

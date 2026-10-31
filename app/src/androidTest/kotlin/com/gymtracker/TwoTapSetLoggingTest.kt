@@ -1,8 +1,10 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -158,8 +160,11 @@ class TwoTapSetLoggingTest {
             awaitSheetOpen()
 
             // The whole reason two taps is possible: last week's numbers are already there.
-            compose.onNodeWithText("135").assertExists("weight should be prefilled from last week")
-            compose.onNodeWithText("8").assertExists("reps should be prefilled from last week")
+            compose.onNodeWithContentDescription("Weight (lb)").assertTextContains("135")
+            compose.onNodeWithContentDescription("Reps").assertTextContains("8")
+
+            compose.onNodeWithText("Sets", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithText("Bulk entry").assertExists()
 
             // Tap 2 — confirm. Nothing is typed: the prefilled values were already right.
             compose.onNodeWithText("Save set").performClick()
@@ -211,7 +216,7 @@ class TwoTapSetLoggingTest {
      * perform exactly two `performClick` calls. A human on a screen this small scrolls too, and
      * scrolling is not one of the two taps that confirm a set.
      */
-    private fun addSetButton() = compose.onNodeWithText("Add set", useUnmergedTree = true)
+    private fun addSetButton() = compose.onNodeWithText("Adjust this set", useUnmergedTree = true)
 
     /**
      * Waits for the entry sheet to appear, the mirror of [awaitSheetClosed].
@@ -252,7 +257,7 @@ class TwoTapSetLoggingTest {
      */
     private fun awaitReadyToLogASet() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText("Add set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Adjust this set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
     }
 

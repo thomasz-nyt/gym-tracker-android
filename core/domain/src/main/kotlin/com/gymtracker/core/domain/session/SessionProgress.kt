@@ -3,6 +3,7 @@ package com.gymtracker.core.domain.session
 import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.model.status
 
 /**
  * What a session knows about its own progress: how many movements are done, which one is
@@ -42,8 +43,7 @@ data class SessionProgress(
             sets: List<ExerciseSet>,
         ): SessionProgress {
             val ordered = exercises.filter { it.sessionId == session.id }.sortedBy { it.position }
-            val performedIds = sets.map { it.sessionExerciseId }.toSet()
-            val untouched = ordered.filter { it.id !in performedIds }
+            val untouched = ordered.filterNot { it.status(sets).isFinished }
 
             return SessionProgress(
                 movementsTotal = ordered.size,

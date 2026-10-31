@@ -66,6 +66,20 @@ class RoomSessionRepository
          * Enqueues exactly like an ordinary write — US-57's own decision is that a restore gets
          * no special case; see ADR-0043's amendment.
          */
+        override suspend fun updateSession(session: WorkoutSession) {
+            database.withTransaction {
+                dao.updateWorkflow(
+                    session.id.value,
+                    session.endedAt?.toEpochMilli(),
+                    WorkflowCodec.encode(session.workflow),
+                    Instant.now().toEpochMilli(),
+                )
+                dao.find(session.id.value)?.let { row ->
+                    syncQueue.insert(syncWriteEntry(SyncEntityNames.SESSIONS, row.id, codec.encode(row)))
+                }
+            }
+        }
+
         override suspend fun restoreSession(session: WorkoutSession) {
             val entity = session.toEntity()
             val payload = codec.encode(entity)

@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +20,7 @@ import com.gymtracker.core.domain.model.Equipment
 import com.gymtracker.core.domain.model.Exercise
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementStatus
 import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -28,10 +28,12 @@ import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.SessionMetrics
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.model.status
 import com.gymtracker.core.domain.progress.PersonalRecord
 import com.gymtracker.core.domain.session.PerformedExercise
 import com.gymtracker.core.domain.session.SessionDetail
 import com.gymtracker.core.domain.session.SessionSummary
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.WeightFormatter
 import com.gymtracker.core.domain.units.WeightUnit
 import java.time.Duration
@@ -62,8 +64,6 @@ internal fun FinishSummaryScreen(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val names = detail.exercises.associate { it.sessionExercise.exerciseId to it.exercise?.name }
-
     Column(
         // No padding here — this screen's own KDoc is explicit that SessionBody already
         // provides it; adding it here would double it.
@@ -72,7 +72,7 @@ internal fun FinishSummaryScreen(
     ) {
         // ADR-0011's Turn 4 amendment: the same two causes HistoryScreen's row had — an
         // unbounded title and a dot-joined stats sentence — fixed the same way here.
-        GymText(text = "Workout complete", role = GymTextRoles.TitleLg)
+        GymText(text = "Workout saved", role = GymTextRoles.TitleLg)
         // US-32 (ADR-0028): leads with the routine this session was started from, the same
         // way HistoryScreen's row does — falling back to "Freestyle" for an ordinary start.
         GymText(
@@ -106,40 +106,50 @@ internal fun FinishSummaryScreen(
             )
         }
 
-        if (records.isNotEmpty()) {
-            RecordsSection(records, names, unit, modifier = Modifier.weight(1f))
-        } else {
-            // US-13's absence pattern: nothing set, so nothing is said — not a "no records
-            // this time" line standing in for one.
-            Column(modifier = Modifier.weight(1f)) {}
-        }
+        FinishedWork(detail, records, unit, Modifier.weight(1f))
 
         PrimaryActionButton(text = "Done", onClick = onDone)
     }
 }
 
-/** Every record this session set, one line each: the movement, the reps, and the load. */
+/** Actual sets lead the summary; unfinished work stays explicitly unfinished. */
 @Composable
-private fun RecordsSection(
+private fun FinishedWork(
+    detail: SessionDetail,
     records: List<PersonalRecord>,
-    names: Map<ExerciseId, String?>,
     unit: WeightUnit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
-        Text(text = "New personal records", style = MaterialTheme.typography.titleMedium)
-
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
-            items(records, key = { "${it.exerciseId.value}-${it.reps}" }) { record ->
+    val names = detail.exercises.associate { it.sessionExercise.exerciseId to it.exercise?.name }
+    LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
+        items(detail.exercises, key = { it.sessionExercise.id.value }) { movement ->
+            GymText(movement.exercise?.name ?: movement.sessionExercise.exerciseId.value, role = GymTextRoles.TitleMd)
+            Text(movement.finishedStatus(), maxLines = 4)
+            if (movement.sets.isEmpty()) Text("No sets recorded", maxLines = 4)
+            movement.sets.sortedBy { it.setIndex }.forEach { set ->
                 Text(
-                    text = record.describe(names[record.exerciseId], unit),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.fillMaxWidth(),
+                    "Set ${set.setIndex}: ${set.reps} reps · ${WeightFormatter.format(set.weightKg, unit).primary}" +
+                        set.rpe?.let { " · ${RpeFormatter.at(it)}" }.orEmpty(),
+                    maxLines = 8,
                 )
             }
         }
+        if (records.isNotEmpty()) item { GymText("Personal records", role = GymTextRoles.TitleMd) }
+        items(records, key = { "${it.exerciseId.value}-${it.reps}" }) { record ->
+            Text(record.describe(names[record.exerciseId], unit), maxLines = 8)
+        }
     }
 }
+
+private fun PerformedExercise.finishedStatus(): String =
+    when (sessionExercise.status(sets)) {
+        MovementStatus.NOT_STARTED -> "Not performed"
+        MovementStatus.IN_PROGRESS -> "Unfinished · ${sets.size} ${if (sets.size == 1) "set" else "sets"} recorded"
+        MovementStatus.PLAN_MET -> "Plan met"
+        MovementStatus.DONE -> "Done"
+        MovementStatus.ENDED_EARLY -> "Ended early"
+        MovementStatus.SKIPPED -> "Skipped"
+    }
 
 /**
  * "New PR: Bench Press, 5 reps, 102.5 kg" — the exercise, the rep count the record was set at,

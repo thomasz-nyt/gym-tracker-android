@@ -70,6 +70,32 @@ class OneTapLogUndoTest {
     )
 
     @Test
+    fun `a write failure is recoverable and does not start a rest or fabricate a set`() =
+        runTest {
+            val failing =
+                object : com.gymtracker.core.domain.set.SetRepository by sets {
+                    override suspend fun append(
+                        set: com.gymtracker.core.domain.model.ExerciseSet,
+                    ): com.gymtracker.core.domain.model.ExerciseSet = throw java.io.IOException("disk full")
+                }
+            val controller =
+                OneTapLogController(
+                    LogUpNextSet(LogSets(LogSet(failing, clock) { "failed" }), restTimer, FakeUnitPreference()),
+                    DeleteSet(failing),
+                    restTimer,
+                    backgroundScope,
+                )
+            assertNull(controller.log(next))
+            assertTrue(
+                controller.error.value
+                    .orEmpty()
+                    .contains("disk full"),
+            )
+            assertTrue(sets.all.isEmpty())
+            assertNull(restStore.restEndsAt.first())
+        }
+
+    @Test
     fun `undo within the window deletes the set and ends the rest it started`() =
         runTest {
             val controller = controller(backgroundScope)
@@ -88,7 +114,7 @@ class OneTapLogUndoTest {
         }
 
     @Test
-    fun `the window closes after five seconds, and undo then does nothing`() =
+    fun `the brief feedback expires but the last logged set stays undoable in actions`() =
         runTest {
             val controller = controller(backgroundScope)
             controller.log(next)
@@ -96,11 +122,11 @@ class OneTapLogUndoTest {
             advanceTimeBy(WINDOW_MILLIS + 1)
             runCurrent()
 
-            assertFalse(controller.canUndo.first(), "ADR-0012's window has closed")
+            assertTrue(controller.canUndo.first(), "US-63 keeps Undo in the actions menu")
             controller.undo()
             runCurrent()
-            assertEquals(1, sets.all.size, "a closed window takes nothing back")
-            assertNotNull(restStore.restEndsAt.first(), "and leaves the rest running")
+            assertEquals(0, sets.all.size, "the menu can still undo the last set")
+            assertNull(restStore.restEndsAt.first(), "Undo also ends the rest earned by the removed set")
         }
 
     @Test

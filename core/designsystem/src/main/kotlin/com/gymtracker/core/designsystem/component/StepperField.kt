@@ -78,7 +78,7 @@ fun StepperField(
                 textStyle =
                     MaterialTheme.typography.titleLarge.copy(textAlign = TextAlign.Center),
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).semantics { contentDescription = label },
             )
 
             StepButton(glyph = "+", description = "Increase $label", onClick = { onStep(1) })

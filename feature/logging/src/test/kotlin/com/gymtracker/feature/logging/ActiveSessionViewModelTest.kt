@@ -44,6 +44,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /** US-01 as the screen sees it. Hand-written fakes, per `specs/testing-strategy.md`. */
@@ -142,6 +143,22 @@ class ActiveSessionViewModelTest {
         guidedPlanStore = guidedStore,
         clock = clock,
     )
+
+    @Test
+    fun `continuing a stale workout preserves its original start and actual records`() =
+        runTest {
+            val stale = session("stale", startedAt = now.minus(Duration.ofHours(5)))
+            val repository = FakeSessions(listOf(stale))
+            val vm = viewModel(repository)
+            vm.uiState.test {
+                assertNotNull(expectMostRecentItem().stalePrompt)
+                vm.onContinueStale()
+                val continued = expectMostRecentItem()
+                assertNull(continued.stalePrompt)
+                assertEquals(stale.startedAt, continued.activeSession?.startedAt)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 
     @Test
     fun `with no session the screen offers to start one`() =

@@ -6,7 +6,9 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -32,6 +34,13 @@ class ExerciseTrendOf(
     private val sets: SetRepository,
     private val zone: ZoneId,
 ) {
+    /** Recomputes from actual records after correction, deletion, Undo or restore (US-64). */
+    fun observe(
+        exerciseId: ExerciseId,
+        member: UserId,
+    ): Flow<ExerciseTrend> =
+        trainingChanges(member, sessions, sessionExercises, sets).map { invoke(exerciseId, member) }
+
     suspend operator fun invoke(
         exerciseId: ExerciseId,
         member: UserId,
