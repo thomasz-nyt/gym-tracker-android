@@ -47,40 +47,43 @@ class ImportBackup(
     suspend operator fun invoke(
         memberId: UserId,
         contents: BackupContents,
-    ): ImportBackupResult = restore(memberId, contents, createSafety = true)
+    ): ImportBackupResult = safely { restoreValidated(memberId, contents, createSafety = true) }
 
     /** The last private pre-restore copy, also available for an explicit export. */
     suspend fun safetyCopy(): BackupContents? = safety.read()
 
-    /** Restores the safety copy without replacing that copy with the state being recovered. */
-    suspend fun recover(memberId: UserId): ImportBackupResult {
-        val contents =
-            safety.read()
-                ?: return ImportBackupResult.Refused(
-                    ImportRefusalReason.Invalid(listOf("No safety copy is available.")),
-                )
-        return restore(memberId, contents, createSafety = false)
-    }
-
-    // Storage ports report unrelated IO/SQL failures; this UI boundary retains the safety copy.
-    @Suppress("TooGenericExceptionCaught")
-    private suspend fun restore(
+    /** Restores the previewed safety copy without replacing it; refuses a changed copy. */
+    suspend fun recover(
         memberId: UserId,
-        contents: BackupContents,
-        createSafety: Boolean,
-    ): ImportBackupResult {
+        expected: BackupContents? = null,
+    ): ImportBackupResult =
+        safely {
+            val contents = safety.read()
+            when {
+                contents == null ->
+                    ImportBackupResult.Refused(ImportRefusalReason.Invalid(listOf("No safety copy is available.")))
+                expected != null && contents != expected ->
+                    ImportBackupResult.Refused(
+                        ImportRefusalReason.Invalid(listOf("The safety copy changed. Preview it again.")),
+                    )
+                else -> restoreValidated(memberId, contents, createSafety = false)
+            }
+        }
+
+    // Storage ports report unrelated IO/SQL failures; retain the recovery file at this UI boundary.
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun safely(operation: suspend () -> ImportBackupResult): ImportBackupResult =
         try {
-            return restoreValidated(memberId, contents, createSafety)
+            operation()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            return ImportBackupResult.Refused(
+            ImportBackupResult.Refused(
                 ImportRefusalReason.Invalid(
                     listOf("Restore failed: ${error.message ?: "storage error"}. Your safety copy is retained."),
                 ),
             )
         }
-    }
 
     private suspend fun restoreValidated(
         memberId: UserId,

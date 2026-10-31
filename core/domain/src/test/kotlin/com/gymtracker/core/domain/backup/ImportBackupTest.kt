@@ -152,6 +152,36 @@ class ImportBackupTest {
             assertIs<ImportRefusalReason.SessionActive>(refused.reason)
         }
 
+    @Test
+    fun `a damaged safety file reports recovery failure without changing current records`() =
+        runTest {
+            val store = FakeBackupStore(mapOf(member to contents))
+            val safety =
+                object : BackupSafetyStore {
+                    override suspend fun write(contents: BackupContents) = error("must not replace recovery copy")
+
+                    override suspend fun read(): BackupContents? = throw java.io.IOException("unreadable safety file")
+                }
+            val importer = ImportBackup(FakeSessionRepository(), ExerciseCatalogStub(known), store, safety)
+            val result = assertIs<ImportBackupResult.Refused>(importer.recover(member))
+            assertIs<ImportRefusalReason.Invalid>(result.reason)
+            assertEquals(null, store.lastReplaced)
+        }
+
+    @Test
+    fun `recovery refuses a different copy than the preview and preserves the confirmed copy on success`() =
+        runTest {
+            val store = FakeBackupStore(mapOf(member to contents.copy(unit = WeightUnit.LB)))
+            val safety = FakeBackupSafetyStore()
+            safety.write(contents)
+            val importer = ImportBackup(FakeSessionRepository(), ExerciseCatalogStub(known), store, safety)
+            assertIs<ImportBackupResult.Refused>(importer.recover(member, contents.copy(unit = WeightUnit.LB)))
+            assertEquals(null, store.lastReplaced)
+            assertIs<ImportBackupResult.Imported>(importer.recover(member, contents))
+            assertEquals(contents, store.lastReplaced)
+            assertEquals(contents, safety.read())
+        }
+
     private class ExerciseCatalogStub(
         private val ids: Set<ExerciseId>,
     ) : ExerciseCatalog {

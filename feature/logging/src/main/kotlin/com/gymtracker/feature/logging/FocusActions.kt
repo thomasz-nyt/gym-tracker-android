@@ -22,6 +22,7 @@ data class FocusActions(
     val onUndoLog: () -> Unit = {},
     val onUndoDelete: () -> Unit = {},
     val onUndoRemoval: () -> Unit = {},
+    val onStartWarmUp: () -> Unit = {},
     val onSettings: () -> Unit = {},
     val onFinish: () -> Unit = {},
     val onDismissError: () -> Unit = {},

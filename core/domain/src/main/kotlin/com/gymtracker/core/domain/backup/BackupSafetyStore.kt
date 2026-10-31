@@ -7,4 +7,13 @@ interface BackupSafetyStore {
 
     /** Reads the validated copy, or null if this installation has not made one. */
     suspend fun read(): BackupContents?
+
+    /** Reads records and their original file metadata from the same committed copy. */
+    suspend fun snapshot(): BackupSnapshot? = read()?.let { BackupSnapshot(it) }
 }
+
+/** Records paired with the time/build that created this particular copy, when available. */
+data class BackupSnapshot(
+    val contents: BackupContents,
+    val metadata: BackupMetadata? = null,
+)

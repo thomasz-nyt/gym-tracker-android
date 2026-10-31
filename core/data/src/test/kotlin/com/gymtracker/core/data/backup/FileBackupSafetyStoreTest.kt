@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.gymtracker.core.domain.TestData
 import com.gymtracker.core.domain.backup.AppVersion
 import com.gymtracker.core.domain.backup.BackupContents
+import com.gymtracker.core.domain.backup.BackupMetadata
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.test.runTest
@@ -54,6 +55,8 @@ class FileBackupSafetyStoreTest {
             assertNull(store().read())
             store().write(contents)
             assertEquals(contents, store().read())
+            assertEquals(contents, store().snapshot()?.contents)
+            assertEquals(BackupMetadata(clock.instant(), "test"), store().snapshot()?.metadata)
             val invalid = contents.copy(sets = contents.sets.map { it.copy(weightKg = Double.NaN) })
             assertFails { store().write(invalid) }
             assertEquals(contents, store().read(), "a failed replacement keeps the last verified complete copy")

@@ -5,6 +5,7 @@ import android.util.AtomicFile
 import com.gymtracker.core.domain.backup.AppVersion
 import com.gymtracker.core.domain.backup.BackupContents
 import com.gymtracker.core.domain.backup.BackupSafetyStore
+import com.gymtracker.core.domain.backup.BackupSnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -43,12 +44,17 @@ class FileBackupSafetyStore
                 check(read() == contents) { "Safety copy readback failed" }
             }
 
-        override suspend fun read(): BackupContents? =
+        override suspend fun read(): BackupContents? = snapshot()?.contents
+
+        override suspend fun snapshot(): BackupSnapshot? =
             withContext(Dispatchers.IO) {
                 if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) {
                     null
                 } else {
-                    file.openRead().bufferedReader().use { codec.decode(it.readText()) }
+                    file.openRead().bufferedReader().use {
+                        val raw = it.readText()
+                        BackupSnapshot(codec.decode(raw), codec.metadata(raw))
+                    }
                 }
             }
     }

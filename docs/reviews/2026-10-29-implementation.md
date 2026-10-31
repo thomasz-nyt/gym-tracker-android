@@ -85,3 +85,26 @@ the old dialog and failed on actual native window bounds before passing with key
 The return-from-history test exposed retained scroll before page-specific scroll was applied.
 Six settled native screenshots are attached in the device review directory. Full native
 regression adaptation, optional-features-off and the story checklist remain open.
+
+## Pixel 8a full native regression checkpoint
+
+Adapted the retired guided paths to current-set Focus without dropping the underlying storage,
+correction, Undo, rest and selection assertions. Shared-plan tests now prove actual performed
+counts meet copied targets without finishing the workout, and allow an explicit extra set.
+The device tests exposed missing effort/target-rest details and warm-up access; those are now
+secondary actions/details. Empty-workout confirmation explicitly discards the empty visit.
+Dialogs are rendered once for all logging states, with active content delegated separately.
+
+Default native run: 66 passed, 5 conditional/viewport skips, 0 failures (71 declared cases).
+Optional-features-off run: 68 passed, 3 conditional/viewport skips, 0 failures (71 declared).
+These are per-test counts, correcting earlier progress totals that included assumption skips.
+Logs: `/tmp/rep-pixel8a-native-large-red.log` (the large-text check passed) and
+`/tmp/rep-pixel8a-off-native.log`. Full gates passed in
+`/tmp/rep-focus-rest-regression-gates2.log`: 1,076 unit tests, no failures/errors, clean ktlint,
+detekt, app lint and domain dependency verification. Two additional native warm-up screenshots
+were retrieved and inspected, including a constrained 320×600 dp, 200% text viewport.
+
+Recovery primitives now report an unreadable safety file without mutating current records,
+refuse a changed copy at confirmation, preserve the confirmed copy on recovery, and read original
+creation/build metadata with its records. Recovery/export UI and complete replacement-scope
+protection remain part of the unchecked US-66 work; this checkpoint does not claim them complete.

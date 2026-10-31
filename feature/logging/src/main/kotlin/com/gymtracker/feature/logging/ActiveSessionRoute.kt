@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -27,6 +28,7 @@ import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.feature.logging.session.RestAlertsRationaleDialog
 import com.gymtracker.feature.logging.session.SessionBody
 import com.gymtracker.feature.logging.session.SessionDialogs
+import com.gymtracker.feature.logging.session.WarmUpStep
 import kotlinx.coroutines.launch
 import java.time.Duration
 
@@ -229,8 +231,8 @@ data class GuidedActions(
  * The warm-up, and the two things it can be asked to do (US-28, ADR-0021).
  *
  * A record for the same reason [GuidedActions] is one, and it carries its own state rather
- * than reading it off [SessionUiState] — because a warm-up is not part of the session. It has
- * no row, adds nothing to the duration, and never reaches history, and it comes from
+ * than reading it off [SessionUiState] — because the stopwatch has no performed-set row. The visit duration includes
+ * warm-up and rest (ADR-0052), while the stopwatch itself is not a logged activity. It comes from
  * [WarmUpViewModel] rather than from the session's own state to keep that true structurally.
  *
  * [elapsed] is null when no warm-up is running, and [Duration.ZERO] for one that has just
@@ -276,9 +278,11 @@ internal fun LoggingScreen(
     warmUp: WarmUp = WarmUp(),
     modifier: Modifier = Modifier,
 ) {
+    SessionDialogs(state, onResolveStale, guided, setEntry, setEdit, onContinueStale)
     if (state.activeSession != null && state.finish == null) {
-        FocusWorkoutScreen(
+        ActiveWorkoutContent(
             state,
+            warmUp,
             FocusActions(
                 onLogSet = onLogNextSet,
                 onAdjust = onAddSet,
@@ -299,13 +303,11 @@ internal fun LoggingScreen(
             ),
             modifier,
         )
-        SessionDialogs(state, onResolveStale, guided, setEntry, setEdit, onContinueStale)
         return
     }
     SessionScreen(
         state = state,
         onStartWorkout = onStartWorkout,
-        onResolveStale = onResolveStale,
         onFinishWorkout = onFinishWorkout,
         onFinishSummaryDismissed = onFinishSummaryDismissed,
         onAddSet = onAddSet,
@@ -317,9 +319,7 @@ internal fun LoggingScreen(
         onExtendRest = onExtendRest,
         onOpenHistory = onOpenHistory,
         onBrowseCatalog = onBrowseCatalog,
-        setEntry = setEntry,
         onEditSet = onEditSet,
-        setEdit = setEdit,
         onUndoSetDelete = onUndoSetDelete,
         onLogNextSet = onLogNextSet,
         onUndoOneTapLog = onUndoOneTapLog,
@@ -333,12 +333,29 @@ internal fun LoggingScreen(
     )
 }
 
+/** Warm-up and current-set Focus are two views of this same active visit. */
+@Composable
+private fun ActiveWorkoutContent(
+    state: SessionUiState,
+    warmUp: WarmUp,
+    actions: FocusActions,
+    modifier: Modifier,
+) {
+    if (warmUp.elapsed != null) {
+        Box(modifier) {
+            val selected = state.exercises.firstOrNull { it.sessionExercise.id == state.openSessionExerciseId }
+            WarmUpStep(warmUp, selected?.exercise?.name)
+        }
+    } else {
+        FocusWorkoutScreen(state, actions.copy(onStartWarmUp = warmUp.onStart), modifier)
+    }
+}
+
 /** The session itself: the body, and the two dialogs that can sit over it. */
 @Composable
 private fun SessionScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
-    onResolveStale: (StaleSessionPrompt) -> Unit,
     onFinishWorkout: () -> Unit,
     onFinishSummaryDismissed: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
@@ -350,9 +367,7 @@ private fun SessionScreen(
     onExtendRest: () -> Unit,
     onOpenHistory: () -> Unit,
     onBrowseCatalog: () -> Unit,
-    setEntry: SetEntryCallbacks,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
-    setEdit: SetEditCallbacks,
     onUndoSetDelete: () -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
     onUndoOneTapLog: () -> Unit,
@@ -390,14 +405,6 @@ private fun SessionScreen(
             onSelectExercise = onSelectExercise,
             warmUp = warmUp,
             modifier = Modifier.padding(padding),
-        )
-
-        SessionDialogs(
-            state = state,
-            onResolveStale = onResolveStale,
-            guided = guided,
-            setEntry = setEntry,
-            setEdit = setEdit,
         )
     }
 }

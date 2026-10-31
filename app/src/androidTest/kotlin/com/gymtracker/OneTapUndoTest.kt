@@ -6,7 +6,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -126,7 +125,7 @@ class OneTapUndoTest {
     fun aOneTapLogCanBeTakenBackAndTakesItsRestWithIt() {
         runBlocking {
             awaitReadyToLogASet()
-            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).performScrollTo().performClick()
+            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).assertIsDisplayed().performClick()
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 runBlocking { sets.observeForSessionExercise(TODAY).first().isNotEmpty() }
             }
@@ -155,7 +154,7 @@ class OneTapUndoTest {
         const val READY_TIMEOUT_MILLIS = 10_000L
         const val EXERCISE = "Bench Dips"
         const val LOG_SET = "LOG SET 1"
-        const val SET_LOGGED = "Set logged"
+        const val SET_LOGGED = "Set saved"
         const val UNDO = "Undo"
         val LAST_WEEK = SessionId("last-week-undo")
         val TODAY_SESSION = SessionId("today-undo")

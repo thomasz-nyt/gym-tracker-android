@@ -114,30 +114,20 @@ class SwitchingExercisesTest {
     }
 
     @Test
-    fun switchingBackToTheSkippedExerciseOpensItAndLogsAgainstIt() {
+    fun switchingBackToAnUnperformedExerciseSelectsAndLogsAgainstIt(): Unit =
         runBlocking {
-            awaitSecondExerciseOpen()
-
-            // The bug this story fixes: before ADR-0037, the first exercise had no row and
-            // nothing to tap once the second became current -- it must be on screen now.
-            val firstExerciseRow = compose.onNodeWithText(FIRST_EXERCISE)
-            firstExerciseRow.assertIsDisplayed()
-            firstExerciseRow.performClick()
-
-            // Proof the tap *selected* it rather than firing a sheet blind: its own empty set
-            // list renders, which only the row genuinely open can show (the second exercise,
-            // the only other one in this fixture, already has a set and would say so instead).
-            awaitFirstExerciseOpen()
-
-            addSetButton().performScrollTo().performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("Workout").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("Workout").performClick()
+            compose.onNodeWithText(FIRST_EXERCISE).performScrollTo().performClick()
+            compose.onNodeWithText(FIRST_EXERCISE).assertIsDisplayed()
+            compose.onNodeWithText("Add set").assertIsDisplayed().performClick()
             awaitSheetOpen()
             compose.onNodeWithText("Save set").performClick()
             awaitSheetClosed()
-
-            val logged = sets.observeForSessionExercise(FIRST_ID).first()
-            assertEquals(1, logged.size, "the set was written against the exercise switched to")
+            assertEquals(1, sets.observeForSessionExercise(FIRST_ID).first().size)
+            assertEquals(1, sets.observeForSessionExercise(SECOND_ID).first().size)
+            compose.onNodeWithText(FIRST_EXERCISE).assertIsDisplayed()
         }
-    }
 
     private fun addSetButton() = compose.onNodeWithText("Add set", useUnmergedTree = true)
 

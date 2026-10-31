@@ -1,12 +1,12 @@
 package com.gymtracker
 
 import android.Manifest
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -133,32 +133,21 @@ class LastTimeBlockTest {
 
     @Test
     fun theOpenMovementShowsEverySetOfLastTime() {
-        // The open exercise is the first by position (nothing logged yet, US-45's default), the
-        // one done last week — so the block is on screen as soon as the session is.
-        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText(LAST_TIME, substring = true).fetchSemanticsNodes().isNotEmpty()
-        }
-
-        compose.onNodeWithText(LAST_TIME, substring = true).assertIsDisplayed()
-        // All three sets, in order, each with its effort where one was recorded — not the last
-        // set alone, which is the rest panel's job (ADR-0023).
+        compose.openFocusRecords()
+        compose.onNodeWithText("Last time").assertIsDisplayed()
         val load = WeightFormatter.format(61.23, WeightUnit.LB).primary
-        compose.onNodeWithText("$load × 8 @8  ·  $load × 8  ·  $load × 7 @9").assertIsDisplayed()
+        compose.onNodeWithText("Set 1 · $load × 8 @8").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Set 2 · $load × 8").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Set 3 · $load × 7 @9").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun aMovementNeverDoneBeforeShowsNoBlock() {
-        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText(NEVER_DONE).fetchSemanticsNodes().isNotEmpty()
-        }
-
-        // US-45: tapping the other exercise opens it fully. Its own header then carries no
-        // "last time" at all — absence, not an empty label (US-13, constitution §2.4).
-        compose.onNodeWithText(NEVER_DONE).performClick()
-        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText(LAST_TIME, substring = true).fetchSemanticsNodes().isEmpty()
-        }
-        compose.onAllNodesWithText(LAST_TIME, substring = true).assertCountEquals(0)
+    fun aMovementNeverDoneBeforeShowsHonestAbsence() {
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Workout").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Workout").performClick()
+        compose.onNodeWithText(NEVER_DONE).performScrollTo().performClick()
+        compose.openFocusRecords()
+        compose.onNodeWithText("No previous performance.").performScrollTo().assertIsDisplayed()
     }
 
     private companion object {

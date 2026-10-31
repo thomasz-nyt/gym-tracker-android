@@ -1,11 +1,11 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -151,7 +151,7 @@ class OneTapSetLoggingTest {
     fun aSetIsPersistedAfterOneTap() {
         runBlocking {
             awaitReadyToLogASet()
-            logSetButton().performScrollTo().performClick()
+            logSetButton().assertIsDisplayed().performClick()
 
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 runBlocking { sets.observeForSessionExercise(TODAY).first().isNotEmpty() }
@@ -168,7 +168,7 @@ class OneTapSetLoggingTest {
     fun theOneTapButtonNeverOpensASheet() {
         runBlocking {
             awaitReadyToLogASet()
-            logSetButton().performScrollTo().performClick()
+            logSetButton().assertIsDisplayed().performClick()
 
             // If a sheet had opened, "Save set" would be on screen; the whole point of the
             // one-tap button is that it never is.

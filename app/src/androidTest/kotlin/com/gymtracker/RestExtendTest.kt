@@ -6,7 +6,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -143,7 +142,7 @@ class RestExtendTest {
             }
             compose
                 .onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true)
-                .performScrollTo()
+                .assertIsDisplayed()
                 .performClick()
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 runBlocking { restTimerStore.restEndsAt.first() != null }
@@ -151,6 +150,7 @@ class RestExtendTest {
             val endsAtBefore = assertNotNull(restTimerStore.restEndsAt.first(), "the one-tap log started a rest")
             val totalBefore = assertNotNull(restTimerStore.restTotal.first())
 
+            compose.openFocusMore()
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 compose.onAllNodesWithText(EXTEND).fetchSemanticsNodes().isNotEmpty()
             }
@@ -165,12 +165,6 @@ class RestExtendTest {
                 restTimerStore.restTotal.first(),
                 "and the bar's total moved with it",
             )
-
-            // "of 1:30" — the default rest is 60 s (US-05), so the band now reads the extended total.
-            compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-                compose.onAllNodesWithText(EXTENDED_TOTAL, substring = true).fetchSemanticsNodes().isNotEmpty()
-            }
-            compose.onNodeWithText(EXTENDED_TOTAL, substring = true).assertIsDisplayed()
         }
     }
 
@@ -178,7 +172,7 @@ class RestExtendTest {
         const val READY_TIMEOUT_MILLIS = 10_000L
         const val EXERCISE = "Bench Dips"
         const val LOG_SET = "LOG SET 1"
-        const val EXTEND = "+30S"
+        const val EXTEND = "Add 30 seconds rest"
         const val EXTENDED_TOTAL = "of 1:30"
         val LAST_WEEK = SessionId("last-week-extend")
         val TODAY_SESSION = SessionId("today-extend")

@@ -1,9 +1,9 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -14,6 +14,7 @@ import com.gymtracker.core.data.exercise.CatalogSeeder
 import com.gymtracker.core.domain.exercise.ExerciseCatalog
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
 import com.gymtracker.core.domain.model.SessionId
@@ -26,7 +27,6 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -35,25 +35,15 @@ import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
-/**
- * US-05a as amended 2026-09-05: on the guided screen the weight is a stepper like the rep count,
- * and `LOG SET n` writes what the field shows.
- *
- * `GuidedFlowTest` pins the arithmetic and the carry-forward; this is the wiring check only an
- * instrumented test can give — that the control is actually on the running screen, that the log
- * button's detail line follows it, and that the set written is the stepped weight rather than the
- * start dialog's. Same fixture shape as `GuidedFlowScreenTest`: a prior week's set, so the dialog
- * opens with a real prefill (135 lb) and `Start` is enabled without typing.
- */
+/** US-63: copied plan counts actual sets; completing it never finishes the workout implicitly. */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
-class GuidedWeightEditTest {
+class SharedWorkoutPlanTest {
     @get:Rule(order = 0)
     val hilt = HiltAndroidRule(this)
 
-    /** Same reason as `GuidedFlowScreenTest`: finishing a set starts the rest timer. */
+    /** Same reason as `TwoTapSetLoggingTest`: finishing a set starts the rest timer. */
     @get:Rule(order = 1)
     val notifications: GrantPermissionRule = GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
 
@@ -81,6 +71,7 @@ class GuidedWeightEditTest {
     @Inject
     lateinit var restTimerStore: RestTimerStore
 
+    /** A prior set so the setup dialog's "Start" is enabled without typing (a real prefill). */
     @Before
     fun startedWorkoutWithHistory() {
         runBlocking {
@@ -88,14 +79,21 @@ class GuidedWeightEditTest {
             catalogSeeder.seedIfEmpty(Instant.now().toEpochMilli())
 
             val member = currentMember.id()
-            val exercise = catalog.search(EXERCISE, member).first().first { it.name == EXERCISE }
+            val benchPress = catalog.search(EXERCISE, member).first().first { it.name == EXERCISE }
             val now = Instant.now()
 
-            sessions.observeActiveSession(member).first()?.let { sessions.deleteSession(it.id) }
             listOf(LAST_WEEK, TODAY_SESSION).forEach { sessions.deleteSession(it) }
             restTimerStore.setRestEndsAt(null)
-            // See GuidedFlowScreenTest for why: the already-granted permission would otherwise
-            // still be requested on this image, and that system dialog is outside the tree.
+            // GrantPermissionRule pre-grants POST_NOTIFICATIONS at the OS level, but on this
+            // emulator image RestNotifications still calls Activity.requestPermissions() for it
+            // the first time a rest starts (RestController.shouldAskForNotifications reads its
+            // own "have we asked" flag, not the OS grant state) — and requesting an
+            // already-granted permission still surfaces the system dialog here, a real,
+            // reproducible platform quirk, not a theory: confirmed by walking the exact same
+            // flow by hand on this AVD. That dialog is a different window from a different
+            // package, which the test's Compose semantics tree cannot see into or past. Marking
+            // the permission already-asked skips the request path entirely, the same state a
+            // real member's second-ever workout would be in.
             restTimerStore.markNotificationPermissionAsked()
 
             sessions.startSession(
@@ -108,11 +106,11 @@ class GuidedWeightEditTest {
                     metrics = null,
                 ),
             )
-            val previously = SessionExerciseId("se-last-week-guided-weight")
-            sessionExercises.add(SessionExercise(previously, LAST_WEEK, exercise.id, 1))
+            val previously = SessionExerciseId("se-last-week-guided")
+            sessionExercises.add(SessionExercise(previously, LAST_WEEK, benchPress.id, 1))
             sets.add(
                 ExerciseSet(
-                    id = "set-last-week-guided-weight",
+                    id = "set-last-week-guided",
                     sessionExerciseId = previously,
                     setIndex = 1,
                     weightKg = 61.23,
@@ -123,60 +121,40 @@ class GuidedWeightEditTest {
             )
 
             sessions.startSession(WorkoutSession(TODAY_SESSION, member, null, now, null, null))
-            sessionExercises.add(SessionExercise(TODAY, TODAY_SESSION, exercise.id, 1))
-        }
-    }
-
-    @After
-    fun discardTheSession() {
-        runBlocking {
-            restTimerStore.setRestEndsAt(null)
-            sessions.deleteSession(TODAY_SESSION)
-            sessions.deleteSession(LAST_WEEK)
+            sessionExercises.add(SessionExercise(TODAY, TODAY_SESSION, benchPress.id, 1, MovementTarget(3, 12, 80.0)))
         }
     }
 
     @Test
-    fun plusOnTheRunningScreenChangesWhatLogSetWrites() {
+    fun copiedPlanCountsActualSetsAndAllowsAnExplicitExtraSet(): Unit =
         runBlocking {
-            awaitText("Start exercise")
-            compose.onNodeWithText("Start exercise", useUnmergedTree = true).performScrollTo().performClick()
-            awaitText("Start")
-            compose.onNodeWithText("Start").performClick()
-            awaitText(LOG_SET)
-
-            // 135 lb from last week's set, stepped once — the 5 lb set entry's own stepper moves.
-            compose.onNodeWithContentDescription(INCREASE_WEIGHT).performScrollTo().performClick()
-            awaitText(STEPPED_DETAIL)
-
-            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).performScrollTo().performClick()
-            awaitText("REST")
-
-            val logged = sets.observeForSessionExercise(TODAY).first()
-            val written = assertNotNull(logged.single().weightKg, "a loaded set, not bodyweight")
-            assertEquals(63.5, written, 0.01, "140 lb in canonical kilograms — not the dialog's 135")
+            for (number in 1..3) {
+                awaitText("LOG SET $number")
+                compose.onNodeWithText("LOG SET $number").assertIsDisplayed().performClick()
+                compose.waitUntil(
+                    10_000,
+                ) { runBlocking { sets.observeForSessionExercise(TODAY).first().size == number } }
+            }
+            awaitText("Plan met")
+            compose.onNodeWithText("Review workout").assertIsDisplayed()
+            assertEquals(TODAY_SESSION, sessions.findActiveSession(currentMember.id())?.id)
+            assertEquals(listOf(8, 8, 8), sets.observeForSessionExercise(TODAY).first().map { it.reps })
+            compose.onNodeWithText("Add an extra set").performScrollTo().performClick()
+            awaitText("Save set")
+            compose.onNodeWithText("Save set").performClick()
+            compose.waitUntil(10_000) { runBlocking { sets.observeForSessionExercise(TODAY).first().size == 4 } }
+            assertEquals(TODAY_SESSION, sessions.findActiveSession(currentMember.id())?.id)
         }
-    }
 
     private fun awaitText(text: String) {
-        compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose
-                .onAllNodesWithText(text, substring = true, useUnmergedTree = true)
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
 
     private companion object {
         const val READY_TIMEOUT_MILLIS = 10_000L
         const val EXERCISE = "Bench Dips"
-        const val LOG_SET = "LOG SET 1"
-
-        /** `StepperField`'s own description for its `+`, for the label the running screen gives the weight. */
-        const val INCREASE_WEIGHT = "Increase Weight (lb)"
-        const val STEPPED_DETAIL = "140 lb × 12"
-        val LAST_WEEK = SessionId("last-week-guided-weight")
-        val TODAY_SESSION = SessionId("today-guided-weight")
-        val TODAY = SessionExerciseId("se-today-guided-weight")
+        val LAST_WEEK = SessionId("last-week-guided")
+        val TODAY_SESSION = SessionId("today-guided")
+        val TODAY = SessionExerciseId("se-today-guided")
     }
 }

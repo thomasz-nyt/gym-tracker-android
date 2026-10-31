@@ -30,11 +30,14 @@ import com.gymtracker.core.designsystem.component.GymText
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
 import com.gymtracker.core.designsystem.theme.GymDimens
 import com.gymtracker.core.designsystem.theme.GymTextRoles
+import com.gymtracker.core.domain.model.ExerciseSet
 import com.gymtracker.core.domain.model.MovementOutcome
 import com.gymtracker.core.domain.model.MovementStatus
 import com.gymtracker.core.domain.model.status
 import com.gymtracker.core.domain.rest.UpNextSet
+import com.gymtracker.core.domain.set.RpeFormatter
 import com.gymtracker.core.domain.units.WeightFormatter
+import com.gymtracker.core.domain.units.WeightUnit
 import kotlinx.coroutines.delay
 
 private enum class FocusPage { CURRENT, PLAN, MORE, RECORDS }
@@ -270,6 +273,7 @@ private fun FocusMore(
     if (state.canUndoSetDelete) FocusButton("Undo delete set", onClick = actions.onUndoDelete)
     if (state.canUndoRemoval) FocusButton("Undo remove exercise", onClick = actions.onUndoRemoval)
     if (state.restRemaining != null) FocusButton("Add 30 seconds rest", onClick = actions.onExtendRest)
+    FocusButton("Start warm-up", onClick = actions.onStartWarmUp)
     FocusButton("Settings", onClick = actions.onSettings)
     FocusButton("Finish workout", onClick = onFinish)
 }
@@ -353,9 +357,17 @@ private fun FocusFinishConfirmation(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { FocusText("Finish this workout?") },
-        text = { FocusText("$count actual sets will be kept. Unfinished exercises are not marked complete.") },
-        confirmButton = { FocusButton("Finish workout", onClick = onConfirm) },
+        title = { FocusText(if (count == 0) "Discard empty workout?" else "Finish this workout?") },
+        text = {
+            FocusText(
+                if (count == 0) {
+                    "This workout has no recorded sets and will be discarded."
+                } else {
+                    "$count actual sets will be kept. Unfinished exercises are not marked complete."
+                },
+            )
+        },
+        confirmButton = { FocusButton(if (count == 0) "Discard workout" else "Finish workout", onClick = onConfirm) },
         dismissButton = { FocusButton("Keep going", onClick = onDismiss) },
     )
 }
@@ -370,7 +382,7 @@ private fun FocusRecords(
     if (row.sets.isEmpty()) FocusText("No sets recorded yet.")
     row.sets.sortedBy { it.setIndex }.forEach { set ->
         FocusButton(
-            "Set ${set.setIndex} · ${WeightFormatter.format(set.weightKg, state.unit).primary} × ${set.reps}",
+            set.focusRecord(state.unit),
             "Edit set ${set.setIndex}",
         ) {
             actions.onEdit(row, set)
@@ -391,6 +403,7 @@ private fun FocusRecords(
             ).primary}"
         },
     )
+    target?.rest?.let { FocusText("${it.asMinutesSeconds()} rest") }
     GymText("Last time", role = GymTextRoles.TitleMd)
     val last = state.lastTime
     if (last == null) {
@@ -398,7 +411,7 @@ private fun FocusRecords(
     } else {
         FocusText(last.performedAt.toString().substringBefore('T'))
         last.sets.forEach {
-            FocusText("Set ${it.setIndex} · ${WeightFormatter.format(it.weightKg, state.unit).primary} × ${it.reps}")
+            FocusText(it.focusRecord(state.unit))
         }
     }
 }
@@ -431,3 +444,7 @@ private fun MovementStatus.label() =
         MovementStatus.ENDED_EARLY -> "Ended early"
         MovementStatus.SKIPPED -> "Skipped"
     }
+
+private fun ExerciseSet.focusRecord(unit: WeightUnit): String =
+    "Set $setIndex · ${WeightFormatter.format(weightKg, unit).primary} × $reps" +
+        rpe?.let { " ${RpeFormatter.at(it)}" }.orEmpty()

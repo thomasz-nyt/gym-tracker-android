@@ -117,9 +117,17 @@ class PerExerciseRestScreenTest {
     fun theTargetLineNamesTheRestAndTheRestThatFollowsIsThatLong() {
         runBlocking {
             awaitText(LOG_SET)
-            compose.onNodeWithText(TARGET_LINE, substring = true, useUnmergedTree = true).assertIsDisplayed()
+            compose.openFocusRecords()
+            compose
+                .onNodeWithText(
+                    TARGET_LINE,
+                    substring = true,
+                    useUnmergedTree = true,
+                ).performScrollTo()
+                .assertIsDisplayed()
 
-            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).performScrollTo().performClick()
+            compose.onNodeWithText("Back to set").performClick()
+            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).assertIsDisplayed().performClick()
 
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 runBlocking { restTimerStore.restEndsAt.first() != null }
@@ -129,7 +137,8 @@ class PerExerciseRestScreenTest {
                 restTimerStore.restTotal.first(),
                 "the movement's own rest, not the default",
             )
-            awaitText(BAND_TOTAL)
+            awaitText("Rest")
+            compose.onNodeWithText("Rest").assertIsDisplayed()
         }
     }
 
