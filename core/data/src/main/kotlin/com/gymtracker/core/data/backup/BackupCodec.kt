@@ -4,6 +4,7 @@ import com.gymtracker.core.data.session.WorkflowCodec
 import com.gymtracker.core.domain.backup.BackupContents
 import com.gymtracker.core.domain.backup.BackupDecoder
 import com.gymtracker.core.domain.backup.BackupEncoder
+import com.gymtracker.core.domain.backup.BackupMetadata
 import com.gymtracker.core.domain.backup.UnsupportedBackupFormatException
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
@@ -62,6 +63,11 @@ class BackupCodec
                     payload = contents.toDto(),
                 ),
             )
+
+        override fun metadata(raw: String): BackupMetadata {
+            val envelope = json.decodeFromString(BackupEnvelopeDto.serializer(), raw)
+            return BackupMetadata(Instant.ofEpochMilli(envelope.exportedAt), envelope.appVersion)
+        }
 
         override fun decode(raw: String): BackupContents {
             val envelope = json.decodeFromString(BackupEnvelopeDto.serializer(), raw)

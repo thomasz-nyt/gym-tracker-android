@@ -14,4 +14,7 @@ fun interface BackupDecoder {
      *   nothing was written, and let the member try a different file.
      */
     fun decode(raw: String): BackupContents
+
+    /** Optional envelope details, kept separate from the payload and its record equality. */
+    fun metadata(raw: String): BackupMetadata? = null
 }

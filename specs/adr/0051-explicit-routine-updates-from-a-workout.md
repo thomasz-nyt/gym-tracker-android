@@ -1,6 +1,6 @@
 # ADR-0051: Routine changes from a workout require an explicit save
 
-- **Status:** accepted — the user requested the capability and agreed timing, destination, and scope in Q26–Q28. Production implementation has not started; final review-wide alignment is a separate checkpoint.
+- **Status:** accepted — the user requested the capability and agreed timing, destination, and scope in Q26–Q28. Implementation authorized on 2026-10-29 through ADR-0052; the separate post-save operation is now being verified with domain, Room and physical-device tests.
 - **Date:** 2026-10-22
 - **Deciders:** maintainer (requested capability and selected the interaction), agent (documented boundary and alternatives)
 - **Relates to:** ADR-0020, ADR-0027, ADR-0028; [product review](../../docs/reviews/2026-10-22-product-ux-review.md), [alignment Q26–Q28](../../docs/reviews/2026-10-22-product-alignment.md)
@@ -39,4 +39,4 @@ The user accepted this interaction in Q26–Q28:
 - Use occurrence identity/order deliberately: the same catalog exercise can appear twice. Exact storage, baseline/diff strategy, schema, sync behavior, and acceptance tests belong to the implementation story after product alignment; none is silently selected here.
 - If the source routine is deleted or has changed since the workout began, do not blindly overwrite it. Preserve the workout and offer an appropriate reviewed fallback, such as Save as new.
 - A later Undo finish must not imply undoing a separately confirmed routine update. Re-finishing without further exercise-list changes should not repeatedly ask to save the same change. Verify these interactions in the story.
-- This decision adds no dependency, changes no constitution rule, and authorizes no production implementation.
+- This product decision added no dependency and changed no constitution rule. Production implementation was separately authorized on 2026-10-29 through ADR-0052.

@@ -29,8 +29,8 @@ history preservation, finite numeric validation, atomic Room set-index allocatio
 workflow migration, persisted selection/outcomes and bounded reopen rules, complete table graph
 validation, a private rolling recovery file, transactional restore checks/rollback, and reactive
 member and Progress reads. These are slices of the stories above; their unchecked acceptance
-criteria remain required. Routine template reuse and the remaining preparation/integration UI
-have not yet been implemented.
+criteria remain required. Routine template reuse is implemented in the checkpoint below; the remaining preparation
+and integration UI is still required.
 
 Meaningful red cases included delayed duplicate submission, concurrent append numbering,
 restore identity/scope and storage rollback, retained identity observers, incomplete planned
@@ -50,3 +50,38 @@ Gradle heap; no host configuration was changed.
 The first integrated full gate passed (`/tmp/rep-full-gates-3.log`): ktlintCheck, detekt, domain
 and Android unit tests, app lint and domain dependency verification. Native suite adaptation,
 screenshots and the unchecked story criteria remain in progress.
+
+## 2026-10-31 continuation
+
+Implemented and individually checked the explicit routine-reuse domain operation, atomic Room
+replacement/review marker, and post-save UI. Domain tests cover net structure, authored target
+preservation, Today only, changed-original fallback and failures; Room tests cover commit,
+conflict, rollback/outbox and a reopened-workout guard. The finish summary now shows actual
+sets and labels unfinished/unperformed work. The routine-review ViewModel guards duplicate
+pending saves.
+
+The connected Pixel 9a received the committed `981222a` build after a private full-data and APK
+backup. Its signing certificate and app UID matched; the snapshot was restored and checked
+byte-for-byte before launch. Schema 11→12 migrated successfully with integrity OK, every old
+column/value preserved, and DataStore preferences identical. Personal backup files and screenshots
+stay outside the repository. Broader redesign work remains in progress.
+
+Testing subsequently switched to the connected Pixel 8a. Seven focused native checks passed,
+including both explicit routine-save choices and the actual saved-workout summary. Native
+synthetic-fixture screenshots were retrieved and inspected; platform-window transitions were
+allowed to settle before recapture. See [the device checkpoint](2026-10-31-device/README.md).
+
+Remaining work includes: restore metadata/recovery-copy UI; preparation/catalog flows; actual
+Progress/selector, bodyweight, time-axis/week/date fixes; reopened-workout UI and atomic lifecycle
+boundaries; warm-up access, rest origin/notification completion, numeric edge cases and past-set
+Undo; optional integration recovery; missing states and adaptive layouts; full native suite
+adaptation to the shared-plan design, optional-features-off run, final screenshots and CI.
+
+The 2026-10-31 routine/Focus checkpoint passed all full local gates, including app lint and
+pure-domain dependency verification (`/tmp/rep-pixel8a-checkpoint-gates2.log`). Local unit result
+files total 1,074 tests, zero failures and errors. Ten focused native tests passed together on
+Pixel 8a (`/tmp/rep-pixel8a-direct-native.log`). The keyboard regression was also run against
+the old dialog and failed on actual native window bounds before passing with keyboard insets.
+The return-from-history test exposed retained scroll before page-specific scroll was applied.
+Six settled native screenshots are attached in the device review directory. Full native
+regression adaptation, optional-features-off and the story checklist remain open.

@@ -16,6 +16,7 @@ sealed interface ImportPreviewResult {
         val incomingRoutineCount: Int,
         val currentSessionCount: Int,
         val currentRoutineCount: Int,
+        val metadata: BackupMetadata? = null,
     ) : ImportPreviewResult
 
     data class Refused(
@@ -50,16 +51,19 @@ class PreviewBackupImport(
         // (IOException) and a bad parse (kotlinx.serialization's SerializationException, or
         // UnsupportedBackupFormatException) — are unrelated exception hierarchies, and every
         // one of them means the same thing to the member: this file cannot be imported.
-        return runCatching { decoder.decode(fileReader.read(source)) }
-            .fold(
-                onSuccess = { contents -> resolveAgainstLiveState(memberId, contents) },
-                onFailure = { ImportPreviewResult.Unreadable(it.message ?: "could not read this file") },
-            )
+        return runCatching {
+            val raw = fileReader.read(source)
+            decoder.decode(raw) to decoder.metadata(raw)
+        }.fold(
+            onSuccess = { (contents, metadata) -> resolveAgainstLiveState(memberId, contents, metadata) },
+            onFailure = { ImportPreviewResult.Unreadable(it.message ?: "could not read this file") },
+        )
     }
 
     private suspend fun resolveAgainstLiveState(
         memberId: UserId,
         contents: BackupContents,
+        metadata: BackupMetadata?,
     ): ImportPreviewResult {
         if (sessions.findActiveSession(memberId) != null) {
             return ImportPreviewResult.Refused(ImportRefusalReason.SessionActive)
@@ -70,6 +74,7 @@ class PreviewBackupImport(
                 val current = store.read(memberId)
                 ImportPreviewResult.Ready(
                     incoming = contents,
+                    metadata = metadata,
                     incomingSessionCount = contents.sessions.size,
                     incomingRoutineCount = contents.routines.size,
                     currentSessionCount = current.sessions.size,

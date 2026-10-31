@@ -138,6 +138,7 @@ fun LoggingRoute(
             ),
         modifier = modifier,
     )
+    (state.finish as? FinishFlow.Ready)?.let { RoutineReviewRoute(it.detail.summary.session.id) }
 }
 
 /** Set entry's actions, wired to the controller that serves them (ADR-0016's stepper sheet). */

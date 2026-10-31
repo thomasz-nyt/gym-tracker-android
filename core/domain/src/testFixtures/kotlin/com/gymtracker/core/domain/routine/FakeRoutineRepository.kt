@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.map
  *   Nothing in the domain deletes items explicitly, so a test that cares has to wire it, the
  *   same way [com.gymtracker.core.domain.session.FakeSessionRepository] does.
  */
-internal class FakeRoutineRepository(
+class FakeRoutineRepository(
     private val cascade: (RoutineId) -> Unit = {},
 ) : RoutineRepository {
     private val state = MutableStateFlow(emptyList<Routine>())
@@ -52,7 +52,7 @@ internal class FakeRoutineRepository(
 }
 
 /** The movements half of the fake pair; see [FakeRoutineRepository]. */
-internal class FakeRoutineItemRepository : RoutineItemRepository {
+class FakeRoutineItemRepository : RoutineItemRepository {
     private val state = MutableStateFlow(emptyList<RoutineItem>())
 
     val all: List<RoutineItem> get() = state.value
