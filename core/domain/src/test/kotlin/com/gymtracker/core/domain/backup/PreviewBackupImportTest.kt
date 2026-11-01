@@ -57,6 +57,22 @@ class PreviewBackupImportTest {
         )
 
     @Test
+    fun `a private recovery copy uses the same preview validation and original metadata`() =
+        runTest {
+            val metadata = BackupMetadata(Instant.EPOCH, "original-build")
+            val preview = preview(reader = BackupFileReader { error("private copy must not read an external file") })
+            val ready =
+                assertIs<ImportPreviewResult.Ready>(
+                    preview.previewContents(member, BackupSnapshot(incoming, metadata)),
+                )
+            assertEquals(incoming, ready.incoming)
+            assertEquals(metadata, ready.metadata)
+            assertIs<ImportPreviewResult.Refused>(
+                preview.previewContents(member, BackupSnapshot(incoming.copy(sessions = emptyList()), metadata)),
+            )
+        }
+
+    @Test
     fun `preview retains file creation time and build metadata without changing payload records`() =
         runTest {
             val metadata = BackupMetadata(Instant.parse("2026-10-20T12:00:00Z"), "0.1-test")

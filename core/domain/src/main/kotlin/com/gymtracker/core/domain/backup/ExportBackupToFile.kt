@@ -2,7 +2,6 @@ package com.gymtracker.core.domain.backup
 
 import com.gymtracker.core.domain.model.UserId
 import java.time.Clock
-import java.time.Instant
 
 /**
  * US-40, end to end: reads a member's data, encodes it, and writes it to a destination they
@@ -20,8 +19,16 @@ class ExportBackupToFile(
         memberId: UserId,
         destination: String,
     ) {
-        val contents = exportBackup(memberId)
-        val json = encoder.encode(contents, Instant.now(clock), appVersion.name())
+        writeSnapshot(BackupSnapshot(exportBackup(memberId)), destination)
+    }
+
+    /** Exports the chosen recovery copy, preserving its original age and build metadata. */
+    suspend fun writeSnapshot(
+        snapshot: BackupSnapshot,
+        destination: String,
+    ) {
+        val metadata = snapshot.metadata ?: BackupMetadata(clock.instant(), appVersion.name())
+        val json = encoder.encode(snapshot.contents, metadata.exportedAt, metadata.appVersion)
         fileWriter.write(destination, json)
     }
 }

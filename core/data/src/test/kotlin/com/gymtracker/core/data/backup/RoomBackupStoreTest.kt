@@ -198,6 +198,29 @@ class RoomBackupStoreTest {
         }
 
     @Test
+    fun `restore refuses to erase a different existing profile outside the safety copy`() =
+        runTest {
+            currentMember.restore(alice)
+            database.sessionDao().insert(session("alice-workout"))
+            database.sessionDao().insert(session("bob-workout", userId = bob))
+            val incoming =
+                BackupContents(
+                    bob,
+                    WeightUnit.KG,
+                    Duration.ofSeconds(90),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                    emptyList(),
+                )
+            assertFailsWith<IllegalStateException> { store.replaceAll(incoming) }
+            assertEquals(1, database.sessionDao().allForUser(alice.value).size)
+            assertEquals(1, database.sessionDao().allForUser(bob.value).size)
+            assertEquals(alice, currentMember.id())
+        }
+
+    @Test
     fun `a newly active workout is checked inside the replacement transaction`() =
         runTest {
             currentMember.restore(alice)
@@ -396,6 +419,7 @@ class RoomBackupStoreTest {
     @Test
     fun `replaceAll wipes what was there before, not just adds to it`() =
         runTest {
+            currentMember.restore(alice)
             database.exerciseDao().insertAll(listOf(seedExercise()))
             database.sessionDao().insert(session("old-session"))
             val empty =
@@ -418,6 +442,7 @@ class RoomBackupStoreTest {
     @Test
     fun `deleting a member's sessions and routines cascades their children`() =
         runTest {
+            currentMember.restore(alice)
             database.exerciseDao().insertAll(listOf(seedExercise()))
             database.sessionDao().insert(session("s1"))
             database.sessionExerciseDao().insert(sessionExercise("se1", sessionId = "s1"))

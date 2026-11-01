@@ -60,6 +60,12 @@ class PreviewBackupImport(
         )
     }
 
+    /** Validates a private recovery copy against the same live state as an external file. */
+    suspend fun previewContents(
+        memberId: UserId,
+        snapshot: BackupSnapshot,
+    ): ImportPreviewResult = resolveAgainstLiveState(memberId, snapshot.contents, snapshot.metadata)
+
     private suspend fun resolveAgainstLiveState(
         memberId: UserId,
         contents: BackupContents,

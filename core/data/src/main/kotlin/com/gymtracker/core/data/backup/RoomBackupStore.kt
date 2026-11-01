@@ -74,6 +74,13 @@ class RoomBackupStore
             try {
                 database.withTransaction {
                     check(database.sessionDao().findActive(previousMember.value) == null) { "A workout is running" }
+                    if (contents.memberId != previousMember) {
+                        val incomingOwner = contents.memberId.value
+                        check(
+                            database.sessionDao().allForUser(incomingOwner).isEmpty() &&
+                                database.routineDao().allForUser(incomingOwner).isEmpty(),
+                        ) { "The backup profile already has records outside the safety copy." }
+                    }
                     setOf(previousMember.value, contents.memberId.value).forEach { userId ->
                         database.sessionDao().deleteAllForUser(userId)
                         database.routineDao().deleteAllForUser(userId)

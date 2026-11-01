@@ -64,6 +64,7 @@ class OutboxEnqueueTest {
     private lateinit var sets: RoomSetRepository
     private lateinit var routines: RoomRoutineRepository
     private lateinit var routineItems: RoomRoutineItemRepository
+    private lateinit var currentMember: DataStoreCurrentMember
     private lateinit var backupStore: RoomBackupStore
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -90,12 +91,13 @@ class OutboxEnqueueTest {
             sets = RoomSetRepository(database.setDao(), database, codec)
             routines = RoomRoutineRepository(database.routineDao(), database, codec)
             routineItems = RoomRoutineItemRepository(database.routineItemDao(), database, codec)
+            currentMember = DataStoreCurrentMember(preferences("member.preferences_pb"))
             backupStore =
                 RoomBackupStore(
                     database = database,
                     unitPreference = DataStoreUnitPreference(preferences("unit.preferences_pb")),
                     restTimerStore = DataStoreRestTimerStore(preferences("rest.preferences_pb")),
-                    currentMember = DataStoreCurrentMember(preferences("member.preferences_pb")),
+                    currentMember = currentMember,
                     codec = codec,
                 )
         }
@@ -443,9 +445,10 @@ class OutboxEnqueueTest {
     @Test
     fun `replaceAll wiping a member's prior rows does not itself enqueue any delete`() =
         runTest {
+            currentMember.restore(alice)
             // The deliberately-unresolved question this story leaves open (see the M2 roadmap
             // entry and ADR-0043's amendment): deleteAllForUser stays exactly what it was.
-            sessions.startSession(session("old"))
+            sessions.startSession(session("old").copy(endedAt = now.plusSeconds(3600)))
             val beforeWipe = queueRows().size
 
             backupStore.replaceAll(

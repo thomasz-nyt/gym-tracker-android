@@ -108,3 +108,13 @@ Recovery primitives now report an unreadable safety file without mutating curren
 refuse a changed copy at confirmation, preserve the confirmed copy on recovery, and read original
 creation/build metadata with its records. Recovery/export UI and complete replacement-scope
 protection remain part of the unchecked US-66 work; this checkpoint does not claim them complete.
+
+## Restore scope checkpoint
+
+A restore now refuses inside the Room transaction if its incoming owner is a different profile
+that already has workouts or routines on the device. The rolling safety copy contains the current
+profile, so replacing that other profile would otherwise erase records outside the copy. A Room
+test reproduces that case and verifies both profiles and the current identity remain intact.
+Private-copy preview uses the normal validation, and exporting a snapshot preserves its original
+creation time and app version. These domain operations still need Settings controls, and the
+restore preview should surface the profile conflict before confirmation. US-66 remains open.

@@ -100,4 +100,23 @@ class ExportBackupToFileTest {
 
             assertFailsWith<IllegalStateException> { export(member, "content://fake/backup.json") }
         }
+
+    @Test
+    fun `exporting a safety snapshot retains its original records date and build`() =
+        runTest {
+            val encoder = FakeEncoder()
+            val writer = FakeFileWriter()
+            val export =
+                ExportBackupToFile(
+                    ExportBackup(FakeBackupStore(mapOf(member to contents.copy(unit = WeightUnit.LB)))),
+                    encoder,
+                    writer,
+                    AppVersion { "current-build" },
+                    clock,
+                )
+            val original = BackupMetadata(now.minusSeconds(86_400), "previous-build")
+            export.writeSnapshot(BackupSnapshot(contents, original), "content://safety-copy.json")
+            assertEquals(Triple(contents, original.exportedAt, "previous-build"), encoder.lastArgs)
+            assertEquals("content://safety-copy.json", writer.lastDestination)
+        }
 }
