@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 import com.gymtracker.core.data.session.SYNC_STATE_PENDING
 import com.gymtracker.core.data.session.SessionEntity
 import com.gymtracker.core.domain.model.ExerciseId
+import com.gymtracker.core.domain.model.MovementOutcome
 import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.SessionExercise
 import com.gymtracker.core.domain.model.SessionExerciseId
@@ -48,6 +49,8 @@ data class SessionExerciseEntity(
     @ColumnInfo(name = "target_reps") val targetReps: Int? = null,
     @ColumnInfo(name = "target_weight_kg") val targetWeightKg: Double? = null,
     @ColumnInfo(name = "target_rest_seconds") val targetRestSeconds: Int? = null,
+    @ColumnInfo(name = "outcome") val outcome: String? = null,
+    @ColumnInfo(name = "routine_item_id") val routineItemId: String? = null,
 )
 
 internal fun SessionExerciseEntity.toDomain(): SessionExercise =
@@ -57,6 +60,8 @@ internal fun SessionExerciseEntity.toDomain(): SessionExercise =
         exerciseId = ExerciseId(exerciseId),
         position = position,
         target = toTarget(targetSets, targetReps, targetWeightKg, targetRestSeconds),
+        outcome = outcome?.let(MovementOutcome::valueOf),
+        routineItemId = routineItemId,
     )
 
 internal fun SessionExercise.toEntity(updatedAt: Instant = Instant.now()): SessionExerciseEntity =
@@ -71,6 +76,8 @@ internal fun SessionExercise.toEntity(updatedAt: Instant = Instant.now()): Sessi
         targetReps = target?.reps,
         targetWeightKg = target?.weightKg,
         targetRestSeconds = target?.restSeconds,
+        outcome = outcome?.name,
+        routineItemId = routineItemId,
     )
 
 /**

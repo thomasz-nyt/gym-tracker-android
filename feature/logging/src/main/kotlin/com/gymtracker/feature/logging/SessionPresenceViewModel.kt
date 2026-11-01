@@ -9,7 +9,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -33,7 +32,8 @@ class SessionPresenceViewModel
     ) : ViewModel() {
         @OptIn(ExperimentalCoroutinesApi::class)
         val hasActiveSession: StateFlow<Boolean> =
-            flow { emit(currentMember.id()) }
+            currentMember
+                .observe()
                 .flatMapLatest { sessions.observeActiveSession(it) }
                 .map { it != null }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), false)

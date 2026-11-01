@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.util.Locale
 import javax.inject.Inject
@@ -73,7 +73,7 @@ data class ExerciseProgressUiState(
     val isLoading: Boolean = true,
     val exerciseName: String = "",
     val trend: ExerciseTrend = ExerciseTrend.NoData,
-    val series: TrendSeries = TrendSeries.ESTIMATED_ONE_REP_MAX,
+    val series: TrendSeries = TrendSeries.TOP_SET,
     val unit: WeightUnit = WeightUnit.LB,
     /** US-34: what was actually done, newest first. Empty when [trend] is [ExerciseTrend.NoData]. */
     val log: List<ExerciseLogEntry> = emptyList(),
@@ -102,27 +102,26 @@ class ExerciseProgressViewModel
         unitPreference: UnitPreference,
     ) : ViewModel() {
         private val charting = MutableStateFlow<ExerciseId?>(null)
-        private val chosenSeries = MutableStateFlow(TrendSeries.ESTIMATED_ONE_REP_MAX)
+        private val chosenSeries = MutableStateFlow(TrendSeries.TOP_SET)
 
         @OptIn(ExperimentalCoroutinesApi::class)
         private val loaded: Flow<Loaded> =
             charting.filterNotNull().flatMapLatest { exerciseId ->
-                flow {
-                    val member = currentMember.id()
-                    val name =
-                        catalog
-                            .observeRanked(member)
-                            .first()
-                            .firstOrNull { it.id == exerciseId }
-                            ?.name
-                    emit(
+                currentMember.observe().flatMapLatest { member ->
+                    exerciseTrendOf.observe(exerciseId, member).map { trend ->
+                        val name =
+                            catalog
+                                .observeRanked(member)
+                                .first()
+                                .firstOrNull { it.id == exerciseId }
+                                ?.name
                         Loaded(
                             name = name ?: exerciseId.value,
-                            trend = exerciseTrendOf(exerciseId, member),
+                            trend = trend,
                             log = exerciseLogOf(exerciseId, member),
                             records = personalRecordsOf(exerciseId, member),
-                        ),
-                    )
+                        )
+                    }
                 }
             }
 

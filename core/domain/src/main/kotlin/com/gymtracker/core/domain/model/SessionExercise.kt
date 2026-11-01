@@ -22,4 +22,6 @@ data class SessionExercise(
     val exerciseId: ExerciseId,
     val position: Int,
     val target: MovementTarget? = null,
+    val outcome: MovementOutcome? = null,
+    val routineItemId: String? = null,
 )

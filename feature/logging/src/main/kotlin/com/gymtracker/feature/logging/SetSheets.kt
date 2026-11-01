@@ -15,8 +15,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import com.gymtracker.core.designsystem.component.PrimaryActionButton
@@ -75,7 +80,12 @@ internal fun SetEntrySheet(
         // is already right, this is the second of the two taps (US-03) and nothing may come
         // between the thumb and it.
         PrimaryActionButton(
-            text = "Save set",
+            text =
+                when {
+                    entry.isSaving -> "Saving…"
+                    entry.bulk -> "Save ${entry.sets} ${if (entry.sets == "1") "set" else "sets"}"
+                    else -> "Save set"
+                },
             onClick = callbacks.onConfirm,
             // The same predicate SetEntryController.confirm() checks before writing anything —
             // see SetEntry.canSave's doc. Reps/sets alone used to gate this button, so an
@@ -172,6 +182,7 @@ private fun SetEditFields(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(GymDimens.Gap)) {
         Text(edit.exerciseName, style = MaterialTheme.typography.titleLarge)
         Text("Set ${edit.set.setIndex}", style = MaterialTheme.typography.bodyMedium)
+        edit.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         StepperField(
             label = "Weight (${unit.name.lowercase()})",
@@ -179,7 +190,14 @@ private fun SetEditFields(
             onValueChange = callbacks.onWeightChanged,
             onStep = callbacks.onWeightStepped,
             placeholder = "Bodyweight",
-            supporting = edit.weight.otherUnit(unit),
+            supporting =
+                if (edit.weight.isValidLoad()) {
+                    edit.weight.otherUnit(
+                        unit,
+                    )
+                } else {
+                    "Enter a finite load, 0 or more."
+                },
             keyboardType = KeyboardType.Decimal,
         )
 
@@ -242,7 +260,14 @@ private fun SetEntryFields(
             onStep = callbacks.onWeightStepped,
             placeholder = "Bodyweight",
             // The other unit, live, so nobody converts in their head between sets (ADR-0008).
-            supporting = entry.weight.otherUnit(unit),
+            supporting =
+                if (entry.weight.isValidLoad()) {
+                    entry.weight.otherUnit(
+                        unit,
+                    )
+                } else {
+                    "Enter a finite load, 0 or more."
+                },
             keyboardType = KeyboardType.Decimal,
         )
 
@@ -253,13 +278,17 @@ private fun SetEntryFields(
             onStep = callbacks.onRepsStepped,
         )
 
-        StepperField(
-            label = "Sets",
-            value = entry.sets,
-            onValueChange = callbacks.onSetsChanged,
-            onStep = callbacks.onSetsStepped,
-            supporting = "Records this many identical sets.",
-        )
+        TextButton(onClick = callbacks.onToggleBulk) { Text(if (entry.bulk) "Log one set instead" else "Bulk entry") }
+        if (entry.bulk) {
+            StepperField(
+                label = "Sets",
+                value = entry.sets,
+                onValueChange = callbacks.onSetsChanged,
+                onStep = callbacks.onSetsStepped,
+                supporting = "Records this many identical actual sets now. Use only for sets already performed.",
+            )
+        }
+        entry.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         RpeChips(selected = entry.rpe, onSelected = callbacks.onRpeChanged)
     }
@@ -288,6 +317,7 @@ private fun RpeChips(
     selected: String,
     onSelected: (String) -> Unit,
 ) {
+    var help by remember { mutableStateOf(false) }
     val selectedValue = selected.trim().toDoubleOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap)) {
         Text(
@@ -295,6 +325,13 @@ private fun RpeChips(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        TextButton(onClick = { help = !help }) { Text(if (help) "Hide RPE help" else "What is RPE?") }
+        if (help) {
+            Text(
+                "RPE means how hard this set felt. 10 means no more reps were possible; " +
+                    "9 means about one more, 8 about two more. Leave it blank if unsure.",
+            )
+        }
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(GymDimens.TightGap),
             verticalArrangement = Arrangement.spacedBy(GymDimens.HairGap),
@@ -330,6 +367,7 @@ internal data class SetEntryCallbacks(
     val onRpeChanged: (String) -> Unit,
     val onConfirm: () -> Unit,
     val onDismiss: () -> Unit,
+    val onToggleBulk: () -> Unit = {},
 ) {
     companion object {
         /** For previews and for callers that only render the session behind the sheet. */
@@ -342,6 +380,7 @@ internal data class SetEntryCallbacks(
 private fun String.otherUnit(unit: WeightUnit): String? =
     trim()
         .toDoubleOrNull()
+        ?.takeIf { it.isFinite() && it >= 0.0 }
         ?.let { typed -> WeightFormatter.format(UnitConverter.toKilograms(typed, unit), unit).secondary }
 
 /** "100 lb × 8", or "8 reps" for a bodyweight prefill — the sheet's own provenance line (US-37). */

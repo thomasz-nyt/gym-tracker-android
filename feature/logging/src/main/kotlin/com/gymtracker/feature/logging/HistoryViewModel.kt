@@ -22,12 +22,12 @@ import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.UpdateSet
 import com.gymtracker.core.domain.units.WeightUnit
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Everything the history and workout-detail destinations render (ADR-0024). */
@@ -112,7 +112,8 @@ class HistoryViewModel
          * history, unrelated to what makes a row's own fields load, and there is no reason to
          * recompute it every time a delete or an undo touches [history]'s state.
          */
-        private val recordSessions = MutableStateFlow<Set<SessionId>>(emptySet())
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val recordSessions = currentMember.observe().flatMapLatest { sessionsWithRecords.observe(it) }
 
         val uiState: StateFlow<HistoryUiState> =
             combine(
@@ -138,7 +139,6 @@ class HistoryViewModel
         /** Starts loading the list (US-06), and which of it is badged (US-38). */
         fun open() {
             history.open()
-            viewModelScope.launch { recordSessions.value = sessionsWithRecords(currentMember.id()) }
         }
 
         /** Leaves the list. Not needed for navigating away — see the class doc — kept for parity. */

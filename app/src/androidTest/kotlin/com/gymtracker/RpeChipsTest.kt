@@ -161,31 +161,21 @@ class RpeChipsTest {
             }
             assertEquals(8.5, todaysRpe(), "one tap recorded it")
 
-            // Resting now (ADR-0029): the comparison line carries last week's effort beside its
-            // load and reps — the number to beat, with how hard it was.
-            //
-            // `assertExists`, not `assertIsDisplayed`: on CI's 320×640 emulator this node is
-            // composed with the right text and then sits below the fold, and the rest panel is
-            // deliberately *not* scrollable — ADR-0029 and ADR-0047 draw resting as an exclusive
-            // full-screen mode — so there is no ancestor to scroll it into view with. What US-60
-            // claims is that the effort reaches the comparison line, which is what this asserts.
-            // That the line itself clips on a very short screen is a real layout finding and a
-            // separate one: it predates this story, since the line was already there before an
-            // `@8` was appended to it. Filed rather than papered over.
+            compose.openFocusRecords()
+            // Actual effort remains readable on demand while the same rest keeps running.
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 compose
-                    .onAllNodesWithText(LAST_WEEK_READ_BACK, substring = true)
+                    .onAllNodesWithText(LAST_WEEK_READ_BACK)
                     .fetchSemanticsNodes()
                     .isNotEmpty()
             }
-            compose.onNodeWithText(LAST_WEEK_READ_BACK, substring = true).assertExists()
+            compose.onNodeWithText(LAST_WEEK_READ_BACK).performScrollTo().assertIsDisplayed()
 
             // Back on the set list, the row reads it back too.
-            compose.onNodeWithText(SKIP_REST).performClick()
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-                compose.onAllNodesWithText(CHOSEN_READ_BACK).fetchSemanticsNodes().isNotEmpty()
+                compose.onAllNodesWithText(CHOSEN_READ_BACK, substring = true).fetchSemanticsNodes().isNotEmpty()
             }
-            compose.onNodeWithText(CHOSEN_READ_BACK).assertIsDisplayed()
+            compose.onNodeWithText(CHOSEN_READ_BACK, substring = true).performScrollTo().assertIsDisplayed()
         }
     }
 
@@ -195,6 +185,7 @@ class RpeChipsTest {
             // A set already logged today, with no effort recorded — seeded rather than tapped, the
             // same way `CorrectingASetTest` builds its fixture.
             sets.add(ExerciseSet(TODAY_SET, TODAY, 1, 61.23, 8, null, Instant.now()))
+            compose.openFocusRecords()
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 compose.onAllNodesWithContentDescription(EDIT_SET_1).fetchSemanticsNodes().isNotEmpty()
             }
@@ -208,7 +199,7 @@ class RpeChipsTest {
                 runBlocking { todaysRpe() == 9.0 }
             }
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-                compose.onAllNodesWithText(CORRECTED_READ_BACK).fetchSemanticsNodes().isNotEmpty()
+                compose.onAllNodesWithText(CORRECTED_READ_BACK, substring = true).fetchSemanticsNodes().isNotEmpty()
             }
 
             // Tapping the selected chip again clears it: not recorded, not "easy" (constitution §2.4).
@@ -222,9 +213,9 @@ class RpeChipsTest {
             }
             assertNull(todaysRpe(), "a second tap clears it")
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-                compose.onAllNodesWithText(CORRECTED_READ_BACK).fetchSemanticsNodes().isEmpty()
+                compose.onAllNodesWithText(CORRECTED_READ_BACK, substring = true).fetchSemanticsNodes().isEmpty()
             }
-            compose.onAllNodesWithText(CORRECTED_READ_BACK).assertCountEquals(0)
+            compose.onAllNodesWithText(CORRECTED_READ_BACK, substring = true).assertCountEquals(0)
         }
     }
 
@@ -274,7 +265,7 @@ class RpeChipsTest {
     private companion object {
         const val READY_TIMEOUT_MILLIS = 10_000L
         const val EXERCISE = "Bench Dips"
-        const val ADD_SET = "Add set"
+        const val ADD_SET = "Adjust this set"
         const val SAVE_SET = "Save set"
         const val SAVE_CHANGES = "Save changes"
         const val SKIP_REST = "SKIP REST"
@@ -283,7 +274,7 @@ class RpeChipsTest {
         const val LAST_WEEK_RPE = 8.0
 
         /** The tail of the rest panel's comparison line: load, reps and last week's effort. */
-        const val LAST_WEEK_READ_BACK = "× 8  @8"
+        const val LAST_WEEK_READ_BACK = "Set 1 · 135 lb × 8 @8"
         const val CHOSEN_RPE = "@8.5"
         const val CHOSEN_READ_BACK = "@8.5"
         const val CORRECTED_RPE = "@9"

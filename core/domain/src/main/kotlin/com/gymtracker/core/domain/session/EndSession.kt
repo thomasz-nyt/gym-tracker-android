@@ -3,6 +3,7 @@ package com.gymtracker.core.domain.session
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.rest.RestTimerStore
 import com.gymtracker.core.domain.set.SetRepository
+import kotlinx.coroutines.flow.first
 import java.time.Clock
 import java.time.Instant
 
@@ -49,7 +50,22 @@ class EndSession(
             return EndSessionResult.Discarded
         }
 
-        val endedAt = clock.instant()
+        val session = sessions.findSession(id)
+        val reopened = session?.workflow?.reopened
+        val actualIds =
+            sets
+                .observeForSessions(listOf(id))
+                .first()
+                .map { it.id }
+                .toSet()
+        val endedAt =
+            if (reopened != null &&
+                (actualIds - reopened.setIds).isEmpty()
+            ) {
+                reopened.endedAt
+            } else {
+                clock.instant()
+            }
         sessions.endSession(id, endedAt)
         return EndSessionResult.Ended(endedAt)
     }

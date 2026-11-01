@@ -16,10 +16,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.Clock
-import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -99,11 +98,14 @@ class WeeklyVolumeViewModel
         private val loaded: Flow<List<VolumeWeek>> =
             opened.filter { it }.flatMapLatest {
                 chosenRange.flatMapLatest { range ->
-                    flow {
-                        // Today in the member's zone, not UTC: which week a late Sunday session
-                        // falls in is the same question `WeeklyVolumeByBodyPart` documents.
+                    currentMember.observe().flatMapLatest { member ->
                         val today = clock.instant().atZone(zone).toLocalDate()
-                        emit(volumeSince(today, range))
+                        val monday =
+                            today.with(
+                                java.time.temporal.TemporalAdjusters
+                                    .previousOrSame(java.time.DayOfWeek.MONDAY),
+                            )
+                        weeklyVolume.observe(member, monday.minusWeeks(range.weeks - 1L), today).map { it.reversed() }
                     }
                 }
             }
@@ -122,17 +124,6 @@ class WeeklyVolumeViewModel
         fun onRangeChanged(range: VolumeRange) {
             chosenRange.value = range
         }
-
-        /** Most recent week first — [WeeklyVolumeByBodyPart] returns them oldest first. */
-        private suspend fun volumeSince(
-            today: LocalDate,
-            range: VolumeRange,
-        ): List<VolumeWeek> =
-            weeklyVolume(
-                member = currentMember.id(),
-                from = today.minusWeeks(range.weeks - 1L),
-                to = today,
-            ).reversed()
 
         private companion object {
             const val STOP_TIMEOUT_MILLIS = 5_000L

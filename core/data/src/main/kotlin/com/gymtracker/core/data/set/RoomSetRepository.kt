@@ -65,6 +65,13 @@ class RoomSetRepository
             }
         }
 
+        override suspend fun append(set: ExerciseSet): ExerciseSet =
+            database.withTransaction {
+                val indexed = set.copy(setIndex = dao.maxSetIndex(set.sessionExerciseId.value) + 1)
+                add(indexed)
+                indexed
+            }
+
         override suspend fun update(set: ExerciseSet) {
             val entity = set.toEntity()
             val payload = codec.encode(entity)

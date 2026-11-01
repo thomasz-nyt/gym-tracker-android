@@ -57,7 +57,8 @@ data class WorkoutSession(
     val startedAt: Instant,
     val endedAt: Instant?,
     val metrics: SessionMetrics?, // null unless a health source provided them
-    val routine: RoutineOrigin?,  // schema v9, US-32, ADR-0028 — see the note below the Room schema
+    val routine: RoutineOrigin?,  // schema v9, US-32, ADR-0028
+    val workflow: WorkoutWorkflow = WorkoutWorkflow(), // schema v12, US-63/65, ADR-0052
 )
 
 /** All fields nullable. Absence is a first-class state, never zero. */
@@ -97,7 +98,9 @@ data class SessionExercise(
     val sessionId: SessionId,
     val exerciseId: ExerciseId,
     val position: Int,            // 1-based order within the session
-    val target: MovementTarget?,  // schema v8, US-30, ADR-0027 — copied from RoutineItem at start
+    val target: MovementTarget?,  // copied authored target
+    val outcome: MovementOutcome? = null, // DONE | ENDED_EARLY | SKIPPED; separate from actual sets
+    val routineItemId: String? = null, // source occurrence snapshot, not a live foreign key
 )
 
 data class ExerciseSet(
@@ -174,12 +177,12 @@ exercises(id PK, name, aliases_json, primary_json, secondary_json, equipment,
 sessions(id PK, user_id, gym_name, started_at, ended_at,
          avg_hr, max_hr, active_kcal, metrics_source,
          updated_at, sync_state,
-         routine_name NULL, routine_id NULL)
+         routine_name NULL, routine_id NULL, workflow_json NULL)
 
 session_exercises(id PK, session_id FK→sessions ON DELETE CASCADE,
                   exercise_id, position,
                   target_sets NULL, target_reps NULL, target_weight_kg NULL,
-                  target_rest_seconds NULL,
+                  target_rest_seconds NULL, outcome NULL, routine_item_id NULL,
                   updated_at, sync_state)
 
 sets(id PK, session_exercise_id FK→session_exercises ON DELETE CASCADE,
@@ -246,6 +249,18 @@ routine carries neither, and renders as "Freestyle."
 
 Index: `routine_items(routine_id, position)` for reading a routine in order, and
 `routines(user_id, position)` for the member's list.
+
+**Workout workflow (v12, ADR-0052 / US-63,65):** `workflow_json` is nullable TEXT containing
+only explicit workflow decisions: selected occurrence; original authored routine-item snapshot;
+handled structural-review signature; structural-edit/reopen eligibility; and a reopen snapshot
+of original finish time and actual-set identities. Default/legacy null decodes to an empty
+workflow. `outcome` records an explicit terminal choice; Plan met is derived from actual set
+count and never stored as performed data. `routine_item_id` identifies an authored occurrence
+for reviewed reuse. Both baseline and source identity remain meaningful after a routine is
+edited/deleted, so neither is a live foreign key. Migration 11→12 only adds nullable columns;
+existing sessions, targets and actual sets are retained. Backup format 1 carries optional
+workflow/outcome fields while older files continue to decode. Sync outbox payloads retain this
+metadata for the future M2 transport; this review does not enable remote synchronization.
 
 Indexes: `session_exercises(exercise_id)` and
 `sets(session_exercise_id, performed_at DESC)` — together these back the prefill

@@ -35,7 +35,7 @@ import com.gymtracker.core.data.sync.SyncQueueEntity
         RoutineItemEntity::class,
         SyncQueueEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class GymTrackerDatabase : RoomDatabase() {
@@ -69,6 +69,7 @@ abstract class GymTrackerDatabase : RoomDatabase() {
         private const val V9_ROUTINE_ORIGIN = 9
         private const val V10_SYNC_QUEUE = 10
         private const val V11_TARGET_REST = 11
+        private const val V12_WORKFLOW = 12
 
         /**
          * Adds the catalog table (US-02). Purely additive — `sessions` is untouched, so a
@@ -338,6 +339,16 @@ abstract class GymTrackerDatabase : RoomDatabase() {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE `routine_items` ADD COLUMN `target_rest_seconds` INTEGER")
                     db.execSQL("ALTER TABLE `session_exercises` ADD COLUMN `target_rest_seconds` INTEGER")
+                }
+            }
+
+        /** US-63/65: additive workflow state; no existing actual record or target is rewritten. */
+        val MIGRATION_11_12 =
+            object : Migration(V11_TARGET_REST, V12_WORKFLOW) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE sessions ADD COLUMN workflow_json TEXT")
+                    db.execSQL("ALTER TABLE session_exercises ADD COLUMN outcome TEXT")
+                    db.execSQL("ALTER TABLE session_exercises ADD COLUMN routine_item_id TEXT")
                 }
             }
     }

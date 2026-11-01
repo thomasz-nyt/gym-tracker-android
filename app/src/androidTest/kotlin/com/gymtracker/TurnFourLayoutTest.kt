@@ -185,7 +185,14 @@ class TurnFourLayoutTest {
             // returns setNumber = alreadyLogged(0) + 1 = 2 for the one still to come after it.
             sessions.deleteSession(LAST_WEEK)
             sessions.startSession(
-                WorkoutSession(LAST_WEEK, member, null, now.minus(Duration.ofDays(7)), null, null),
+                WorkoutSession(
+                    LAST_WEEK,
+                    member,
+                    null,
+                    now.minus(Duration.ofDays(7)),
+                    now.minus(Duration.ofDays(7)).plusSeconds(3600),
+                    null,
+                ),
             )
             val lastWeekAppearance = SessionExerciseId("se-turn4-layout-last-week")
             sessionExercises.add(SessionExercise(lastWeekAppearance, LAST_WEEK, exercise.id, 1))
@@ -246,11 +253,11 @@ class TurnFourLayoutTest {
         }
     }
 
-    private fun addSetButton() = compose.onNodeWithText("Add set", useUnmergedTree = true)
+    private fun addSetButton() = compose.onNodeWithText("Adjust this set", useUnmergedTree = true)
 
     private fun awaitReadyToLogASet() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText("Add set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Adjust this set", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
     }
 

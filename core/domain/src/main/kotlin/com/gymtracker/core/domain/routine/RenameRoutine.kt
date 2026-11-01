@@ -10,6 +10,6 @@ class RenameRoutine(
         id: RoutineId,
         name: String,
     ) {
-        routines.rename(id, name)
+        if (name.isNotBlank()) routines.rename(id, name.trim())
     }
 }

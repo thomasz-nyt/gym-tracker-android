@@ -47,6 +47,14 @@ class RoomSessionExerciseRepository
             }
         }
 
+        override suspend fun update(sessionExercise: SessionExercise) {
+            val entity = sessionExercise.toEntity()
+            database.withTransaction {
+                dao.update(entity)
+                syncQueue.insert(syncWriteEntry(SyncEntityNames.SESSION_EXERCISES, entity.id, codec.encode(entity)))
+            }
+        }
+
         override suspend fun remove(id: SessionExerciseId) {
             database.withTransaction {
                 if (dao.delete(id.value) > 0) {

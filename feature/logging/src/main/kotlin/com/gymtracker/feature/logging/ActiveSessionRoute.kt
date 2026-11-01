@@ -4,9 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -28,6 +28,7 @@ import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.feature.logging.session.RestAlertsRationaleDialog
 import com.gymtracker.feature.logging.session.SessionBody
 import com.gymtracker.feature.logging.session.SessionDialogs
+import com.gymtracker.feature.logging.session.WarmUpStep
 import kotlinx.coroutines.launch
 import java.time.Duration
 
@@ -105,10 +106,13 @@ fun LoggingRoute(
         onFinishWorkout = viewModel.finish::confirm,
         onFinishSummaryDismissed = viewModel.finish::dismiss,
         onResolveStale = viewModel::onResolveStale,
+        onContinueStale = viewModel.onContinueStale,
         onAddSet = viewModel.setEntry::open,
         onRemoveExercise = viewModel.removal::remove,
         onUndoRemoval = viewModel.removal::undo,
-        onSelectExercise = viewModel.selection::select,
+        onSelectExercise = viewModel.workout::select,
+        onMovementOutcome = viewModel.workout::outcome,
+        onMoveExercise = viewModel.workout::move,
         guided = viewModel.guidedActions(),
         onSkipRest = viewModel.rest::skip,
         onExtendRest = viewModel.rest::extend,
@@ -122,6 +126,7 @@ fun LoggingRoute(
         onUndoSetDelete = viewModel.setEdit::undo,
         onLogNextSet = viewModel::onLogNextSet,
         onUndoOneTapLog = viewModel.oneTap::undo,
+        onDismissActionError = viewModel.oneTap::dismissError,
         onAddExercise = onAddExercise,
         nextRoutine = nextRoutine,
         onStartFromRoutine = viewModel::onStartFromRoutine,
@@ -135,6 +140,7 @@ fun LoggingRoute(
             ),
         modifier = modifier,
     )
+    (state.finish as? FinishFlow.Ready)?.let { RoutineReviewRoute(it.detail.summary.session.id) }
 }
 
 /** Set entry's actions, wired to the controller that serves them (ADR-0016's stepper sheet). */
@@ -148,6 +154,7 @@ private fun ActiveSessionViewModel.setEntryCallbacks() =
         onSetsStepped = setEntry::stepSets,
         onRpeChanged = { setEntry.change(rpe = it) },
         onConfirm = setEntry::confirm,
+        onToggleBulk = setEntry::toggleBulk,
         onDismiss = setEntry::dismiss,
     )
 
@@ -224,8 +231,8 @@ data class GuidedActions(
  * The warm-up, and the two things it can be asked to do (US-28, ADR-0021).
  *
  * A record for the same reason [GuidedActions] is one, and it carries its own state rather
- * than reading it off [SessionUiState] — because a warm-up is not part of the session. It has
- * no row, adds nothing to the duration, and never reaches history, and it comes from
+ * than reading it off [SessionUiState] — because the stopwatch has no performed-set row. The visit duration includes
+ * warm-up and rest (ADR-0052), while the stopwatch itself is not a logged activity. It comes from
  * [WarmUpViewModel] rather than from the session's own state to keep that true structurally.
  *
  * [elapsed] is null when no warm-up is running, and [Duration.ZERO] for one that has just
@@ -242,12 +249,15 @@ internal fun LoggingScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
     onResolveStale: (StaleSessionPrompt) -> Unit,
+    onContinueStale: () -> Unit = {},
     onFinishWorkout: () -> Unit = {},
     onFinishSummaryDismissed: () -> Unit = {},
     onAddSet: (SessionExerciseRow) -> Unit = {},
     onRemoveExercise: (SessionExerciseId) -> Unit = {},
     onUndoRemoval: () -> Unit = {},
     onSelectExercise: (SessionExerciseId) -> Unit = {},
+    onMovementOutcome: (SessionExerciseRow, com.gymtracker.core.domain.model.MovementOutcome?) -> Unit = { _, _ -> },
+    onMoveExercise: (SessionExerciseId, Int) -> Unit = { _, _ -> },
     guided: GuidedActions = GuidedActions(),
     onSkipRest: () -> Unit = {},
     onExtendRest: () -> Unit = {},
@@ -259,6 +269,7 @@ internal fun LoggingScreen(
     onUndoSetDelete: () -> Unit = {},
     onLogNextSet: (UpNextSet) -> Unit = {},
     onUndoOneTapLog: () -> Unit = {},
+    onDismissActionError: () -> Unit = {},
     onAddExercise: () -> Unit = {},
     nextRoutine: Routine? = null,
     onStartFromRoutine: (RoutineId) -> Unit = {},
@@ -267,69 +278,77 @@ internal fun LoggingScreen(
     warmUp: WarmUp = WarmUp(),
     modifier: Modifier = Modifier,
 ) {
-    val running = state.guided.running
-
-    // Which full-screen thing is showing. History and the workout detail are navigation
-    // destinations of their own now (ADR-0024); only the guided flow and the finish summary
-    // (US-31) are still selected by state here, deliberately, for the reason ADR-0017 gives.
-    if (running != null) {
-        // A lens over the already-logged rows, so leaving it loses nothing (US-05a).
-        GuidedRoute(running = running, state = state, guided = guided, modifier = modifier)
-    } else {
-        SessionScreen(
-            state = state,
-            onStartWorkout = onStartWorkout,
-            onResolveStale = onResolveStale,
-            onFinishWorkout = onFinishWorkout,
-            onFinishSummaryDismissed = onFinishSummaryDismissed,
-            onAddSet = onAddSet,
-            onRemoveExercise = onRemoveExercise,
-            onUndoRemoval = onUndoRemoval,
-            onSelectExercise = onSelectExercise,
-            guided = guided,
-            onSkipRest = onSkipRest,
-            onExtendRest = onExtendRest,
-            onOpenHistory = onOpenHistory,
-            onBrowseCatalog = onBrowseCatalog,
-            setEntry = setEntry,
-            onEditSet = onEditSet,
-            setEdit = setEdit,
-            onUndoSetDelete = onUndoSetDelete,
-            onLogNextSet = onLogNextSet,
-            onUndoOneTapLog = onUndoOneTapLog,
-            onAddExercise = onAddExercise,
-            nextRoutine = nextRoutine,
-            onStartFromRoutine = onStartFromRoutine,
-            onOpenRoutines = onOpenRoutines,
-            onOpenSettings = onOpenSettings,
-            warmUp = warmUp,
-            modifier = modifier,
+    SessionDialogs(state, onResolveStale, guided, setEntry, setEdit, onContinueStale)
+    if (state.activeSession != null && state.finish == null) {
+        ActiveWorkoutContent(
+            state,
+            warmUp,
+            FocusActions(
+                onLogSet = onLogNextSet,
+                onAdjust = onAddSet,
+                onSelect = onSelectExercise,
+                onEdit = onEditSet,
+                onRemove = onRemoveExercise,
+                onOutcome = onMovementOutcome,
+                onMove = onMoveExercise,
+                onAddExercise = onAddExercise,
+                onSkipRest = onSkipRest,
+                onExtendRest = onExtendRest,
+                onUndoLog = onUndoOneTapLog,
+                onUndoDelete = onUndoSetDelete,
+                onUndoRemoval = onUndoRemoval,
+                onSettings = onOpenSettings,
+                onFinish = onFinishWorkout,
+                onDismissError = onDismissActionError,
+            ),
+            modifier,
         )
+        return
     }
-}
-
-/** The guided flow's own screen (US-05a), kept behind the same `BackHandler` its stop button offers. */
-@Composable
-private fun GuidedRoute(
-    running: GuidedRunning,
-    state: SessionUiState,
-    guided: GuidedActions,
-    modifier: Modifier = Modifier,
-) {
-    BackHandler(onBack = guided.onStop)
-    GuidedExerciseScreen(
-        running = running,
-        unit = state.unit,
-        restRemaining = state.restRemaining,
-        onWeightChanged = guided.onWeightChanged,
-        onWeightStepped = guided.onWeightStepped,
-        onRepsChanged = guided.onRepsChanged,
-        onRepsStepped = guided.onRepsStepped,
-        onFinishSet = guided.onFinishSet,
-        onStartNext = guided.onStartNext,
-        onStop = guided.onStop,
+    SessionScreen(
+        state = state,
+        onStartWorkout = onStartWorkout,
+        onFinishWorkout = onFinishWorkout,
+        onFinishSummaryDismissed = onFinishSummaryDismissed,
+        onAddSet = onAddSet,
+        onRemoveExercise = onRemoveExercise,
+        onUndoRemoval = onUndoRemoval,
+        onSelectExercise = onSelectExercise,
+        guided = guided,
+        onSkipRest = onSkipRest,
+        onExtendRest = onExtendRest,
+        onOpenHistory = onOpenHistory,
+        onBrowseCatalog = onBrowseCatalog,
+        onEditSet = onEditSet,
+        onUndoSetDelete = onUndoSetDelete,
+        onLogNextSet = onLogNextSet,
+        onUndoOneTapLog = onUndoOneTapLog,
+        onAddExercise = onAddExercise,
+        nextRoutine = nextRoutine,
+        onStartFromRoutine = onStartFromRoutine,
+        onOpenRoutines = onOpenRoutines,
+        onOpenSettings = onOpenSettings,
+        warmUp = warmUp,
         modifier = modifier,
     )
+}
+
+/** Warm-up and current-set Focus are two views of this same active visit. */
+@Composable
+private fun ActiveWorkoutContent(
+    state: SessionUiState,
+    warmUp: WarmUp,
+    actions: FocusActions,
+    modifier: Modifier,
+) {
+    if (warmUp.elapsed != null) {
+        Box(modifier) {
+            val selected = state.exercises.firstOrNull { it.sessionExercise.id == state.openSessionExerciseId }
+            WarmUpStep(warmUp, selected?.exercise?.name)
+        }
+    } else {
+        FocusWorkoutScreen(state, actions.copy(onStartWarmUp = warmUp.onStart), modifier)
+    }
 }
 
 /** The session itself: the body, and the two dialogs that can sit over it. */
@@ -337,7 +356,6 @@ private fun GuidedRoute(
 private fun SessionScreen(
     state: SessionUiState,
     onStartWorkout: () -> Unit,
-    onResolveStale: (StaleSessionPrompt) -> Unit,
     onFinishWorkout: () -> Unit,
     onFinishSummaryDismissed: () -> Unit,
     onAddSet: (SessionExerciseRow) -> Unit,
@@ -349,9 +367,7 @@ private fun SessionScreen(
     onExtendRest: () -> Unit,
     onOpenHistory: () -> Unit,
     onBrowseCatalog: () -> Unit,
-    setEntry: SetEntryCallbacks,
     onEditSet: (SessionExerciseRow, ExerciseSet) -> Unit,
-    setEdit: SetEditCallbacks,
     onUndoSetDelete: () -> Unit,
     onLogNextSet: (UpNextSet) -> Unit,
     onUndoOneTapLog: () -> Unit,
@@ -389,14 +405,6 @@ private fun SessionScreen(
             onSelectExercise = onSelectExercise,
             warmUp = warmUp,
             modifier = Modifier.padding(padding),
-        )
-
-        SessionDialogs(
-            state = state,
-            onResolveStale = onResolveStale,
-            guided = guided,
-            setEntry = setEntry,
-            setEdit = setEdit,
         )
     }
 }

@@ -26,11 +26,14 @@ internal data class SyncSessionDto(
     val metricsSource: String? = null,
     val routineName: String? = null,
     val routineId: String? = null,
+    val workflowJson: String? = null,
     val updatedAt: Long,
 )
 
 @Serializable
 internal data class SyncSessionExerciseDto(
+    val outcome: String? = null,
+    val routineItemId: String? = null,
     val id: String,
     val sessionId: String,
     val exerciseId: String,

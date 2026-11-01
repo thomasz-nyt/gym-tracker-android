@@ -1,5 +1,6 @@
 package com.gymtracker.core.data.backup
 
+import com.gymtracker.core.data.session.WorkflowDto
 import kotlinx.serialization.Serializable
 
 /**
@@ -56,10 +57,13 @@ internal data class SessionDto(
     val metricsSource: String? = null,
     val routineId: String? = null,
     val routineName: String? = null,
+    val workflow: WorkflowDto? = null,
 )
 
 @Serializable
 internal data class SessionExerciseDto(
+    val outcome: String? = null,
+    val routineItemId: String? = null,
     val id: String,
     val sessionId: String,
     val exerciseId: String,

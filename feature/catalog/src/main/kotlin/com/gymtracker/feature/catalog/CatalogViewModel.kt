@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -68,7 +67,7 @@ class CatalogViewModel
          */
         private val addedThisVisit = MutableStateFlow(emptyList<ExerciseId>())
 
-        private val member = flow { emit(currentMember.id()) }
+        private val member = currentMember.observe()
 
         @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
         private val results: Flow<List<Exercise>> =

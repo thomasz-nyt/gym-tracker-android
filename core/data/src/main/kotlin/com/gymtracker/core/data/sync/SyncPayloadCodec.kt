@@ -43,11 +43,14 @@ private fun SessionEntity.toSyncDto() =
         metricsSource = metricsSource,
         routineName = routineName,
         routineId = routineId,
+        workflowJson = workflowJson,
         updatedAt = updatedAt,
     )
 
 private fun SessionExerciseEntity.toSyncDto() =
     SyncSessionExerciseDto(
+        outcome = outcome,
+        routineItemId = routineItemId,
         id = id,
         sessionId = sessionId,
         exerciseId = exerciseId,

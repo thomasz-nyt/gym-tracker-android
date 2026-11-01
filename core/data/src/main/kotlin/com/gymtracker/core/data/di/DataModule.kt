@@ -5,6 +5,7 @@ import com.gymtracker.core.data.backup.AndroidAppVersion
 import com.gymtracker.core.data.backup.AndroidBackupFileReader
 import com.gymtracker.core.data.backup.AndroidBackupFileWriter
 import com.gymtracker.core.data.backup.BackupCodec
+import com.gymtracker.core.data.backup.FileBackupSafetyStore
 import com.gymtracker.core.data.backup.RoomBackupStore
 import com.gymtracker.core.data.database.GymTrackerDatabase
 import com.gymtracker.core.data.exercise.AndroidCatalogAssetReader
@@ -25,6 +26,7 @@ import com.gymtracker.core.data.rest.DataStoreRestCueTonePreference
 import com.gymtracker.core.data.rest.DataStoreRestTimerStore
 import com.gymtracker.core.data.routine.RoomRoutineItemRepository
 import com.gymtracker.core.data.routine.RoomRoutineRepository
+import com.gymtracker.core.data.routine.RoomRoutineTemplateStore
 import com.gymtracker.core.data.routine.RoutineDao
 import com.gymtracker.core.data.routine.RoutineItemDao
 import com.gymtracker.core.data.session.RoomSessionRepository
@@ -40,6 +42,7 @@ import com.gymtracker.core.domain.backup.BackupDecoder
 import com.gymtracker.core.domain.backup.BackupEncoder
 import com.gymtracker.core.domain.backup.BackupFileReader
 import com.gymtracker.core.domain.backup.BackupFileWriter
+import com.gymtracker.core.domain.backup.BackupSafetyStore
 import com.gymtracker.core.domain.backup.BackupStore
 import com.gymtracker.core.domain.backup.ExportBackup
 import com.gymtracker.core.domain.backup.ExportBackupToFile
@@ -85,6 +88,8 @@ import com.gymtracker.core.domain.routine.RemoveExerciseFromRoutine
 import com.gymtracker.core.domain.routine.RenameRoutine
 import com.gymtracker.core.domain.routine.RoutineItemRepository
 import com.gymtracker.core.domain.routine.RoutineRepository
+import com.gymtracker.core.domain.routine.RoutineReuse
+import com.gymtracker.core.domain.routine.RoutineTemplateStore
 import com.gymtracker.core.domain.routine.SetRoutineItemTarget
 import com.gymtracker.core.domain.routine.StartSessionFromRoutine
 import com.gymtracker.core.domain.session.DeleteSession
@@ -145,6 +150,15 @@ object DataModule {
 
     @Provides
     fun syncQueueDao(database: GymTrackerDatabase): SyncQueueDao = database.syncQueueDao()
+
+    @Provides
+    fun routineReuse(
+        sessions: SessionRepository,
+        movements: SessionExerciseRepository,
+        routines: RoutineRepository,
+        items: RoutineItemRepository,
+        store: RoutineTemplateStore,
+    ): RoutineReuse = RoutineReuse(sessions, movements, routines, items, store) { UUID.randomUUID().toString() }
 
     @Provides
     fun createRoutine(routines: RoutineRepository): CreateRoutine =
@@ -432,7 +446,8 @@ object DataModule {
         sessions: SessionRepository,
         catalog: ExerciseCatalog,
         store: BackupStore,
-    ): ImportBackup = ImportBackup(sessions, catalog, store)
+        safety: BackupSafetyStore,
+    ): ImportBackup = ImportBackup(sessions, catalog, store, safety)
 
     @Provides
     fun previewBackupImport(
@@ -487,6 +502,9 @@ abstract class DataBindings {
     abstract fun routines(impl: RoomRoutineRepository): RoutineRepository
 
     @Binds
+    abstract fun routineTemplateStore(impl: RoomRoutineTemplateStore): RoutineTemplateStore
+
+    @Binds
     abstract fun routineItems(impl: RoomRoutineItemRepository): RoutineItemRepository
 
     @Binds
@@ -503,6 +521,9 @@ abstract class DataBindings {
 
     @Binds
     abstract fun backupStore(impl: RoomBackupStore): BackupStore
+
+    @Binds
+    abstract fun backupSafetyStore(impl: FileBackupSafetyStore): BackupSafetyStore
 
     @Binds
     abstract fun backupEncoder(impl: BackupCodec): BackupEncoder

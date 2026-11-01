@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -93,6 +94,35 @@ class ExerciseProgressViewModelTest {
     }
 
     @Test
+    fun `retained progress refreshes actual values after correction deletion and Undo`() =
+        runTest {
+            loadTwelveWeeks()
+            val original = sets.all.last()
+            val exercise = sessionExercises.find(original.sessionExerciseId)!!.exerciseId
+            val vm = viewModel().also { it.open(exercise) }
+            vm.uiState.test {
+                expectMostRecentItem()
+                sets.update(original.copy(weightKg = 25.0, reps = 20))
+                runCurrent()
+                val changed = expectMostRecentItem()
+                assertTrue(
+                    changed.log.flatMap { it.sets }.any {
+                        it.id == original.id &&
+                            it.reps == 20 &&
+                            it.weightKg == 25.0
+                    },
+                )
+                sets.delete(original.id)
+                runCurrent()
+                assertTrue(expectMostRecentItem().log.flatMap { it.sets }.none { it.id == original.id })
+                sets.add(original)
+                runCurrent()
+                assertTrue(expectMostRecentItem().log.flatMap { it.sets }.any { it == original })
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `the screen names the exercise it is charting`() =
         runTest {
             loadTwelveWeeks()
@@ -151,7 +181,7 @@ class ExerciseProgressViewModelTest {
         }
 
     @Test
-    fun `the estimate is what the chart opens on`() =
+    fun `actual top-set load is what the chart opens on`() =
         runTest {
             // US-16 lists estimated 1RM first, and it is the series that answers "am I getting
             // stronger" rather than "did I do more today".
@@ -159,7 +189,7 @@ class ExerciseProgressViewModelTest {
             val viewModel = viewModel().also { it.open(TestData.BENCH) }
 
             viewModel.uiState.test {
-                assertEquals(TrendSeries.ESTIMATED_ONE_REP_MAX, expectMostRecentItem().series)
+                assertEquals(TrendSeries.TOP_SET, expectMostRecentItem().series)
                 cancelAndIgnoreRemainingEvents()
             }
         }

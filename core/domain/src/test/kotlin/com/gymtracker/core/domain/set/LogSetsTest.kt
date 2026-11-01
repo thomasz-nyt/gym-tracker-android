@@ -82,6 +82,12 @@ class LogSetsTest {
         override suspend fun nextSetIndex(sessionExerciseId: SessionExerciseId): Int =
             stored.count { it.sessionExerciseId == sessionExerciseId } + 1
 
+        override suspend fun append(set: ExerciseSet): ExerciseSet {
+            val indexed = set.copy(setIndex = nextSetIndex(set.sessionExerciseId))
+            add(indexed)
+            return indexed
+        }
+
         override suspend fun add(set: ExerciseSet) {
             stored += set
         }

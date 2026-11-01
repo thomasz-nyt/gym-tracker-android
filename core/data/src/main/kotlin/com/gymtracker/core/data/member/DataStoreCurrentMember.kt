@@ -6,7 +6,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.model.UserId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.mapNotNull
 import java.util.UUID
 import javax.inject.Inject
 
@@ -34,6 +39,12 @@ class DataStoreCurrentMember
                 }
             return UserId(requireNotNull(stored[MEMBER_ID]))
         }
+
+        override fun observe(): Flow<UserId> =
+            flow {
+                id()
+                emitAll(preferences.data.mapNotNull { it[MEMBER_ID]?.let(::UserId) }.distinctUntilChanged())
+            }
 
         override suspend fun restore(id: UserId) {
             preferences.edit { it[MEMBER_ID] = id.value }

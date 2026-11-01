@@ -52,6 +52,13 @@ interface SetRepository {
     /** Persists a set. Must complete before any UI transition (US-03). */
     suspend fun add(set: ExerciseSet)
 
+    /** Allocates the next index and inserts as one atomic append in persistent stores. */
+    suspend fun append(set: ExerciseSet): ExerciseSet {
+        val indexed = set.copy(setIndex = nextSetIndex(set.sessionExerciseId))
+        add(indexed)
+        return indexed
+    }
+
     /**
      * Writes back a corrected weight, reps or RPE for a set that already exists (US-04). [set]'s
      * `id` addresses the row; every other field on it is the new value to store.

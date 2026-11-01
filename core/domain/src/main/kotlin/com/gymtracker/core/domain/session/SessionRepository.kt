@@ -49,6 +49,11 @@ interface SessionRepository {
      */
     suspend fun restoreSession(session: WorkoutSession)
 
+    /** Updates workflow/selection without replacing the row or deleting its children. */
+    suspend fun updateSession(session: WorkoutSession) {
+        error("Updating a workout is not supported by this repository")
+    }
+
     /**
      * Closes a session at [endedAt], which must be a real observed timestamp — either the
      * moment the member ended it or their last set's `performed_at` (US-01, US-06).

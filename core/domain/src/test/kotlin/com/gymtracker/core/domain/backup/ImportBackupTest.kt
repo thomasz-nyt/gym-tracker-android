@@ -39,8 +39,46 @@ class ImportBackupTest {
     private fun importBackup(
         sessions: FakeSessionRepository = FakeSessionRepository(),
         catalog: ExerciseCatalogStub = ExerciseCatalogStub(known),
-        store: FakeBackupStore = FakeBackupStore(),
-    ) = ImportBackup(sessions, catalog, store) to store
+        store: FakeBackupStore = FakeBackupStore(mapOf(member to contents)),
+    ) = ImportBackup(sessions, catalog, store, FakeBackupSafetyStore()) to store
+
+    @Test
+    fun `safety copy is validated and durable before replacement can begin`() =
+        runTest {
+            val old = contents.copy(sessions = emptyList(), sessionExercises = emptyList(), sets = emptyList())
+            val store = FakeBackupStore(mapOf(member to old))
+            var saved: BackupContents? = null
+            val safety =
+                object : BackupSafetyStore {
+                    override suspend fun write(contents: BackupContents) {
+                        saved = contents
+                    }
+
+                    override suspend fun read() = saved
+                }
+            val importer = ImportBackup(FakeSessionRepository(), ExerciseCatalogStub(known), store, safety)
+            assertIs<ImportBackupResult.Imported>(importer(member, contents))
+            assertEquals(old, saved)
+            assertEquals(contents, store.lastReplaced)
+        }
+
+    @Test
+    fun `safety write failure refuses restore with original records intact`() =
+        runTest {
+            val store = FakeBackupStore(mapOf(member to contents))
+            val safety =
+                object : BackupSafetyStore {
+                    override suspend fun write(contents: BackupContents) {
+                        error("disk full")
+                    }
+
+                    override suspend fun read(): BackupContents? = null
+                }
+            val result =
+                ImportBackup(FakeSessionRepository(), ExerciseCatalogStub(known), store, safety)(member, contents)
+            assertIs<ImportBackupResult.Refused>(result)
+            assertEquals(null, store.lastReplaced)
+        }
 
     @Test
     fun `replaces everything when the file is valid and no session is running`() =
@@ -112,6 +150,36 @@ class ImportBackupTest {
 
             val refused = assertIs<ImportBackupResult.Refused>(result)
             assertIs<ImportRefusalReason.SessionActive>(refused.reason)
+        }
+
+    @Test
+    fun `a damaged safety file reports recovery failure without changing current records`() =
+        runTest {
+            val store = FakeBackupStore(mapOf(member to contents))
+            val safety =
+                object : BackupSafetyStore {
+                    override suspend fun write(contents: BackupContents) = error("must not replace recovery copy")
+
+                    override suspend fun read(): BackupContents? = throw java.io.IOException("unreadable safety file")
+                }
+            val importer = ImportBackup(FakeSessionRepository(), ExerciseCatalogStub(known), store, safety)
+            val result = assertIs<ImportBackupResult.Refused>(importer.recover(member))
+            assertIs<ImportRefusalReason.Invalid>(result.reason)
+            assertEquals(null, store.lastReplaced)
+        }
+
+    @Test
+    fun `recovery refuses a different copy than the preview and preserves the confirmed copy on success`() =
+        runTest {
+            val store = FakeBackupStore(mapOf(member to contents.copy(unit = WeightUnit.LB)))
+            val safety = FakeBackupSafetyStore()
+            safety.write(contents)
+            val importer = ImportBackup(FakeSessionRepository(), ExerciseCatalogStub(known), store, safety)
+            assertIs<ImportBackupResult.Refused>(importer.recover(member, contents.copy(unit = WeightUnit.LB)))
+            assertEquals(null, store.lastReplaced)
+            assertIs<ImportBackupResult.Imported>(importer.recover(member, contents))
+            assertEquals(contents, store.lastReplaced)
+            assertEquals(contents, safety.read())
         }
 
     private class ExerciseCatalogStub(

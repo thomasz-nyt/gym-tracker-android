@@ -4,7 +4,9 @@ import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.model.WorkoutSession
+import com.gymtracker.core.domain.model.WorkoutWorkflow
 import com.gymtracker.core.domain.rest.RestTimerStore
+import kotlinx.coroutines.flow.first
 import java.time.Clock
 
 /** Whether "Start workout" created a session or returned the one already running. */
@@ -46,9 +48,13 @@ class StartSession(
     suspend operator fun invoke(
         userId: UserId,
         routine: RoutineOrigin? = null,
+        workflow: WorkoutWorkflow = WorkoutWorkflow(),
     ): StartSessionResult {
         sessions.findActiveSession(userId)?.let { return StartSessionResult.Resumed(it) }
 
+        sessions.observeFinishedSessions(userId).first().firstOrNull()?.let { previous ->
+            sessions.updateSession(previous.copy(workflow = previous.workflow.copy(reopenEligible = false)))
+        }
         val session =
             WorkoutSession(
                 id = newId(),
@@ -58,6 +64,7 @@ class StartSession(
                 endedAt = null,
                 metrics = null,
                 routine = routine,
+                workflow = workflow,
             )
         sessions.startSession(session)
         // The rest timer (ADR-0010) is stored keyed by nothing but "the member's current rest" —

@@ -84,8 +84,7 @@ class KeepScreenOnTest {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) { screenIsHeldOn() }
         assertTrue(screenIsHeldOn(), "a running workout holds the screen on")
 
-        compose.onNodeWithText(FINISH).performClick()
-        compose.onNodeWithText(CONFIRM_FINISH).performClick()
+        compose.finishFocusWorkout(empty = true)
 
         // Released the moment the session ends — before the finish summary is dismissed, since
         // the summary is not a workout running.
@@ -113,7 +112,7 @@ class KeepScreenOnTest {
 
     private fun awaitSession() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
-            compose.onAllNodesWithText(FINISH).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Choose your first exercise").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

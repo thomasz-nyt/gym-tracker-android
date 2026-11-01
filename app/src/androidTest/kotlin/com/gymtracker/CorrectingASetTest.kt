@@ -187,7 +187,7 @@ class CorrectingASetTest {
             )
 
             // US-04: undo, available for five seconds.
-            compose.onNodeWithText("Undo").performClick()
+            compose.onNodeWithText("Undo delete set").performClick()
             awaitSetCount(2)
 
             val restored = sets.observeForSessionExercise(TODAY).first().first { it.id == FIRST_SET }
@@ -199,6 +199,7 @@ class CorrectingASetTest {
     }
 
     private fun awaitSetsOnScreen() {
+        compose.openFocusRecords()
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithContentDescription("Edit set 1").fetchSemanticsNodes().isNotEmpty()
         }

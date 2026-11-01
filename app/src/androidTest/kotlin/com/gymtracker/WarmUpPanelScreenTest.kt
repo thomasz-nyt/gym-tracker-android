@@ -1,15 +1,27 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
+import com.gymtracker.app.GymTrackerNavHost
 import com.gymtracker.app.MainActivity
 import com.gymtracker.core.data.exercise.CatalogSeeder
+import com.gymtracker.core.designsystem.theme.GymTrackerTheme
 import com.gymtracker.core.domain.member.CurrentMember
 import com.gymtracker.core.domain.model.SessionId
 import com.gymtracker.core.domain.model.WorkoutSession
@@ -96,21 +108,24 @@ class WarmUpPanelScreenTest {
             awaitStartWarmUpButton()
             // FINISH is on every ordinary session state (SessionHeader) — present now, proving
             // this really is the session screen before the warm-up starts.
-            compose.onNodeWithText("FINISH").assertIsDisplayed()
+            compose.onNodeWithContentDescription("More exercise actions").assertIsDisplayed()
 
             compose.onNodeWithText("Start warm-up").performClick()
             awaitWarmUpRunning()
 
             // ADR-0045's own claim: no state where the running step and session content are both
             // visible. FINISH is the direct instrumented check for that, not just an assumption.
-            assertTrue(compose.onAllNodesWithText("FINISH").fetchSemanticsNodes().isEmpty())
+            assertTrue(
+                compose.onAllNodesWithContentDescription("More exercise actions").fetchSemanticsNodes().isEmpty(),
+            )
+            captureNativeReview("warm-up.png")
 
             val done = compose.onNodeWithText("DONE — START LIFTING", substring = true)
             done.assertIsDisplayed()
             done.performClick()
 
             awaitWarmUpStopped()
-            compose.onNodeWithText("FINISH").assertIsDisplayed()
+            compose.onNodeWithText("Start warm-up").assertIsDisplayed()
         }
     }
 
@@ -128,7 +143,29 @@ class WarmUpPanelScreenTest {
         }
     }
 
+    @Test
+    fun warmUpActionsStayReachableWithLargeTextOnAShortScreen() {
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                    GymTrackerTheme {
+                        Box(Modifier.size(320.dp, 600.dp)) { GymTrackerNavHost() }
+                    }
+                }
+            }
+        }
+        awaitStartWarmUpButton()
+        compose.onNodeWithText("Start warm-up").performClick()
+        awaitWarmUpRunning()
+        captureNativeReview("warm-up-large-text.png")
+        compose.onNodeWithText("SKIP").assertIsDisplayed()
+        compose.onNodeWithText("DONE — START LIFTING").assertIsDisplayed().performClick()
+        awaitWarmUpStopped()
+    }
+
     private fun awaitStartWarmUpButton() {
+        compose.openFocusMore()
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText("Start warm-up").fetchSemanticsNodes().isNotEmpty()
         }
@@ -145,6 +182,7 @@ class WarmUpPanelScreenTest {
     }
 
     private fun awaitWarmUpStopped() {
+        compose.openFocusMore()
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
             compose.onAllNodesWithText("Start warm-up").fetchSemanticsNodes().isNotEmpty()
         }

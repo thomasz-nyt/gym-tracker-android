@@ -40,6 +40,7 @@ data class SessionEntity(
     @ColumnInfo(name = "sync_state") val syncState: String,
     @ColumnInfo(name = "routine_name") val routineName: String? = null,
     @ColumnInfo(name = "routine_id") val routineId: String? = null,
+    @ColumnInfo(name = "workflow_json") val workflowJson: String? = null,
 )
 
 /** Not yet synced. The only value M1 ever writes; see `data-model.md` § Sync. */
@@ -54,6 +55,7 @@ internal fun SessionEntity.toDomain(): WorkoutSession =
         endedAt = endedAt?.let(Instant::ofEpochMilli),
         metrics = metrics(),
         routine = routineOrigin(),
+        workflow = WorkflowCodec.decode(workflowJson),
     )
 
 /**
@@ -95,4 +97,5 @@ internal fun WorkoutSession.toEntity(updatedAt: Instant = Instant.now()): Sessio
         syncState = SYNC_STATE_PENDING,
         routineName = routine?.name,
         routineId = routine?.id,
+        workflowJson = WorkflowCodec.encode(workflow),
     )

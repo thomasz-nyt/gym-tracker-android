@@ -27,9 +27,10 @@ internal fun SessionDialogs(
     guided: GuidedActions,
     setEntry: SetEntryCallbacks,
     setEdit: SetEditCallbacks,
+    onContinueStale: () -> Unit = {},
 ) {
     state.stalePrompt?.let { prompt ->
-        AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale)
+        AbandonedSessionDialog(prompt = prompt, onResolve = onResolveStale, onContinue = onContinueStale)
     }
 
     state.guided.setup?.let { setup ->
@@ -133,11 +134,13 @@ internal fun RestAlertsRationaleDialog(
 private fun AbandonedSessionDialog(
     prompt: StaleSessionPrompt,
     onResolve: (StaleSessionPrompt) -> Unit,
+    onContinue: () -> Unit,
 ) {
     // Not dismissible: US-01 offers finish or discard, and nothing else. Leaving the session
     // open is not one of the choices, so there is no way to tap it away.
     AlertDialog(
         onDismissRequest = {},
+        dismissButton = { TextButton(onClick = onContinue) { Text("Continue workout") } },
         title = { Text("You left a workout running") },
         text = { Text(prompt.explanation()) },
         confirmButton = {
@@ -152,11 +155,13 @@ private fun StaleSessionPrompt.explanation(): String =
     when (this) {
         is StaleSessionPrompt.Finish ->
             "It has been idle for more than ${StaleSessionPromptCopy.THRESHOLD_HOURS} hours. " +
-                "We will end it at your last set, ${endedAt.asLocalTime()} — never at a time you were not lifting."
+                "Finish saves the last set time, ${endedAt.asLocalTime()}. " +
+                "Continue keeps the full time since Start, including this gap."
 
         is StaleSessionPrompt.Discard ->
             "It has been idle for more than ${StaleSessionPromptCopy.THRESHOLD_HOURS} hours and has no sets, " +
-                "so there is nothing to keep and no honest end time to record."
+                "so there is nothing to keep and no honest end time to record. Continue keeps the full " +
+                "time since Start, including this gap."
     }
 
 private object StaleSessionPromptCopy {

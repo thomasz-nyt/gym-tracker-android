@@ -3,6 +3,7 @@ package com.gymtracker.core.data.sessionexercise
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /** Queries over `session_exercises`. */
@@ -20,6 +21,9 @@ interface SessionExerciseDao {
 
     @Query("SELECT COALESCE(MAX(position), 0) FROM session_exercises WHERE session_id = :sessionId")
     suspend fun maxPosition(sessionId: String): Int
+
+    @Update
+    suspend fun update(sessionExercise: SessionExerciseEntity)
 
     @Insert
     suspend fun insert(sessionExercise: SessionExerciseEntity)

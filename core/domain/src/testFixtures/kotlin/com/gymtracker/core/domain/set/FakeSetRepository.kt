@@ -70,7 +70,7 @@ class FakeSetRepository : SetRepository {
         forSession(sessionId).maxOfOrNull { it.performedAt }
 
     override suspend fun nextSetIndex(sessionExerciseId: SessionExerciseId): Int =
-        state.value.count { it.sessionExerciseId == sessionExerciseId } + 1
+        (state.value.filter { it.sessionExerciseId == sessionExerciseId }.maxOfOrNull { it.setIndex } ?: 0) + 1
 
     override suspend fun add(set: ExerciseSet) {
         state.value = state.value + set

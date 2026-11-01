@@ -30,6 +30,7 @@ import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.session.StaleSessionPolicy
 import com.gymtracker.core.domain.session.StaleSessionPrompt
 import com.gymtracker.core.domain.session.StartSession
+import com.gymtracker.core.domain.session.WorkoutActions
 import com.gymtracker.core.domain.session.WorkoutDetail
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
 import com.gymtracker.core.domain.sessionexercise.RemoveExerciseFromSession
@@ -60,6 +61,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.time.Clock
 import java.time.Duration
 import javax.inject.Inject
@@ -138,6 +140,7 @@ data class SessionUiState(
      * almost always: US-18's own rule is that most sets are not records.
      */
     val justSetRecord: PersonalRecord? = null,
+    val actionError: String? = null,
 )
 
 /**
@@ -248,6 +251,7 @@ private data class SideTrips(
     val canUndoRemoval: Boolean,
     val guided: GuidedState,
     val canUndoOneTapLog: Boolean,
+    val error: String?,
 )
 
 /** US-01 and US-02: run a session, and add exercises to it from the catalog. */
@@ -303,10 +307,13 @@ class ActiveSessionViewModel
          */
         private val previousPerformanceOf = PreviousPerformanceOf(sets)
 
+        private val submission = Mutex()
+
         /** Set entry lives in its own state holder; see [SetEntryController]. */
         val setEntry =
             SetEntryController(
                 logSets = logSets,
+                submission = submission,
                 onSetLogged = { sessionExerciseId, logged ->
                     // ADR-0050: the movement's own rest when its target names one, else the default.
                     rest.startAfterSet(sessionExercises.find(sessionExerciseId)?.target?.rest)
@@ -352,6 +359,7 @@ class ActiveSessionViewModel
                 restTimer = restTimer,
                 scope = viewModelScope,
                 onUndone = { justSetRecord.value = null },
+                submission = submission,
             )
 
         /** Ending the session lives in its own state holder; see [FinishController]. */
@@ -381,7 +389,7 @@ class ActiveSessionViewModel
          */
         private val justSetRecord = MutableStateFlow<PersonalRecord?>(null)
 
-        private val member: Flow<UserId> = flow { emit(currentMember.id()) }
+        private val member: Flow<UserId> = currentMember.observe()
 
         @OptIn(ExperimentalCoroutinesApi::class)
         private val activeSession: Flow<WorkoutSession?> =
@@ -497,7 +505,12 @@ class ActiveSessionViewModel
                 // and it stays open until a different explicit tap changes it. A stale selection
                 // (its exercise was removed) falls through to the derived default automatically.
                 val currentRow =
-                    selected?.let { id -> rows.firstOrNull { it.sessionExercise.id == id } }
+                    (session?.workflow?.selected ?: selected)?.let { id ->
+                        rows.firstOrNull {
+                            it.sessionExercise.id ==
+                                id
+                        }
+                    }
                         ?: rows.lastOrNull { it.sets.isNotEmpty() }
                         ?: rows.firstOrNull()
                 val history =
@@ -529,7 +542,7 @@ class ActiveSessionViewModel
                         UpNextSet(
                             sessionExerciseId = currentRow.sessionExercise.id,
                             exerciseId = currentRow.sessionExercise.exerciseId,
-                            setNumber = currentRow.sets.size + 1,
+                            setNumber = (currentRow.sets.maxOfOrNull { it.setIndex } ?: 0) + 1,
                             prefill = prefill,
                             comparison =
                                 sets.lastSetOfBefore(
@@ -599,8 +612,13 @@ class ActiveSessionViewModel
                 ) { unit, entry, edit, canUndoSetDelete ->
                     ScreenExtras(unit, entry, edit, canUndoSetDelete)
                 },
-                combine(removal.canUndo, guided.state, oneTap.canUndo) { canUndoRemoval, guidedState, canUndoOneTap ->
-                    SideTrips(canUndoRemoval, guidedState, canUndoOneTap)
+                combine(
+                    removal.canUndo,
+                    guided.state,
+                    oneTap.canUndo,
+                    oneTap.error,
+                ) { canUndoRemoval, guidedState, canUndoOneTap, error ->
+                    SideTrips(canUndoRemoval, guidedState, canUndoOneTap, error)
                 },
                 justSetRecord,
             ) { computed, prompt, extras, sideTrips, record ->
@@ -624,6 +642,7 @@ class ActiveSessionViewModel
                     nextLoggableSet = computed.nextLoggableSet,
                     lastTime = computed.lastTime,
                     justSetRecord = record,
+                    actionError = sideTrips.error,
                 )
             }
 
@@ -636,6 +655,9 @@ class ActiveSessionViewModel
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), SessionUiState())
 
         init {
+            viewModelScope.launch {
+                activeSession.map { it?.id }.distinctUntilChanged().collect { oneTap.clear() }
+            }
             checkForAbandonedSession()
         }
 
@@ -652,7 +674,7 @@ class ActiveSessionViewModel
                 // The write and the rest that follows it are `LogUpNextSet`'s, shared with the
                 // notification's own LOG SET so the two cannot drift (US-54). What stays here
                 // is the part that is genuinely this screen's: the record banner.
-                val logged = oneTap.log(next)
+                val logged = oneTap.log(next) ?: return@launch
                 rest.markStarted()
                 justSetRecord.value = detectPersonalRecord(logged, next.exerciseId, currentMember.id())
             }
@@ -688,6 +710,15 @@ class ActiveSessionViewModel
          * — US-02 says so, and each appearance is its own row, which is also what lets one
          * visit to browse add the same movement more than once (US-02a).
          */
+        val workout =
+            WorkoutNavigationController(
+                WorkoutActions(sessions, sessionExercises, sets),
+                sessions,
+                currentMember,
+                selection,
+                viewModelScope,
+            )
+
         fun onExerciseChosen(exerciseId: ExerciseId) = onExercisesChosen(listOf(exerciseId))
 
         /**
@@ -732,11 +763,17 @@ class ActiveSessionViewModel
                 unitPreference.current(),
             )
 
+        /** Keeps the original visit start and all actual records when resuming after a gap. */
+        val onContinueStale: () -> Unit = {
+            stalePrompt.value = null
+        }
+
         /**
          * Applies the member's answer to the abandoned-session prompt. [StaleSessionPrompt]
          * already carries the only honest outcome for that session, so there is no choice of
          * end time to make here.
          */
+
         fun onResolveStale(prompt: StaleSessionPrompt) {
             viewModelScope.launch {
                 when (prompt) {

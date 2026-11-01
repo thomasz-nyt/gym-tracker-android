@@ -24,8 +24,8 @@ import javax.inject.Inject
  * The warm-up before the lifting starts (US-28, ADR-0021).
  *
  * **A ViewModel of its own, deliberately.** The warm-up is drawn on the session screen but it
- * is not part of the session: it has no row, contributes nothing to duration, and never
- * reaches history. Folding it into [SessionUiState] would put it inside the object the
+ * has no set row or separate historical activity. Start-to-Finish visit duration includes
+ * its elapsed time (ADR-0052). Folding it into [SessionUiState] would put it inside the object the
  * session is rendered from and invite exactly the coupling constitution §1 forbids. Keeping
  * it here means it *cannot* write a set — it has no repository to write one with — which is
  * the same trick ADR-0024 used when history left [ActiveSessionViewModel].

@@ -39,7 +39,7 @@ class ResolveSetPrefillTest {
     }
 
     @Test
-    fun `a target alone fills every field it carries`() {
+    fun `a target fills load and reps but ordinary entry records one actual set`() {
         // KG display rounds to one decimal (UnitConverter), so 61.2 round-trips exactly.
         val target = MovementTarget(sets = 4, reps = 10, weightKg = 61.2)
 
@@ -47,17 +47,17 @@ class ResolveSetPrefillTest {
 
         assertEquals(61.2, resolved.weight)
         assertEquals(10, resolved.reps)
-        assertEquals(4, resolved.sets)
+        assertEquals(1, resolved.sets)
         assertFalse(resolved.fromHistory)
     }
 
     @Test
-    fun `a target with no explicit set count floors sets at 3, not 1`() {
+    fun `a target without a set count still opens one actual set`() {
         val target = MovementTarget(sets = null, reps = 8, weightKg = null)
 
         val resolved = ResolveSetPrefill(history = null, target = target, unit = WeightUnit.LB)
 
-        assertEquals(3, resolved.sets)
+        assertEquals(1, resolved.sets)
     }
 
     @Test
@@ -77,13 +77,27 @@ class ResolveSetPrefillTest {
     }
 
     @Test
-    fun `sets always comes from the target, never from history, per ADR-0009`() {
+    fun `planned set count is never the ordinary entry batch count`() {
         val history = SetPrefill(weight = 100.0, reps = 8)
         val target = MovementTarget(sets = 5, reps = null, weightKg = null)
 
         val resolved = ResolveSetPrefill(history = history, target = target, unit = WeightUnit.LB)
 
-        assertEquals(5, resolved.sets)
+        assertEquals(1, resolved.sets)
+    }
+
+    @Test
+    fun `bodyweight history remains bodyweight even when the target names a load`() {
+        val resolved =
+            ResolveSetPrefill(
+                history = SetPrefill(weight = null, reps = 15),
+                target = MovementTarget(sets = 3, reps = 12, weightKg = 50.0),
+                unit = WeightUnit.KG,
+            )
+
+        assertNull(resolved.weight)
+        assertEquals(15, resolved.reps)
+        assertEquals(1, resolved.sets)
     }
 
     @Test

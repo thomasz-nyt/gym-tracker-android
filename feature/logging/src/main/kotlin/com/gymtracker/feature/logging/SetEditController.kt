@@ -7,6 +7,7 @@ import com.gymtracker.core.domain.set.RestoreSet
 import com.gymtracker.core.domain.set.UpdateSet
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.weightIncrement
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,6 +35,8 @@ data class SetEdit(
     val reps: String,
     /** Optional, 5.0–10.0 in half steps. Blank means not recorded, which is not the same as easy. */
     val rpe: String,
+    val isSaving: Boolean = false,
+    val error: String? = null,
 )
 
 /**
@@ -126,19 +129,22 @@ class SetEditController(
     /**
      * Writes the correction. The editor closes only after the write returns, so what is on
      * screen is never ahead of what is stored (constitution §2).
+     * Recover IO/SQL failures at the editing boundary, keeping the complete correction draft.
      */
+    @Suppress("TooGenericExceptionCaught")
     fun save() {
+        if (state.value?.isSaving == true) return
         val corrected = state.value?.validated() ?: return
-
+        state.value = corrected.edit.copy(isSaving = true, error = null)
         scope.launch {
-            updateSet(
-                set = corrected.edit.set,
-                weight = corrected.weight,
-                unit = unitPreference.current(),
-                reps = corrected.reps,
-                rpe = corrected.rpe,
-            )
-            state.value = null
+            try {
+                updateSet(corrected.edit.set, corrected.weight, unitPreference.current(), corrected.reps, corrected.rpe)
+                state.value = null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                state.value = corrected.edit.copy(error = "Could not save changes. ${error.message.orEmpty()}")
+            }
         }
     }
 
@@ -165,14 +171,15 @@ class SetEditController(
         val unusable =
             parsedReps == null ||
                 parsedReps < 1 ||
-                (typedWeight.isNotEmpty() && parsedWeight == null) ||
-                (typedRpe.isNotEmpty() && parsedRpe == null)
+                !weight.isValidLoad() ||
+                !rpe.isValidEffort()
 
         return if (unusable) null else CorrectedSet(this, parsedWeight, parsedReps, parsedRpe)
     }
 
     /** Deletes the set the editor is open on, closes it, and starts the undo window. */
     fun delete() {
+        if (state.value?.isSaving == true) return
         val current = state.value ?: return
         scope.launch {
             val deleted = deleteSet(current.set.id) ?: return@launch
@@ -209,9 +216,9 @@ class SetEditController(
 internal fun SetEdit.canSave(): Boolean {
     val parsedReps = reps.trim().toIntOrNull()
     val typedWeight = weight.trim()
-    val weightUnusable = typedWeight.isNotEmpty() && typedWeight.toDoubleOrNull() == null
+    val weightUnusable = !weight.isValidLoad()
     val typedRpe = rpe.trim()
-    val rpeUnusable = typedRpe.isNotEmpty() && typedRpe.toDoubleOrNull() == null
+    val rpeUnusable = !rpe.isValidEffort()
 
-    return parsedReps != null && parsedReps >= 1 && !weightUnusable && !rpeUnusable
+    return !isSaving && parsedReps != null && parsedReps >= 1 && !weightUnusable && !rpeUnusable
 }

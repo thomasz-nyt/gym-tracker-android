@@ -5,7 +5,9 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 /**
  * Which of the member's finished sessions contain at least one personal record (US-38), for the
@@ -25,6 +27,10 @@ class SessionsWithRecords(
     private val sessionExercises: SessionExerciseRepository,
     private val sets: SetRepository,
 ) {
+    /** Recomputes from actual records after correction, deletion, Undo or restore (US-64). */
+    fun observe(member: UserId): Flow<Set<SessionId>> =
+        trainingChanges(member, sessions, sessionExercises, sets).map { invoke(member) }
+
     suspend operator fun invoke(member: UserId): Set<SessionId> {
         val sessionIds = sessions.observeFinishedSessions(member).first().map { it.id }
         if (sessionIds.isEmpty()) return emptySet()

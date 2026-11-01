@@ -1,11 +1,14 @@
 package com.gymtracker.core.data.backup
 
+import com.gymtracker.core.data.session.WorkflowCodec
 import com.gymtracker.core.domain.backup.BackupContents
 import com.gymtracker.core.domain.backup.BackupDecoder
 import com.gymtracker.core.domain.backup.BackupEncoder
+import com.gymtracker.core.domain.backup.BackupMetadata
 import com.gymtracker.core.domain.backup.UnsupportedBackupFormatException
 import com.gymtracker.core.domain.model.ExerciseId
 import com.gymtracker.core.domain.model.ExerciseSet
+import com.gymtracker.core.domain.model.MovementOutcome
 import com.gymtracker.core.domain.model.MovementTarget
 import com.gymtracker.core.domain.model.Routine
 import com.gymtracker.core.domain.model.RoutineId
@@ -61,6 +64,11 @@ class BackupCodec
                 ),
             )
 
+        override fun metadata(raw: String): BackupMetadata {
+            val envelope = json.decodeFromString(BackupEnvelopeDto.serializer(), raw)
+            return BackupMetadata(Instant.ofEpochMilli(envelope.exportedAt), envelope.appVersion)
+        }
+
         override fun decode(raw: String): BackupContents {
             val envelope = json.decodeFromString(BackupEnvelopeDto.serializer(), raw)
             if (envelope.formatVersion > CURRENT_FORMAT_VERSION) {
@@ -107,6 +115,7 @@ class BackupCodec
                 metricsSource = metrics?.source,
                 routineId = routine?.id,
                 routineName = routine?.name,
+                workflow = WorkflowCodec.toDto(workflow),
             )
 
         /**
@@ -122,6 +131,7 @@ class BackupCodec
                 endedAt = endedAt?.let(Instant::ofEpochMilli),
                 metrics = metricsOrNull(),
                 routine = if (routineId != null && routineName != null) RoutineOrigin(routineId, routineName) else null,
+                workflow = WorkflowCodec.fromDto(workflow),
             )
 
         private fun SessionDto.metricsOrNull(): SessionMetrics? {
@@ -136,6 +146,8 @@ class BackupCodec
 
         private fun SessionExercise.toDto() =
             SessionExerciseDto(
+                outcome = outcome?.name,
+                routineItemId = routineItemId,
                 id = id.value,
                 sessionId = sessionId.value,
                 exerciseId = exerciseId.value,
@@ -153,6 +165,8 @@ class BackupCodec
                 exerciseId = ExerciseId(exerciseId),
                 position = position,
                 target = targetOrNull(targetSets, targetReps, targetWeightKg, targetRestSeconds),
+                outcome = outcome?.let(MovementOutcome::valueOf),
+                routineItemId = routineItemId,
             )
 
         private fun ExerciseSet.toDto() =

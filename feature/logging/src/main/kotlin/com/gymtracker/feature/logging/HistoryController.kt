@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -101,7 +100,7 @@ class HistoryController(
             if (!isOpen) {
                 flowOf(emptyList())
             } else {
-                flow { emit(currentMember.id()) }.flatMapLatest { member -> history(member) }
+                currentMember.observe().flatMapLatest { member -> history(member) }
             }
         }
 
@@ -116,7 +115,7 @@ class HistoryController(
             if (!isOpen) {
                 flowOf<TopLift>(TopLift.None)
             } else {
-                flow { emit(topLiftLoader(currentMember.id())) }
+                currentMember.observe().flatMapLatest { topLiftLoader.observe(it) }
             }
         }
 
@@ -127,7 +126,7 @@ class HistoryController(
             if (id == null) {
                 flowOf(null)
             } else {
-                flow { emit(currentMember.id()) }.flatMapLatest { member -> workoutDetail(id, member) }
+                currentMember.observe().flatMapLatest { member -> workoutDetail(id, member) }
             }
         }
 

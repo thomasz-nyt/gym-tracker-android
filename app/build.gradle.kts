@@ -32,6 +32,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Isolated device QA; never replaces the household installation.
+            if (findProperty("gymtracker.review") == "true") applicationIdSuffix = ".review"
+        }
+
         release {
             isMinifyEnabled = false
         }

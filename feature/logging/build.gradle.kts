@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.kotlinx.coroutines.core)
 
+    testImplementation(testFixtures(project(":core:domain")))
     testImplementation(libs.junit4)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

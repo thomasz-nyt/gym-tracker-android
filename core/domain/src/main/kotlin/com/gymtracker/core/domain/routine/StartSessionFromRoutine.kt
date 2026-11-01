@@ -3,6 +3,7 @@ package com.gymtracker.core.domain.routine
 import com.gymtracker.core.domain.model.RoutineId
 import com.gymtracker.core.domain.model.RoutineOrigin
 import com.gymtracker.core.domain.model.UserId
+import com.gymtracker.core.domain.model.WorkoutWorkflow
 import com.gymtracker.core.domain.session.StartSession
 import com.gymtracker.core.domain.session.StartSessionResult
 import com.gymtracker.core.domain.sessionexercise.AddExerciseToSession
@@ -52,12 +53,17 @@ class StartSessionFromRoutine(
         val routine = routines.find(routineId) ?: return null
         val movements = items.itemsOf(routineId)
 
-        val result = startSession(userId, RoutineOrigin(id = routine.id.value, name = routine.name))
+        val result =
+            startSession(
+                userId,
+                RoutineOrigin(id = routine.id.value, name = routine.name),
+                WorkoutWorkflow(originalRoutineItems = movements),
+            )
         if (result is StartSessionResult.Started) {
             // In sequence, never concurrently: AddExerciseToSession takes its position from
             // MAX(position) + 1, so parallel appends would read the same maximum and collide.
             movements.forEach {
-                addExerciseToSession(result.session.id, it.exerciseId, it.target)
+                addExerciseToSession(result.session.id, it.exerciseId, it.target, it.id.value)
             }
         }
         return result

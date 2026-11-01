@@ -43,6 +43,10 @@ class FakeSessionRepository(
         state.value = state.value + session
     }
 
+    override suspend fun updateSession(session: WorkoutSession) {
+        state.value = state.value.map { if (it.id == session.id) session else it }
+    }
+
     override suspend fun restoreSession(session: WorkoutSession) {
         state.value = state.value + session
     }

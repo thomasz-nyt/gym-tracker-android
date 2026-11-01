@@ -7,7 +7,9 @@ import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
@@ -59,6 +61,14 @@ class WeeklyVolumeByBodyPart(
     private val catalog: ExerciseCatalog,
     private val zone: ZoneId,
 ) {
+    /** Recomputes from actual records after correction, deletion, Undo or restore (US-64). */
+    fun observe(
+        member: UserId,
+        from: LocalDate,
+        to: LocalDate,
+    ): Flow<List<VolumeWeek>> =
+        trainingChanges(member, sessions, sessionExercises, sets).map { invoke(member, from, to) }
+
     /**
      * @param from the first day of interest; the week it falls in is the first week returned.
      * @param to the last day of interest, inclusive.

@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -72,7 +71,7 @@ class RoutinesViewModel
         private val createRoutine: CreateRoutine,
         private val startSessionFromRoutine: StartSessionFromRoutine,
     ) : ViewModel() {
-        private val member: Flow<com.gymtracker.core.domain.model.UserId> = flow { emit(currentMember.id()) }
+        private val member: Flow<com.gymtracker.core.domain.model.UserId> = currentMember.observe()
 
         private val started = MutableStateFlow<RoutineStart?>(null)
 

@@ -1,11 +1,11 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -97,42 +97,21 @@ class RestingWithNoUpNextTest {
     }
 
     @Test
-    fun skipRestStaysReachableAfterTheOnlySetIsDeletedMidRest() {
+    fun skipRestStaysReachableAfterTheOnlySetIsDeletedMidRest() =
         runBlocking {
-            // Log the session's first set through the real two-tap sheet (no history to prefill
-            // from, so the default 12x1 goes straight through) — this is what starts the rest.
             awaitReadyToLogASet()
-            compose.onNodeWithText("Add set", useUnmergedTree = true).performScrollTo().performClick()
+            compose.onNodeWithText("Add set", useUnmergedTree = true).assertIsDisplayed().performClick()
             awaitSheetOpen()
             compose.onNodeWithText("Save set").performClick()
             awaitSheetClosed()
-
-            // The set that was just written is the only one in the session — confirm the rest
-            // actually started with something to show before breaking it.
-            awaitTextOnScreen("UP NEXT")
+            compose.waitUntil(10_000) { runBlocking { restTimerStore.restEndsAt.first() != null } }
             val justLogged = sets.observeForSessionExercise(TODAY).first().single()
-
-            // Delete it out from under the running rest. `restTimerStore` is untouched: the rest
-            // keeps counting down exactly as it would if a synced device had deleted the row.
             sets.delete(justLogged.id)
-
-            awaitTextGone("UP NEXT")
-
-            // The bug: SKIP REST used to disappear along with UP NEXT, leaving no way out of
-            // the resting screen at all short of backgrounding the app.
-            compose
-                .onNodeWithText("SKIP REST", useUnmergedTree = true)
-                .assertExists("SKIP REST must survive upNext going null — US-05's 'I can skip it' has no exception")
-                .performClick()
-
-            // Skipping must actually work, not just be present: back to a normal, unblocked
-            // screen. `RestController.skip()` clears the timer on its own coroutine, so this
-            // polls the same way `awaitTextGone`/`awaitReadyToLogASet` do rather than reading
-            // state that has not necessarily settled by the next line.
-            awaitTextGone("SKIP REST")
+            awaitTextOnScreen("Skip")
+            compose.onNodeWithText("Skip").assertIsDisplayed().performClick()
+            compose.waitUntil(10_000) { runBlocking { restTimerStore.restEndsAt.first() == null } }
             awaitReadyToLogASet()
         }
-    }
 
     private fun awaitSheetOpen() {
         compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {

@@ -235,6 +235,10 @@ internal class FakeSessionExercises(
 
     override suspend fun find(id: SessionExerciseId): SessionExercise? = state.value.firstOrNull { it.id == id }
 
+    override suspend fun update(sessionExercise: SessionExercise) {
+        state.value = state.value.map { if (it.id == sessionExercise.id) sessionExercise else it }
+    }
+
     override suspend fun add(sessionExercise: SessionExercise) {
         state.value = state.value + sessionExercise
     }
@@ -285,6 +289,10 @@ internal class FakeSessions(
 
     override suspend fun startSession(session: WorkoutSession) {
         state.value = state.value + session
+    }
+
+    override suspend fun updateSession(session: WorkoutSession) {
+        state.value = state.value.map { if (it.id == session.id) session else it }
     }
 
     override suspend fun restoreSession(session: WorkoutSession) {

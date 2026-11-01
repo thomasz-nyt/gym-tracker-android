@@ -12,10 +12,12 @@ import com.gymtracker.core.domain.set.SetRepository
 import com.gymtracker.core.domain.units.UnitConverter
 import com.gymtracker.core.domain.units.WeightUnit
 import com.gymtracker.core.domain.units.weightIncrement
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.time.Instant
 
 /** The set-entry sheet for one exercise in the session (US-03). */
@@ -38,6 +40,9 @@ data class SetEntry(
     val fromHistory: Boolean,
     /** When [fromHistory], the date that set happened — null otherwise. */
     val lastPerformedAt: Instant? = null,
+    val bulk: Boolean = false,
+    val isSaving: Boolean = false,
+    val error: String? = null,
 )
 
 /**
@@ -46,7 +51,9 @@ data class SetEntry(
  * Split out of `ActiveSessionViewModel` because that class had grown to cover the session,
  * the catalog search and set entry at once. This is the third of those, and it is the one
  * with its own form state and validation, so it is the natural piece to lift out.
+ * The shared lock serializes manual and one-tap submissions alongside the existing collaborators.
  */
+@Suppress("LongParameterList")
 class SetEntryController(
     private val logSets: LogSets,
     /**
@@ -58,6 +65,7 @@ class SetEntryController(
     private val unitPreference: UnitPreference,
     private val currentMember: CurrentMember,
     private val scope: CoroutineScope,
+    private val submission: Mutex = Mutex(),
 ) {
     private val state = MutableStateFlow<SetEntry?>(null)
 
@@ -111,6 +119,8 @@ class SetEntryController(
                     weight = weight ?: current.weight,
                     reps = reps ?: current.reps,
                     sets = sets ?: current.sets,
+                    bulk = if (sets != null) true else current.bulk,
+                    error = null,
                     rpe = rpe ?: current.rpe,
                 )
             }
@@ -151,8 +161,13 @@ class SetEntryController(
     fun stepSets(direction: Int) {
         state.value =
             state.value?.let { current ->
-                current.copy(sets = current.sets.stepWholeNumber(direction))
+                current.copy(sets = current.sets.stepWholeNumber(direction), bulk = true)
             }
+    }
+
+    /** Bulk entry is a deliberate choice, never inherited from the planned count. */
+    fun toggleBulk() {
+        state.value = state.value?.let { it.copy(bulk = !it.bulk, sets = "1", error = null) }
     }
 
     fun dismiss() {
@@ -162,28 +177,34 @@ class SetEntryController(
     /**
      * Records the set, or several identical ones (ADR-0009). The sheet closes only after the
      * write returns, so the UI never moves on from a set that is not yet on disk (US-03).
+     * IO/database errors have unrelated types; retain the draft at this UI boundary.
      */
+    @Suppress("TooGenericExceptionCaught")
     fun confirm() {
         val confirmed = state.value?.validated() ?: return
-
+        if (!submission.tryLock()) return
+        state.value = confirmed.entry.copy(isSaving = true, error = null)
         scope.launch {
-            val logged =
-                logSets(
-                    sessionExerciseId = confirmed.entry.sessionExerciseId,
-                    input =
-                        SetInput(
-                            weight = confirmed.weight,
-                            unit = unitPreference.current(),
-                            reps = confirmed.reps,
-                            rpe = confirmed.rpe,
-                        ),
-                    sets = confirmed.sets,
-                )
-            state.value = null
-
-            // Called after the write, so a failed save cannot start a rest for a set that
-            // does not exist.
-            onSetLogged(confirmed.entry.sessionExerciseId, logged)
+            var committed = false
+            try {
+                val logged =
+                    logSets(
+                        sessionExerciseId = confirmed.entry.sessionExerciseId,
+                        input = SetInput(confirmed.weight, unitPreference.current(), confirmed.reps, confirmed.rpe),
+                        sets = confirmed.sets,
+                    )
+                committed = true
+                state.value = null
+                onSetLogged(confirmed.entry.sessionExerciseId, logged)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (!committed) {
+                    state.value = confirmed.entry.copy(error = "Could not save the set. ${error.message.orEmpty()}")
+                }
+            } finally {
+                submission.unlock()
+            }
         }
     }
 
@@ -202,16 +223,16 @@ class SetEntryController(
      */
     private fun SetEntry.validated(): ConfirmedSet? {
         val parsedReps = reps.toIntOrNull()
-        val parsedSets = sets.toIntOrNull()
+        val parsedSets = if (bulk) sets.toIntOrNull() else 1
         val typed = weight.trim()
         val parsedWeight = typed.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
-        val weightUnusable = typed.isNotEmpty() && parsedWeight == null
+        val weightUnusable = !weight.isValidLoad()
 
         val typedRpe = rpe.trim()
         val parsedRpe = typedRpe.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
         // LogSet enforces the 5..10 range and half steps; here we only reject unparseable
         // text, so a typo does not become "not recorded".
-        val rpeUnusable = typedRpe.isNotEmpty() && parsedRpe == null
+        val rpeUnusable = !rpe.isValidEffort()
         val unusable = parsedReps == null || parsedReps < 1 || parsedSets == null || parsedSets < 1
 
         return if (unusable || weightUnusable || rpeUnusable) {
@@ -234,13 +255,12 @@ class SetEntryController(
  */
 internal fun SetEntry.canSave(): Boolean {
     val parsedReps = reps.toIntOrNull()
-    val parsedSets = sets.toIntOrNull()
-    val typedWeight = weight.trim()
-    val weightUnusable = typedWeight.isNotEmpty() && typedWeight.toDoubleOrNull() == null
-    val typedRpe = rpe.trim()
-    val rpeUnusable = typedRpe.isNotEmpty() && typedRpe.toDoubleOrNull() == null
+    val parsedSets = if (bulk) sets.toIntOrNull() else 1
+    val weightUnusable = !weight.isValidLoad()
+    val rpeUnusable = !rpe.isValidEffort()
 
-    return parsedReps != null &&
+    return !isSaving &&
+        parsedReps != null &&
         parsedReps >= 1 &&
         parsedSets != null &&
         parsedSets >= 1 &&

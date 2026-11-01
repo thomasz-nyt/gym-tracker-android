@@ -18,6 +18,9 @@ import com.gymtracker.core.domain.model.WorkoutSession
 import com.gymtracker.core.domain.set.LogSet
 import com.gymtracker.core.domain.set.PrefillFromLastSet
 import com.gymtracker.core.domain.units.WeightUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -81,6 +84,23 @@ class SetRepositoryTest {
         sessionExercises.add(SessionExercise(id, SessionId(sessionId), exercise, 1))
         return id
     }
+
+    @Test
+    fun `concurrent appends allocate unique indices and preserve holes`() =
+        runTest {
+            val movement = appearance("concurrent")
+            val logger =
+                LogSet(sets, Clock.fixed(now, ZoneOffset.UTC)) {
+                    java.util.UUID
+                        .randomUUID()
+                        .toString()
+                }
+            (1..8).map { async(Dispatchers.Default) { logger(movement, 50.0, WeightUnit.KG, 10, null) } }.awaitAll()
+            val actual = sets.observeForSessionExercise(movement).first()
+            assertEquals((1..8).toList(), actual.map { it.setIndex }.sorted())
+            sets.delete(actual.first { it.setIndex == 4 }.id)
+            assertEquals(9, logger(movement, 50.0, WeightUnit.KG, 10, null).setIndex)
+        }
 
     @Test
     fun `the earlier-session lookup skips the session being performed`() =

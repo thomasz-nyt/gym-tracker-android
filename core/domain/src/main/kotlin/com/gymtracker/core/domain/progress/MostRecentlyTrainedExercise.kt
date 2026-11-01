@@ -5,7 +5,9 @@ import com.gymtracker.core.domain.model.UserId
 import com.gymtracker.core.domain.session.SessionRepository
 import com.gymtracker.core.domain.sessionexercise.SessionExerciseRepository
 import com.gymtracker.core.domain.set.SetRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 /**
  * The lift the Progress tab's top section leads with, without asking (US-33): whatever the
@@ -24,6 +26,10 @@ class MostRecentlyTrainedExercise(
     private val sessionExercises: SessionExerciseRepository,
     private val sets: SetRepository,
 ) {
+    /** Recomputes from actual records after correction, deletion, Undo or restore (US-64). */
+    fun observe(member: UserId): Flow<ExerciseId?> =
+        trainingChanges(member, sessions, sessionExercises, sets).map { invoke(member) }
+
     suspend operator fun invoke(member: UserId): ExerciseId? {
         val mostRecent = sessions.observeFinishedSessions(member).first().firstOrNull() ?: return null
         val appearances = sessionExercises.observeForSession(mostRecent.id).first().sortedBy { it.position }

@@ -1,11 +1,11 @@
 package com.gymtracker
 
 import android.Manifest
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.gymtracker.app.MainActivity
@@ -137,15 +137,13 @@ class FinishDuringRestTest {
     fun finishingTheWorkoutEndsTheRestThatWasRunning() {
         runBlocking {
             awaitText(LOG_SET)
-            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).performScrollTo().performClick()
+            compose.onNodeWithText(LOG_SET, substring = true, useUnmergedTree = true).assertIsDisplayed().performClick()
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 runBlocking { restTimerStore.restEndsAt.first() != null }
             }
             assertNotNull(restTimerStore.restEndsAt.first(), "the one-tap log started a rest")
 
-            compose.onNodeWithText(FINISH).performClick()
-            awaitText(CONFIRM_FINISH)
-            compose.onNodeWithText(CONFIRM_FINISH).performClick()
+            compose.finishFocusWorkout()
 
             compose.waitUntil(timeoutMillis = READY_TIMEOUT_MILLIS) {
                 runBlocking { restTimerStore.restEndsAt.first() == null }

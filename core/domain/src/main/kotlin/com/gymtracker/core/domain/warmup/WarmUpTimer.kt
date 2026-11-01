@@ -11,9 +11,9 @@ import java.time.Instant
  * The warm-up before the lifting starts (US-28).
  *
  * A stopwatch that **records nothing**. It counts up, it has no target and no end, and
- * stopping it discards it — so it never reaches history, never counts toward a session's
- * duration, and never appears in a summary. Nothing is logged, so constitution §2.4 has
- * nothing to be dishonest about (ADR-0021).
+ * stopping it discards the stopwatch. It adds no set or separate activity to history. The
+ * workout's Start-to-Finish duration includes this elapsed time (ADR-0052). Nothing is
+ * inferred or written as performed work (constitution §2.4).
  *
  * There is no ticking here. A warm-up is a start time, and how long it has run is a
  * question you ask the clock — so killing the app mid-warm-up loses nothing, and reopening
